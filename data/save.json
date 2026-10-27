@@ -1,1 +1,9 @@
-{}
+{
+    "game_state": "success",
+    "current_space": "C",
+    "inventory": [
+        "fragment_2",
+        "fragment_1"
+    ],
+    "password_attempts": 3
+}

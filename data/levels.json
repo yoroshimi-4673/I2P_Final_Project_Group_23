@@ -1,1 +1,19 @@
-{}
+{
+    "A": {
+        "name": "Space A",
+        "description": "You found Fragment 1.",
+        "clue": "Right hand: 3, Left hand: 7.",
+        "item": "fragment_1"
+    },
+    "B": {
+        "name": "Space B",
+        "description": "You found Fragment 2.",
+        "clue": "It says: Binary.",
+        "item": "fragment_2"
+    },
+    "C": {
+        "name": "Space C",
+        "description": "You found a six-digit password lock.",
+        "password_required": true
+    }
+}
