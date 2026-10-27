@@ -1,0 +1,70 @@
+{
+    "fragment_1": {
+        "name": "碎片1",
+        "type": "item",
+        "description": "巴掌大的金屬碎片。上面有女兒的圖畫：一家人，其中一個火柴人右手3指、左手7指。",
+        "collectable": true
+    },
+
+    "fragment_2": {
+        "name": "碎片2",
+        "type": "item",
+        "description": "破碎的紙條。上面寫著：「…開與關的語言…」",
+        "collectable": true
+    },
+
+    "wardrobe_rift": {
+        "name": "衣櫃裂隙",
+        "type": "rift",
+        "description": "衣櫃後壁有一道空氣扭曲的裂隙。",
+        "target_space": "B"
+    },
+
+    "floor_rift_A": {
+        "name": "地板裂縫",
+        "type": "rift",
+        "description": "地板出現一道不穩定裂縫。",
+        "target_space": "C"
+    },
+
+    "mirror_door": {
+        "name": "洗手台的門",
+        "type": "inspectable",
+        "description": "黎琛的影像延遲約0.5秒。"
+    },
+
+    "calendar": {
+        "name": "牆上日曆",
+        "type": "inspectable",
+        "description": "日期幾乎全被塗黑，只剩下「7」。"
+    },
+
+    "floor_rift_B": {
+        "name": "鬆動瓷磚",
+        "type": "rift",
+        "description": "掀開瓷磚後，有冷風吹出，下面是一道裂隙。",
+        "target_space": "A"
+    },
+
+    "ceiling_rift": {
+        "name": "通風管道",
+        "type": "rift",
+        "description": "廢棄通風管持續吹出冷風，形成不穩定裂隙。",
+        "target_space": "C"
+    },
+
+    "password_panel": {
+        "name": "密碼面板",
+        "type": "puzzle",
+        "description": "一個需要輸入六位數密碼的面板。",
+        "correct_password": "100101"
+    },
+
+    "photo_1": {
+        "name": "照片",
+        "type": "item",
+        "description": "黎琛和女兒在公園鞦韆上。兩人都笑著，背景陽光明媚。",
+        "back_text": "這不是你的記憶。這是空間D的。",
+        "collectable": true
+    }
+}

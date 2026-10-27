@@ -1,19 +1,43 @@
 {
+    "307": {
+        "name": "307房",
+        "objects": []
+    },
+
     "A": {
-        "name": "Space A",
-        "description": "You found Fragment 1.",
-        "clue": "Right hand: 3, Left hand: 7.",
-        "item": "fragment_1"
+        "name": "空間A",
+        "convergence_rate": 73,
+        "warning": "錨點不穩定",
+
+        "objects": [
+            "fragment_1",
+            "wardrobe_rift",
+            "floor_rift_A",
+            "mirror_door"
+        ]
     },
+
     "B": {
-        "name": "Space B",
-        "description": "You found Fragment 2.",
-        "clue": "It says: Binary.",
-        "item": "fragment_2"
+        "name": "空間B",
+        "convergence_rate": 41,
+
+        "objects": [
+            "fragment_2",
+            "calendar",
+            "floor_rift_B",
+            "ceiling_rift"
+        ]
     },
+
     "C": {
-        "name": "Space C",
-        "description": "You found a six-digit password lock.",
-        "password_required": true
+        "name": "空間C",
+
+        "objects": [
+            "password_panel"
+        ],
+
+        "unlock_objects": [
+            "photo_1"
+        ]
     }
 }

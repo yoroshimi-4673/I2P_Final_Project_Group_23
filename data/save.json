@@ -2,8 +2,12 @@
     "game_state": "success",
     "current_space": "C",
     "inventory": [
-        "fragment_2",
-        "fragment_1"
+        "fragment_1",
+        "fragment_2"
     ],
-    "password_attempts": 3
+    "password_attempts": 1,
+    "play_time": 122.98307609558105,
+    "unlocked_objects": [
+        "photo_1"
+    ]
 }
