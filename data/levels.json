@@ -1,28 +1,21 @@
 {
-    "307": {
-        "name": "307房",
-        "objects": []
-    },
-
     "A": {
         "name": "空間A",
         "convergence_rate": 73,
         "warning": "錨點不穩定",
-
         "objects": [
-            "fragment_1",
+            "bed",
             "wardrobe_rift",
             "floor_rift_A",
-            "mirror_door"
+            "mirror"
         ]
     },
 
     "B": {
         "name": "空間B",
         "convergence_rate": 41,
-
         "objects": [
-            "fragment_2",
+            "workbench",
             "calendar",
             "floor_rift_B",
             "ceiling_rift"
@@ -31,13 +24,11 @@
 
     "C": {
         "name": "空間C",
-
         "objects": [
-            "password_panel"
-        ],
-
-        "unlock_objects": [
-            "photo_1"
+            "password_panel",
+            "rift_C_A",
+            "rift_C_B",
+            "exit_door"
         ]
     }
 }

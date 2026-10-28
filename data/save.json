@@ -1,13 +1,22 @@
+
 {
-    "game_state": "success",
+    "game_state": "space",
+    "current_scene": "chapter_1_end",
     "current_space": "C",
-    "inventory": [
-        "fragment_1",
-        "fragment_2"
-    ],
-    "password_attempts": 1,
-    "play_time": 122.98307609558105,
+    "inventory": [],
     "unlocked_objects": [
         "photo_1"
-    ]
+    ],
+    "inspected_objects": [
+        "photo_1"
+    ],
+    "solved_puzzles": [
+        "password_panel"
+    ],
+    "puzzle_attempts": {
+        "password_panel": 3
+    },
+    "chapter": 1,
+    "game_over_reason": null,
+    "play_time": 40.485886573791504
 }

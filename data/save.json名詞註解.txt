@@ -1,0 +1,23 @@
+# 以下為save.json的名詞註解。因Prototype沒有加入存檔功能，所以可以先不用管每個名詞後面的詞是什麼意思
+
+{
+    "game_state": "space",  #現在遊戲的狀態
+    "current_scene": "chapter_1_end",   #現在進行到哪一個scene
+    "current_space": "C",   #現在遊戲處在的空間
+    "inventory": [],    #道具欄(背包)
+    "unlocked_objects": [   #解鎖後的道具
+        "photo_1"
+    ],
+    "inspected_objects": [  #已檢查的物件
+        "photo_1"
+    ],
+    "solved_puzzles": [    #已解決的謎題
+        "password_panel"
+    ],
+    "puzzle_attempts": {    #謎題嘗試次數
+        "password_panel": 3
+    },
+    "chapter": 1,   #所處章節
+    "game_over_reason": null,   #遊戲結束原因
+    "play_time": 40.485886573791504    #總遊玩時間
+}

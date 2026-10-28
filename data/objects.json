@@ -1,4 +1,23 @@
 {
+    "bed": {
+        "name": "床",
+        "type": "container",
+        "space": "A",
+        "description": "病床上的被褥有些凌亂。",
+        "contents": [
+            "pillow"
+        ]
+    },
+
+    "pillow": {
+        "name": "枕頭",
+        "type": "searchable",
+        "description": "枕頭的位置似乎有些不自然。",
+        "search_prompt": "是否繼續探索枕頭底下？",
+        "item": "fragment_1",
+        "empty_text": "枕頭下現在什麼都沒有。"
+    },
+
     "fragment_1": {
         "name": "碎片1",
         "type": "item",
@@ -6,65 +25,119 @@
         "collectable": true
     },
 
-    "fragment_2": {
-        "name": "碎片2",
-        "type": "item",
-        "description": "破碎的紙條。上面寫著：「…開與關的語言…」",
-        "collectable": true
-    },
-
     "wardrobe_rift": {
         "name": "衣櫃裂隙",
         "type": "rift",
-        "description": "衣櫃後壁有一道空氣扭曲的裂隙。",
+        "space": "A",
+        "description": "衣櫃後壁出現一道空氣扭曲的裂隙。裂隙不穩定，可以跳轉。",
         "target_space": "B"
     },
 
     "floor_rift_A": {
         "name": "地板裂縫",
         "type": "rift",
-        "description": "地板出現一道不穩定裂縫。",
+        "space": "A",
+        "description": "地面出現一道不穩定裂縫，裂縫另一側似乎連接著另一個空間。",
         "target_space": "C"
     },
 
-    "mirror_door": {
-        "name": "洗手台的門",
+    "mirror": {
+        "name": "洗手台鏡子",
         "type": "inspectable",
-        "description": "黎琛的影像延遲約0.5秒。"
+        "space": "A",
+        "description": "你看向鏡子。鏡中的黎琛影像似乎比你的動作慢了大約0.5秒。"
+    },
+
+    "workbench": {
+        "name": "工作檯",
+        "type": "container",
+        "space": "B",
+        "description": "牆邊放著一座廢棄的工作檯。",
+        "contents": [
+            "workbench_drawer"
+        ]
+    },
+
+    "workbench_drawer": {
+        "name": "抽屜",
+        "type": "searchable",
+        "description": "工作檯下方有一個可以拉開的抽屜。",
+        "search_prompt": "是否繼續搜索抽屜內部？",
+        "item": "fragment_2",
+        "empty_text": "抽屜裡現在什麼都沒有。"
+    },
+
+    "fragment_2": {
+        "name": "碎片2",
+        "type": "item",
+        "description": "破碎的紙條。上面只剩一句仍能辨認的文字：「……開與關的語言……」",
+        "collectable": true
     },
 
     "calendar": {
         "name": "牆上日曆",
         "type": "inspectable",
-        "description": "日期幾乎全被塗黑，只剩下「7」。"
+        "space": "B",
+        "description": "日曆上的日期幾乎全部被塗黑，只剩下一個清楚的數字「7」。"
     },
 
     "floor_rift_B": {
         "name": "鬆動瓷磚",
         "type": "rift",
-        "description": "掀開瓷磚後，有冷風吹出，下面是一道裂隙。",
+        "space": "B",
+        "description": "你掀開鬆動的瓷磚，一股冰冷的風吹了上來。下面形成一道不穩定裂隙。",
         "target_space": "A"
     },
 
     "ceiling_rift": {
-        "name": "通風管道",
+        "name": "通風管道裂隙",
         "type": "rift",
-        "description": "廢棄通風管持續吹出冷風，形成不穩定裂隙。",
+        "space": "B",
+        "description": "廢棄的通風管持續吹出異常冰冷的風，其中形成了一道扭曲的裂隙。",
         "target_space": "C"
     },
 
     "password_panel": {
-        "name": "密碼面板",
+        "name": "六位數密碼鎖",
         "type": "puzzle",
-        "description": "一個需要輸入六位數密碼的面板。",
-        "correct_password": "100101"
+        "space": "C",
+        "description": "純白房間中央懸浮著一個六位數密碼鎖。",
+        "correct_password": "100101",
+        "max_attempts": 3,
+        "reward_item": "photo_1"
     },
 
     "photo_1": {
         "name": "照片",
         "type": "item",
-        "description": "黎琛和女兒在公園鞦韆上。兩人都笑著，背景陽光明媚。",
+        "description": "黎琛和女兒在公園鞦韆上。兩人都笑著。背景陽光明媚。",
         "back_text": "這不是你的記憶。這是空間D的。",
         "collectable": true
+    },
+
+    "rift_C_A": {
+        "name": "裂隙α",
+        "type": "rift",
+        "space": "C",
+        "description": "密碼鎖左側的空氣扭曲成一道裂隙，另一側似乎連接著空間A。",
+        "target_space": "A"
+    },
+
+    "rift_C_B": {
+        "name": "裂隙β",
+        "type": "rift",
+        "space": "C",
+        "description": "密碼鎖右側的空氣扭曲成一道裂隙，另一側似乎連接著空間B。",
+        "target_space": "B"
+    },
+
+    "exit_door": {
+        "name": "出口門",
+        "type": "door",
+        "space": "C",
+        "description": "你伸手握住門把。這一次，門沒有鎖。",
+        "locked_description": "出口門就在那裡，但現在還無法打開。",
+        "required_event": "photo_back_seen",
+        "target_scene": "chapter_1_end"
     }
 }
