@@ -1,0 +1,13 @@
+{
+    "chapters": [
+        {
+            "id": "chapter_1",
+            "title": "Chapter 1",
+            "items": [
+                "fragment_1",
+                "fragment_2",
+                "photo_1"
+            ]
+        }
+    ]
+}

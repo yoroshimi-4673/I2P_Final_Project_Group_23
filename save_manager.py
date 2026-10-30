@@ -16,11 +16,14 @@ def save_game(game):  # 將目前所有重要遊戲狀態寫入JSON存檔
         "current_space": game.current_space,
 
         "inventory": game.inventory,
+        "discovered_items": game.discovered_items,  # 保存玩家曾經取得過的圖鑑道具
         "unlocked_objects": game.unlocked_objects,
         "inspected_objects": game.inspected_objects,
         "solved_puzzles": game.solved_puzzles,
 
         "puzzle_attempts": game.puzzle_attempts,
+
+        "story_events": game.story_events,  # 保存目前已完成的重要劇情事件
 
         "chapter": game.chapter,
         "game_over_reason": game.game_over_reason,
@@ -65,6 +68,11 @@ def load_game(game):  # 從存檔讀取資料並恢復GameManager狀態
         []
     )
 
+    game.discovered_items = save_data.get(
+        "discovered_items",
+        game.inventory.copy()
+    )  # 舊存檔沒有此欄時直接由背包補建圖鑑
+
     game.unlocked_objects = save_data.get(
         "unlocked_objects",
         []
@@ -84,6 +92,11 @@ def load_game(game):  # 從存檔讀取資料並恢復GameManager狀態
         "puzzle_attempts",
         {}
     )  # 恢復各個謎題自己的剩餘嘗試次數
+
+    game.story_events = save_data.get(
+        "story_events",
+        []
+    )  # 恢復已經發生的重要劇情事件紀錄
 
     game.chapter = save_data.get(
         "chapter",

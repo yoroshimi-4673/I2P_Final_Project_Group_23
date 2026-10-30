@@ -9,7 +9,8 @@ class GameManager:
         self.current_scene = "intro"  # 記錄目前正在進行的劇情階段
         self.current_space = None  # 記錄玩家目前所在的探索空間
 
-        self.inventory = []  # 記錄玩家目前已經取得的所有道具
+        self.inventory = []  # 記錄玩家目前實際持有的所有道具
+        self.discovered_items = []  # 記錄玩家曾經取得過的所有道具
 
         self.unlocked_objects = []  # 保留給未來章節，記錄已解鎖場景物件
         self.inspected_objects = []  # 保留給未來章節，記錄已調查場景物件
@@ -35,15 +36,34 @@ class GameManager:
 
     # ======== Inventory ======== #
 
-    def add_item(self, item_id):  # 將指定道具加入背包並避免重複取得
+    def discover_item(self, item_id):  # 將曾經取得過的道具加入圖鑑紀錄
+        if item_id not in self.discovered_items:
+            self.discovered_items.append(item_id)
+            return True
+
+        return False
+
+    def add_item(self, item_id):  # 將指定道具加入背包並同步圖鑑紀錄
+        self.discover_item(item_id)  # 每次取得道具都同步更新圖鑑資料
+
         if item_id not in self.inventory:
             self.inventory.append(item_id)
             return True
 
         return False
 
+    def remove_item(self, item_id):  # 從目前背包移除但保留圖鑑紀錄
+        if item_id in self.inventory:
+            self.inventory.remove(item_id)
+            return True
+
+        return False
+
     def has_item(self, item_id):  # 檢查玩家目前是否已經擁有指定道具
         return item_id in self.inventory
+
+    def has_discovered_item(self, item_id):  # 檢查玩家是否曾經取得指定道具
+        return item_id in self.discovered_items
 
 
     # ======== Object Unlock ======== #
@@ -122,7 +142,8 @@ class GameManager:
     # ======== Chapter ======== #
 
     def complete_chapter(self, chapter_number):  # 更新玩家目前已經完成的最高章節
-        self.chapter = chapter_number
+        if chapter_number > self.chapter:
+            self.chapter = chapter_number
 
 
     # ======== Play Time ======== #
@@ -149,6 +170,7 @@ class GameManager:
         self.current_space = None
 
         self.inventory = []
+        self.discovered_items = []  # 新遊戲同步清空圖鑑解鎖紀錄
 
         self.unlocked_objects = []
         self.inspected_objects = []

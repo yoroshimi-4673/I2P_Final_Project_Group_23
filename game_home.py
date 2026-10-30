@@ -1,301 +1,2597 @@
-import pygame
+import json
 import sys
+from pathlib import Path
+
+import pygame
+
+from codex_ui import CodexUI
+
+from dialogue_ui import (
+    DialogueController,
+    ChoiceController,
+    draw_dialogue_box,
+    draw_choice_panel
+)
+
+from game_manager import GameManager
+
+from game_states import (
+    DIALOGUE,
+    CHOICE,
+    SPACE,
+    PASSWORD,
+    SUCCESS,
+    GAME_OVER
+)
+
+from game_ui import GameUI
+
+from interaction_ui import InteractionUI
+
+from interaction_manager import (
+    finish_photo_story_dialogue,
+    leave_puzzle,
+    search_object
+)
+
+
+# ============================================================
+# 初始化
+# ============================================================
 
 pygame.init()
 
-# 視窗:自由拉伸
-screen_width, screen_height = 800, 600
-screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
-pygame.display.set_caption("萬徑.歸一 - 介面與道具欄整合系統")
+BASE_DIR = Path(__file__).resolve().parent  # 取得目前專案根目錄位置
 
-# 音量和外型
-volume = 50 
-looks = [(255, 50, 50), (50, 255, 50), (50, 50, 255)] # 紅、綠、藍
-current_look_index = 0
+LEVELS_PATH = (
+    BASE_DIR
+    / "data"
+    / "levels.json"
+)
 
-# 遊戲狀態管理
-STATE_MENU = 0
-STATE_PLAYING = 1
-current_state = STATE_MENU
+OBJECTS_PATH = (
+    BASE_DIR
+    / "data"
+    / "objects.json"
+)
 
-# 設定選單開啟狀態 (開啟時會暫停背景)
-is_settings_open = False
+DIALOGUE_PATH = (
+    BASE_DIR
+    / "data"
+    / "dialogue.json"
+)
 
-# 5 格道具欄
-NUM_SLOTS = 5
-selected_slot = 0
+UI_LAYOUT_PATH = (
+    BASE_DIR
+    / "data"
+    / "ui_layout.json"
+)
 
-# 道具資料(1, 2, 3, 4, 5)
-items = [
-    {"label": "1", "color": (220, 80, 80)},
-    {"label": "2", "color": (80, 180, 80)},
-    {"label": "3", "color": (80, 120, 220)},
-    {"label": "4", "color": (220, 180, 50)},
-    {"label": "5", "color": (160, 80, 220)},
-]
-
-# 字體設定
-font_title = pygame.font.SysFont("microsoftjhenghei", 40)
-font_ui = pygame.font.SysFont("microsoftjhenghei", 20)
-font_number = pygame.font.SysFont("arial", 28, bold=True)
-
-# ================= 繪製元件函式 =================
-
-def draw_button(screen, text, x, y, width, height, is_hovered, bg_color=(50, 100, 150)):
-    """繪製通用按鈕"""
-    color = (bg_color[0]+30, bg_color[1]+30, bg_color[2]+30) if is_hovered else bg_color
-    pygame.draw.rect(screen, color, (x, y, width, height), border_radius=8)
-    pygame.draw.rect(screen, (255, 255, 255), (x, y, width, height), 2, border_radius=8)
-    
-    text_surf = font_ui.render(text, True, (255, 255, 255))
-    text_rect = text_surf.get_rect(center=(x + width//2, y + height//2))
-    screen.blit(text_surf, text_rect)
+CODEX_PATH = (
+    BASE_DIR
+    / "data"
+    / "codex.json"
+)
 
 
-def draw_hotbar(surface, selected_idx, screen_w, screen_h):
-    """繪製 5 格道具欄 (自動根據畫面大小置中擺放於底部)"""
-    slot_size = 55       # 每格大小
-    padding = 8          # 格子間距
-    border_thick = 4     # 外框厚度
-    
-    total_width = NUM_SLOTS * slot_size + (NUM_SLOTS - 1) * padding + (border_thick * 2)
-    total_height = slot_size + (border_thick * 2)
-    
-    # 根據當前視窗大小動態計算置中位置
-    start_x = (screen_w - total_width) // 2
-    start_y = screen_h - total_height - 30
+def load_json(path):
+    """讀取指定JSON資料檔案。"""
 
-    # 1. 外底座黑框
-    pygame.draw.rect(surface, (20, 20, 20), (start_x, start_y, total_width, total_height), border_radius=6)
+    with open(
+        path,
+        "r",
+        encoding="utf-8"
+    ) as file:
 
-    # 2. 繪製 5 個格子與數字標示
-    for i in range(NUM_SLOTS):
-        x = start_x + border_thick + i * (slot_size + padding)
-        y = start_y + border_thick
+        return json.load(file)
 
-        # 底色與邊框
-        pygame.draw.rect(surface, (120, 120, 120), (x, y, slot_size, slot_size))
-        pygame.draw.rect(surface, (50, 50, 50), (x, y, slot_size, slot_size), 2)
 
-        # 道具底色方塊
-        item = items[i]
-        icon_rect = pygame.Rect(x + 4, y + 4, slot_size - 8, slot_size - 8)
-        pygame.draw.rect(surface, item["color"], icon_rect, border_radius=4)
+levels = load_json(
+    LEVELS_PATH
+)
 
-        # 道具中央的數字 (1 ~ 5)
-        label_surf = font_number.render(item["label"], True, (255, 255, 255))
-        label_rect = label_surf.get_rect(center=icon_rect.center)
-        
-        # 數字文字加陰影
-        shadow_surf = font_number.render(item["label"], True, (30, 30, 30))
-        surface.blit(shadow_surf, (label_rect.x + 2, label_rect.y + 2))
-        surface.blit(label_surf, label_rect)
+objects = load_json(
+    OBJECTS_PATH
+)
 
-    # 3. 選中高亮外框
-    selected_x = start_x + border_thick + selected_idx * (slot_size + padding) - 4
-    selected_y = start_y + border_thick - 4
-    selected_size = slot_size + 8
+dialogues = load_json(
+    DIALOGUE_PATH
+)
 
-    pygame.draw.rect(surface, (0, 0, 0), (selected_x, selected_y, selected_size, selected_size), 4, border_radius=6)
-    pygame.draw.rect(surface, (255, 255, 255), (selected_x + 2, selected_y + 2, selected_size - 4, selected_size - 4), 3, border_radius=4)
+ui_layout = load_json(
+    UI_LAYOUT_PATH
+)
 
-# ================= 主程式迴圈 =================
+codex_data = load_json(
+    CODEX_PATH
+)
+
+
+# ============================================================
+# Pygame Window
+# ============================================================
+
+screen_width = (
+    ui_layout[
+        "base_resolution"
+    ]["width"]
+)
+
+screen_height = (
+    ui_layout[
+        "base_resolution"
+    ]["height"]
+)
+
+screen = pygame.display.set_mode(
+    (
+        screen_width,
+        screen_height
+    ),
+    pygame.RESIZABLE
+)
+
+pygame.display.set_caption(
+    "數到100"
+)
 
 clock = pygame.time.Clock()
+
+
+# ============================================================
+# Managers
+# ============================================================
+
+game = GameManager()
+
+game_ui = GameUI(
+    ui_layout,
+    levels,
+    objects
+)
+
+dialogue_controller = DialogueController(
+    typing_speed=35
+)
+
+choice_controller = ChoiceController()
+
+interaction_ui = InteractionUI(
+    game_ui,
+    game,
+    objects,
+    levels
+)
+
+codex_ui = CodexUI(
+    game_ui,
+    codex_data,
+    objects
+)
+
+
+# ============================================================
+# UI State
+#
+# 注意：
+# 這些不是game_states.py的核心遊戲狀態。
+# ============================================================
+
+UI_MENU = "menu"
+UI_GAME = "game"
+UI_CODEX = "codex"
+
+ui_screen = UI_MENU  # 記錄目前主要顯示的UI頁面
+
+ui_overlay = None  # 記錄Settings等覆蓋式介面
+
+previous_ui_screen = UI_MENU  # 圖鑑返回時使用的上一個畫面
+
+codex_return_to_settings = False  # 記錄圖鑑是否由設定頁進入
+
+
+# ============================================================
+# Settings
+# ============================================================
+
+volume = 50
+
+looks = [
+    (255, 90, 90),
+    (90, 220, 120),
+    (100, 140, 255)
+]
+
+current_look_index = 0
+
 dragging_volume = False
+
+
+# ============================================================
+# Hotbar
+# ============================================================
+
+selected_slot = 0
+
+selected_item = None
+
+hotbar_offset = 0
+
+
+# ============================================================
+# Dialogue Flow
+# ============================================================
+
+pending_target_space = None  # Choice結果播放後要前往的空間
+
+dialogue_after_action = None  # Dialogue結束後要執行的流程
+
+chapter_end_text = (
+    "你只解開了一把鎖。"
+    "但你還沒解開自己。"
+)
+
+
+# ============================================================
+# Game Flow
+# ============================================================
+
+def start_new_game():
+    """建立全新的第一章遊戲流程。"""
+
+    global ui_screen
+    global ui_overlay
+
+    global selected_slot
+    global selected_item
+    global hotbar_offset
+
+    global pending_target_space
+    global dialogue_after_action
+
+    game.reset_game()
+
+    interaction_ui.close()
+
+    codex_ui.close_item()
+
+    selected_slot = 0
+    selected_item = None
+    hotbar_offset = 0
+
+    dialogue_controller.start(
+        "intro",
+        dialogues.get(
+            "intro",
+            []
+        )
+    )
+
+    game.game_state = DIALOGUE
+
+    ui_screen = UI_GAME
+
+    ui_overlay = None
+
+    pending_target_space = None
+
+    dialogue_after_action = (
+        "start_first_choice"
+    )
+
+
+def start_first_choice():
+    """開始307房第一次A/B/C選擇。"""
+
+    game.current_scene = (
+        "scene_04_choice"
+    )
+
+    game.game_state = CHOICE
+
+    choice_controller.start(
+        "scene_04_choice",
+        dialogues[
+            "scene_04_choice"
+        ]
+    )
+
+
+def start_choice_result(
+    selected_option
+):
+    """播放玩家選擇之後的結果文字。"""
+
+    global pending_target_space
+    global dialogue_after_action
+
+    pending_target_space = (
+        selected_option.get(
+            "target_space"
+        )
+    )
+
+    result_text = (
+        selected_option.get(
+            "result_text",
+            ""
+        )
+    )
+
+    dialogue_controller.start(
+        "scene_04_choice_result",
+        [
+            {
+                "speaker": "",
+                "text": result_text
+            }
+        ]
+    )
+
+    game.game_state = DIALOGUE
+
+    dialogue_after_action = (
+        "enter_selected_space"
+    )
+
+
+def start_photo_story(
+    photo_result
+):
+    """照片背面事件後播放劇情Dialogue。"""
+
+    global dialogue_after_action
+
+    dialogue_lines = []
+
+    # 第一段黎琛台詞
+    dialogue_lines.append(
+        {
+            "speaker": "黎琛",
+            "text": "空間D……還有？"
+        }
+    )
+
+    # 旁白
+    dialogue_lines.append(
+        {
+            "speaker": "",
+            "text": (
+                "牆上顯示器突然亮起。"
+            )
+        }
+    )
+
+    system_message = photo_result.get(
+        "system_message",
+        {}
+    )
+
+    values = system_message.get(
+        "values",
+        {}
+    )
+
+    system_text = (
+        "【收斂率更新】\n"
+        f"空間A：{values.get('A', 81)}%\n"
+        f"空間B：{values.get('B', 55)}%\n"
+        f"空間C：{values.get('C', 37)}%"
+    )
+
+    dialogue_lines.append(
+        {
+            "speaker": "",
+            "text": system_text
+        }
+    )
+
+    dialogue_lines.append(
+        {
+            "speaker": "黎琛",
+            "text": (
+                "收斂率在漲……"
+                "這個房間在消失。"
+                "我得走。"
+            )
+        }
+    )
+
+    dialogue_controller.start(
+        "photo_back_story",
+        dialogue_lines
+    )
+
+    game.game_state = DIALOGUE
+
+    dialogue_after_action = (
+        "finish_photo_story"
+    )
+
+
+def start_chapter_end(
+    ending_result
+):
+    """出口門進入後播放第一章結尾Dialogue。"""
+
+    global dialogue_after_action
+    global chapter_end_text
+
+    ending_dialogue = (
+        ending_result.get(
+            "dialogue",
+            []
+        )
+    )
+
+    chapter_end_text = (
+        ending_result.get(
+            "ending_text",
+            chapter_end_text
+        )
+    )
+
+    dialogue_controller.start(
+        "chapter_1_end",
+        ending_dialogue
+    )
+
+    # enter_door()已經將狀態改為SUCCESS，
+    # 這裡暫時切回DIALOGUE播放結尾內容。
+    game.game_state = DIALOGUE
+
+    dialogue_after_action = (
+        "show_chapter_end"
+    )
+
+
+def finish_dialogue_action():
+    """依照Dialogue用途處理後續遊戲流程。"""
+
+    global dialogue_after_action
+    global pending_target_space
+
+    action = dialogue_after_action
+
+    dialogue_after_action = None
+
+    if action == "start_first_choice":
+
+        start_first_choice()
+
+    elif action == "enter_selected_space":
+
+        if pending_target_space is not None:
+
+            game.current_scene = (
+                "exploration"
+            )
+
+            game.enter_space(
+                pending_target_space
+            )
+
+        pending_target_space = None
+
+    elif action == "finish_photo_story":
+
+        finish_photo_story_dialogue(
+            game
+        )
+
+    elif action == "show_chapter_end":
+
+        game.game_state = SUCCESS
+
+
+# ============================================================
+# Choice Keyboard
+# ============================================================
+
+def handle_choice_key(event):
+    """處理Choice畫面的鍵盤操作。"""
+
+    selected_option = None
+
+    if event.key == pygame.K_UP:
+
+        choice_controller.move_up()
+
+    elif event.key == pygame.K_DOWN:
+
+        choice_controller.move_down()
+
+    elif event.key == pygame.K_RETURN:
+
+        selected_option = (
+            choice_controller
+            .select_current()
+        )
+
+    elif event.key == pygame.K_a:
+
+        selected_option = (
+            choice_controller
+            .select_by_id(
+                "A"
+            )
+        )
+
+    elif event.key == pygame.K_b:
+
+        selected_option = (
+            choice_controller
+            .select_by_id(
+                "B"
+            )
+        )
+
+    elif event.key == pygame.K_c:
+
+        selected_option = (
+            choice_controller
+            .select_by_id(
+                "C"
+            )
+        )
+
+    if selected_option is not None:
+
+        start_choice_result(
+            selected_option
+        )
+
+
+# ============================================================
+# Container Child
+# ============================================================
+
+def open_container_child(
+    child_id
+):
+    """
+    開啟Container子物件。
+
+    已搜尋過的Searchable不再顯示是/否，
+    而是直接顯示empty_text。
+    """
+
+    child = objects[
+        child_id
+    ]
+
+    if child[
+        "type"
+    ] == "searchable":
+
+        item_id = child.get(
+            "item"
+        )
+
+        if (
+            item_id is not None
+            and game.has_discovered_item(
+                item_id
+            )
+        ):
+
+            interaction_ui.push_current()
+
+            interaction_ui.current_object_id = (
+                child_id
+            )
+
+            interaction_ui.result = (
+                search_object(
+                    game,
+                    child_id,
+                    objects
+                )
+            )
+
+            interaction_ui.mode = (
+                "message"
+            )
+
+            return
+
+    interaction_ui.open_child(
+        child_id
+    )
+
+
+# ============================================================
+# Hotbar
+# ============================================================
+
+def get_selected_hotbar_item():
+    """取得目前Hotbar真正選中的item_id。"""
+
+    visible_items = (
+        game_ui.get_visible_inventory(
+            game,
+            hotbar_offset
+        )
+    )
+
+    if (
+        selected_slot < 0
+        or selected_slot
+        >= len(visible_items)
+    ):
+
+        return None
+
+    return visible_items[
+        selected_slot
+    ]
+
+
+def open_hotbar_item(
+    item_id
+):
+    """從Hotbar開啟物品詳細內容。"""
+
+    if item_id is None:
+        return
+
+    if item_id == "photo_1":
+
+        interaction_ui.open_photo(
+            item_id,
+            mode="inventory"
+        )
+
+        return
+
+    interaction_ui.open_object(
+        item_id
+    )
+
+
+# ============================================================
+# Codex Navigation
+# ============================================================
+
+def open_codex(
+    from_settings=False
+):
+    """進入Codex並記錄正確返回位置。"""
+
+    global ui_screen
+    global previous_ui_screen
+    global ui_overlay
+    global codex_return_to_settings
+
+    previous_ui_screen = (
+        ui_screen
+    )
+
+    codex_return_to_settings = (
+        from_settings
+    )
+
+    ui_screen = UI_CODEX
+
+    ui_overlay = None
+
+
+def close_codex():
+    """離開Codex並返回原本畫面。"""
+
+    global ui_screen
+    global ui_overlay
+    global codex_return_to_settings
+
+    codex_ui.close_item()
+
+    ui_screen = (
+        previous_ui_screen
+    )
+
+    if codex_return_to_settings:
+
+        ui_overlay = "settings"
+
+    codex_return_to_settings = False
+
+
+# ============================================================
+# Game Over UI
+# ============================================================
+
+def draw_game_over(
+    mouse_pos
+):
+    """繪製GAME OVER畫面。"""
+
+    screen.fill(
+        (25, 15, 18)
+    )
+
+    width, height = (
+        screen.get_size()
+    )
+
+    title = game_ui.font_title.render(
+        "GAME OVER",
+        True,
+        (235, 90, 90)
+    )
+
+    screen.blit(
+        title,
+        title.get_rect(
+            center=(
+                width // 2,
+                height // 2 - 120
+            )
+        )
+    )
+
+    if (
+        game.game_over_reason
+        == "space_c_locked"
+    ):
+
+        message_lines = [
+            "空間 C 已永久封鎖。",
+            "你將永遠被困在這個空間。"
+        ]
+
+    else:
+
+        message_lines = [
+            "遊戲結束。"
+        ]
+
+    y = (
+        height // 2 - 45
+    )
+
+    for line in message_lines:
+
+        surface = (
+            game_ui.font_ui.render(
+                line,
+                True,
+                (235, 225, 225)
+            )
+        )
+
+        screen.blit(
+            surface,
+            surface.get_rect(
+                center=(
+                    width // 2,
+                    y
+                )
+            )
+        )
+
+        y += 30
+
+    button_width = 160
+    button_height = 42
+
+    buttons = {
+        "restart": pygame.Rect(
+            width // 2
+            - button_width // 2,
+
+            height // 2 + 45,
+
+            button_width,
+            button_height
+        ),
+
+        "menu": pygame.Rect(
+            width // 2
+            - button_width // 2,
+
+            height // 2 + 100,
+
+            button_width,
+            button_height
+        ),
+
+        "settings": pygame.Rect(
+            width // 2
+            - button_width // 2,
+
+            height // 2 + 155,
+
+            button_width,
+            button_height
+        )
+    }
+
+    game_ui.draw_button(
+        screen,
+        "重新開始",
+        buttons["restart"],
+        buttons["restart"].collidepoint(
+            mouse_pos
+        )
+    )
+
+    game_ui.draw_button(
+        screen,
+        "回主選單",
+        buttons["menu"],
+        buttons["menu"].collidepoint(
+            mouse_pos
+        )
+    )
+
+    game_ui.draw_button(
+        screen,
+        "設定",
+        buttons["settings"],
+        buttons["settings"].collidepoint(
+            mouse_pos
+        )
+    )
+
+    return buttons
+
+
+# ============================================================
+# Chapter Ending UI
+# ============================================================
+
+def draw_chapter_end(
+    mouse_pos
+):
+    """繪製第一章結束畫面。"""
+
+    screen.fill(
+        (25, 25, 32)
+    )
+
+    width, height = (
+        screen.get_size()
+    )
+
+    title = game_ui.font_title.render(
+        "Chapter 1",
+        True,
+        (245, 245, 245)
+    )
+
+    screen.blit(
+        title,
+        title.get_rect(
+            center=(
+                width // 2,
+                height // 2 - 120
+            )
+        )
+    )
+
+    end_surface = (
+        game_ui.font_large.render(
+            "— END —",
+            True,
+            (220, 220, 225)
+        )
+    )
+
+    screen.blit(
+        end_surface,
+        end_surface.get_rect(
+            center=(
+                width // 2,
+                height // 2 - 70
+            )
+        )
+    )
+
+    quote_lines = [
+        "「你只解開了一把鎖。",
+        "但你還沒解開自己。」"
+    ]
+
+    y = (
+        height // 2
+    )
+
+    for line in quote_lines:
+
+        surface = (
+            game_ui.font_ui.render(
+                line,
+                True,
+                (230, 230, 235)
+            )
+        )
+
+        screen.blit(
+            surface,
+            surface.get_rect(
+                center=(
+                    width // 2,
+                    y
+                )
+            )
+        )
+
+        y += 32
+
+    buttons = {
+        "settings": pygame.Rect(
+            width // 2 - 175,
+            height // 2 + 100,
+            150,
+            42
+        ),
+
+        "menu": pygame.Rect(
+            width // 2 + 25,
+            height // 2 + 100,
+            150,
+            42
+        )
+    }
+
+    game_ui.draw_button(
+        screen,
+        "設定",
+        buttons["settings"],
+        buttons["settings"].collidepoint(
+            mouse_pos
+        )
+    )
+
+    game_ui.draw_button(
+        screen,
+        "回到主選單",
+        buttons["menu"],
+        buttons["menu"].collidepoint(
+            mouse_pos
+        )
+    )
+
+    return buttons
+
+
+# ============================================================
+# Interaction Keyboard
+# ============================================================
+
+def handle_interaction_key(
+    event
+):
+    """處理Interaction UI的鍵盤輸入。"""
+
+    if not interaction_ui.is_open():
+
+        return
+
+    # --------------------------------------------------------
+    # Password
+    # --------------------------------------------------------
+
+    if interaction_ui.mode == "password":
+
+        if (
+            pygame.K_0
+            <= event.key
+            <= pygame.K_9
+        ):
+
+            digit = (
+                event.key
+                - pygame.K_0
+            )
+
+            interaction_ui.add_password_digit(
+                digit
+            )
+
+        elif event.key == pygame.K_BACKSPACE:
+
+            interaction_ui.remove_password_digit()
+
+        elif event.key == pygame.K_RETURN:
+
+            interaction_ui.submit_password()
+
+            if (
+                interaction_ui.result
+                is not None
+                and interaction_ui.result.get(
+                    "status"
+                )
+                == "game_over"
+            ):
+
+                interaction_ui.close()
+
+        elif event.key == pygame.K_ESCAPE:
+
+            leave_puzzle(
+                game
+            )
+
+            interaction_ui.close()
+
+        return
+
+    # --------------------------------------------------------
+    # General Interaction Escape
+    # --------------------------------------------------------
+
+    if event.key == pygame.K_ESCAPE:
+
+        if interaction_ui.parent_stack:
+
+            interaction_ui.go_back()
+
+        else:
+
+            interaction_ui.close()
+
+
+# ============================================================
+# Interaction Mouse
+# ============================================================
+
+def handle_interaction_click(
+    buttons,
+    mouse_pos
+):
+    """處理所有Interaction Popup滑鼠操作。"""
+
+    if not interaction_ui.is_open():
+
+        return
+
+    mode = interaction_ui.mode
+
+    # ========================================================
+    # Container
+    # ========================================================
+
+    if mode == "container":
+
+        if (
+            "close" in buttons
+            and buttons[
+                "close"
+            ].collidepoint(
+                mouse_pos
+            )
+        ):
+
+            interaction_ui.close()
+
+            return
+
+        for (
+            child_id,
+            rect
+        ) in buttons.items():
+
+            if child_id == "close":
+
+                continue
+
+            if rect.collidepoint(
+                mouse_pos
+            ):
+
+                open_container_child(
+                    child_id
+                )
+
+                return
+
+    # ========================================================
+    # Searchable
+    # ========================================================
+
+    elif mode == "searchable":
+
+        if buttons[
+            "yes"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            interaction_ui.confirm_search()
+
+        elif buttons[
+            "no"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            interaction_ui.go_back()
+
+    # ========================================================
+    # Inspectable
+    # ========================================================
+
+    elif mode == "inspectable":
+
+        if buttons[
+            "back"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            interaction_ui.go_back()
+
+    # ========================================================
+    # Rift
+    # ========================================================
+
+    elif mode == "rift":
+
+        if buttons[
+            "enter"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            if (
+                interaction_ui.result[
+                    "status"
+                ]
+                == "rift_available"
+            ):
+
+                interaction_ui.confirm_rift()
+
+        elif buttons[
+            "cancel"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            interaction_ui.close()
+
+    # ========================================================
+    # Password
+    # ========================================================
+
+    elif mode == "password":
+
+        for digit in (
+            "0", "1", "2", "3", "4",
+            "5", "6", "7", "8", "9"
+        ):
+
+            if (
+                digit in buttons
+                and buttons[
+                    digit
+                ].collidepoint(
+                    mouse_pos
+                )
+            ):
+
+                interaction_ui.add_password_digit(
+                    digit
+                )
+
+                return
+
+        if buttons[
+            "clear"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            interaction_ui.clear_password()
+
+        elif buttons[
+            "submit"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            interaction_ui.submit_password()
+
+            if (
+                interaction_ui.result
+                is not None
+                and interaction_ui.result.get(
+                    "status"
+                )
+                == "game_over"
+            ):
+
+                interaction_ui.close()
+
+        elif buttons[
+            "back"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            leave_puzzle(
+                game
+            )
+
+            interaction_ui.close()
+
+    # ========================================================
+    # Photo
+    # ========================================================
+
+    elif mode == "photo":
+
+        if buttons[
+            "front"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            interaction_ui.view_photo_front()
+
+        elif buttons[
+            "back"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            result = (
+                interaction_ui
+                .view_photo_back()
+            )
+
+            if (
+                result.get(
+                    "status"
+                )
+                == "photo_story_triggered"
+            ):
+
+                interaction_ui.close()
+
+                start_photo_story(
+                    result
+                )
+
+        elif (
+            buttons[
+                "allow_close"
+            ]
+            and buttons[
+                "close"
+            ].collidepoint(
+                mouse_pos
+            )
+        ):
+
+            interaction_ui.close()
+
+    # ========================================================
+    # Door
+    # ========================================================
+
+    elif mode == "door":
+
+        if (
+            "enter" in buttons
+            and buttons[
+                "enter"
+            ].collidepoint(
+                mouse_pos
+            )
+        ):
+
+            result = (
+                interaction_ui
+                .confirm_door()
+            )
+
+            if (
+                result.get(
+                    "status"
+                )
+                == "chapter_end"
+            ):
+
+                interaction_ui.close()
+
+                start_chapter_end(
+                    result
+                )
+
+        elif (
+            "cancel" in buttons
+            and buttons[
+                "cancel"
+            ].collidepoint(
+                mouse_pos
+            )
+        ):
+
+            interaction_ui.close()
+
+        elif (
+            "close" in buttons
+            and buttons[
+                "close"
+            ].collidepoint(
+                mouse_pos
+            )
+        ):
+
+            interaction_ui.close()
+
+    # ========================================================
+    # Item
+    # ========================================================
+
+    elif mode == "item":
+
+        if buttons[
+            "close"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            interaction_ui.close()
+
+    # ========================================================
+    # Item Notification
+    # ========================================================
+
+    elif mode == "item_notification":
+
+        if buttons[
+            "ok"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            interaction_ui.go_back()
+
+    # ========================================================
+    # Message
+    # ========================================================
+
+    elif mode == "message":
+
+        if buttons[
+            "ok"
+        ].collidepoint(
+            mouse_pos
+        ):
+
+            interaction_ui.go_back()
+
+
+# ============================================================
+# Main Loop
+# ============================================================
+
 running = True
 
 while running:
-    screen.fill((30, 30, 40)) # 背景底色
 
-    mouse_x, mouse_y = pygame.mouse.get_pos()
-    mouse_click = False
+    dt = (
+        clock.tick(60)
+        / 1000.0
+    )
 
-    # --- A. 事件處理 ---
+    mouse_pos = (
+        pygame.mouse.get_pos()
+    )
+
+    mouse_clicked = False
+
+    # 每一幀重新建立目前畫面Hitbox資料
+    menu_buttons = {}
+
+    settings_buttons = {}
+
+    object_rects = {}
+
+    choice_rects = []
+
+    hotbar_data = None
+
+    settings_button_rect = None
+
+    codex_buttons = {}
+
+    interaction_buttons = {}
+
+    game_over_buttons = {}
+
+    ending_buttons = {}
+
+
+    # ========================================================
+    # Events
+    # ========================================================
+
     for event in pygame.event.get():
+
         if event.type == pygame.QUIT:
+
             running = False
 
-        # 視窗大小拖曳調整
-        if event.type == pygame.VIDEORESIZE:
-            screen_width, screen_height = event.w, event.h
-            screen = pygame.display.set_mode((screen_width, screen_height), pygame.RESIZABLE)
 
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            mouse_click = True
+        # ====================================================
+        # Resize
+        # ====================================================
 
-        if event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+        elif event.type == pygame.VIDEORESIZE:
+
+            screen_width = max(
+                640,
+                event.w
+            )
+
+            screen_height = max(
+                480,
+                event.h
+            )
+
+            screen = pygame.display.set_mode(
+                (
+                    screen_width,
+                    screen_height
+                ),
+                pygame.RESIZABLE
+            )
+
+
+        # ====================================================
+        # Mouse
+        # ====================================================
+
+        elif (
+            event.type
+            == pygame.MOUSEBUTTONDOWN
+            and event.button == 1
+        ):
+
+            mouse_clicked = True
+
+
+        elif (
+            event.type
+            == pygame.MOUSEBUTTONUP
+            and event.button == 1
+        ):
+
             dragging_volume = False
 
-        # 滑鼠滾輪切換道具 (僅在遊戲進行中且未開啟設定時觸發)
-        if event.type == pygame.MOUSEWHEEL and current_state == STATE_PLAYING and not is_settings_open:
-            if event.y > 0:
-                selected_slot = (selected_slot - 1) % NUM_SLOTS
-            elif event.y < 0:
-                selected_slot = (selected_slot + 1) % NUM_SLOTS
+            codex_ui.dragging_scrollbar = (
+                False
+            )
 
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                if is_settings_open:
-                    is_settings_open = False # 關閉設定
-                elif current_state == STATE_PLAYING:
-                    current_state = STATE_MENU # 退回主畫面
 
-            # 【道具欄鍵盤切換功能】(僅在遊戲中且未開啟設定時生效)
-            if current_state == STATE_PLAYING and not is_settings_open:
-                if event.key == pygame.K_LEFT:
-                    selected_slot = (selected_slot - 1) % NUM_SLOTS
+        # ====================================================
+        # Mouse Wheel
+        # ====================================================
+
+        elif event.type == pygame.MOUSEWHEEL:
+
+            if ui_screen == UI_CODEX:
+
+                codex_ui.handle_wheel(
+                    event,
+                    mouse_pos
+                )
+
+            elif (
+                ui_screen == UI_GAME
+                and game.game_state == SPACE
+                and ui_overlay is None
+                and not interaction_ui.is_open()
+            ):
+
+                visible_items = (
+                    game_ui
+                    .get_visible_inventory(
+                        game,
+                        hotbar_offset
+                    )
+                )
+
+                if visible_items:
+
+                    if event.y > 0:
+
+                        selected_slot = max(
+                            0,
+                            selected_slot - 1
+                        )
+
+                    elif event.y < 0:
+
+                        selected_slot = min(
+                            len(
+                                visible_items
+                            ) - 1,
+                            selected_slot + 1
+                        )
+
+
+        # ====================================================
+        # Keyboard
+        # ====================================================
+
+        elif event.type == pygame.KEYDOWN:
+
+            # ------------------------------------------------
+            # Settings優先
+            # ------------------------------------------------
+
+            if ui_overlay == "settings":
+
+                if event.key == pygame.K_ESCAPE:
+
+                    ui_overlay = None
+
+                continue
+
+
+            # ------------------------------------------------
+            # Codex
+            # ------------------------------------------------
+
+            if ui_screen == UI_CODEX:
+
+                if codex_ui.selected_item is not None:
+
+                    if event.key == pygame.K_ESCAPE:
+
+                        codex_ui.close_item()
+
+                elif event.key == pygame.K_ESCAPE:
+
+                    close_codex()
+
+                continue
+
+
+            # ------------------------------------------------
+            # Interaction
+            # ------------------------------------------------
+
+            if (
+                ui_screen == UI_GAME
+                and interaction_ui.is_open()
+            ):
+
+                handle_interaction_key(
+                    event
+                )
+
+                continue
+
+
+            # ------------------------------------------------
+            # Dialogue
+            # ------------------------------------------------
+
+            if (
+                ui_screen == UI_GAME
+                and game.game_state
+                == DIALOGUE
+            ):
+
+                if event.key in (
+                    pygame.K_RETURN,
+                    pygame.K_SPACE
+                ):
+
+                    result = (
+                        dialogue_controller
+                        .advance()
+                    )
+
+                    if (
+                        result
+                        == "dialogue_finished"
+                    ):
+
+                        finish_dialogue_action()
+
+                continue
+
+
+            # ------------------------------------------------
+            # Choice
+            # ------------------------------------------------
+
+            if (
+                ui_screen == UI_GAME
+                and game.game_state
+                == CHOICE
+            ):
+
+                handle_choice_key(
+                    event
+                )
+
+                continue
+
+
+            # ------------------------------------------------
+            # Exploration
+            # ------------------------------------------------
+
+            if (
+                ui_screen == UI_GAME
+                and game.game_state
+                == SPACE
+            ):
+
+                if event.key == pygame.K_ESCAPE:
+
+                    ui_overlay = "settings"
+
+                elif event.key == pygame.K_LEFT:
+
+                    selected_slot = max(
+                        0,
+                        selected_slot - 1
+                    )
+
                 elif event.key == pygame.K_RIGHT:
-                    selected_slot = (selected_slot + 1) % NUM_SLOTS
-                elif pygame.K_1 <= event.key <= pygame.K_5:
-                    selected_slot = event.key - pygame.K_1
 
-    # --- B. 畫面繪製與互動邏輯 ---
+                    visible_items = (
+                        game_ui
+                        .get_visible_inventory(
+                            game,
+                            hotbar_offset
+                        )
+                    )
 
-    if current_state == STATE_MENU:
-        # 主畫面標題
-        title_surf = font_title.render("萬徑.歸一", True, (255, 255, 255))
-        screen.blit(title_surf, (screen_width//2 - title_surf.get_width()//2, screen_height//2 - 160))
+                    if visible_items:
 
-        # 主畫面三個垂直按鈕
-        btn_w, btn_h = 180, 45
-        btn_x = screen_width//2 - btn_w//2
-        start_y = screen_height//2 - 60
+                        selected_slot = min(
+                            len(
+                                visible_items
+                            ) - 1,
+                            selected_slot + 1
+                        )
 
-        rect_start = pygame.Rect(btn_x, start_y, btn_w, btn_h)
-        rect_setting = pygame.Rect(btn_x, start_y + 60, btn_w, btn_h)
-        rect_exit = pygame.Rect(btn_x, start_y + 120, btn_w, btn_h)
+                elif (
+                    pygame.K_1
+                    <= event.key
+                    <= pygame.K_5
+                ):
 
-        if not is_settings_open:
-            hover_start = rect_start.collidepoint(mouse_x, mouse_y)
-            hover_setting = rect_setting.collidepoint(mouse_x, mouse_y)
-            hover_exit = rect_exit.collidepoint(mouse_x, mouse_y)
+                    index = (
+                        event.key
+                        - pygame.K_1
+                    )
 
-            if mouse_click:
-                if hover_start:
-                    current_state = STATE_PLAYING
-                elif hover_setting:
-                    is_settings_open = True
-                elif hover_exit:
-                    running = False
-        else:
-            hover_start = hover_setting = hover_exit = False
+                    visible_items = (
+                        game_ui
+                        .get_visible_inventory(
+                            game,
+                            hotbar_offset
+                        )
+                    )
 
-        draw_button(screen, "開始遊戲", rect_start.x, rect_start.y, btn_w, btn_h, hover_start)
-        draw_button(screen, "設 定", rect_setting.x, rect_setting.y, btn_w, btn_h, hover_setting)
-        draw_button(screen, "退出遊戲", rect_exit.x, rect_exit.y, btn_w, btn_h, hover_exit)
+                    if index < len(
+                        visible_items
+                    ):
 
-    elif current_state == STATE_PLAYING:
-        # 繪製當前外型角色 (置中)
-        current_color = looks[current_look_index]
-        pygame.draw.rect(screen, current_color, (screen_width//2 - 50, screen_height//2 - 50, 100, 100), border_radius=12)
+                        selected_slot = index
 
-        # 右上角的「⚙ 設定」按鈕
-        top_right_btn = pygame.Rect(screen_width - 110, 20, 90, 40)
-        hover_top_setting = top_right_btn.collidepoint(mouse_x, mouse_y) if not is_settings_open else False
+                        selected_item = (
+                            visible_items[
+                                index
+                            ]
+                        )
 
-        if mouse_click and hover_top_setting:
-            is_settings_open = True # 開啟設定選單 (暫停畫面)
+                elif event.key == pygame.K_RETURN:
 
-        draw_button(screen, "⚙ 設定", top_right_btn.x, top_right_btn.y, 90, 40, hover_top_setting, bg_color=(70, 70, 90))
+                    selected_item = (
+                        get_selected_hotbar_item()
+                    )
 
-        # 【繪製 5 格道具欄】
-        draw_hotbar(screen, selected_slot, screen_width, screen_height)
+                    open_hotbar_item(
+                        selected_item
+                    )
 
-    # 共用設定選單彈窗 (Settings Overlay)
-    if is_settings_open:
-        # 半透明背景遮罩
-        overlay = pygame.Surface((screen_width, screen_height))
-        overlay.set_alpha(160)
-        overlay.fill((0, 0, 0))
-        screen.blit(overlay, (0, 0))
+                continue
 
-        # 選單視窗主體
-        modal_w, modal_h = 460, 370
-        modal_x = screen_width//2 - modal_w//2
-        modal_y = screen_height//2 - modal_h//2
-        pygame.draw.rect(screen, (45, 45, 60), (modal_x, modal_y, modal_w, modal_h), border_radius=12)
-        pygame.draw.rect(screen, (255, 255, 255), (modal_x, modal_y, modal_w, modal_h), 2, border_radius=12)
 
-        # 標題
-        settings_title = font_title.render("系統設定", True, (255, 215, 0))
-        screen.blit(settings_title, (screen_width//2 - settings_title.get_width()//2, modal_y + 20))
+            # ------------------------------------------------
+            # GAME OVER
+            # ------------------------------------------------
 
-        # 音效控制 (Slider)
-        vol_label = font_ui.render(f"音量大小: {volume}%", True, (255, 255, 255))
-        screen.blit(vol_label, (modal_x + 40, modal_y + 90))
-        
-        slider_x, slider_y, slider_w = modal_x + 180, modal_y + 95, 220
-        pygame.draw.rect(screen, (80, 80, 80), (slider_x, slider_y, slider_w, 12), border_radius=6)
-        fill_w = int((volume / 100) * slider_w)
-        if fill_w > 0:
-            pygame.draw.rect(screen, (100, 255, 100), (slider_x, slider_y, fill_w, 12), border_radius=6)
-        pygame.draw.circle(screen, (255, 255, 255), (slider_x + fill_w, slider_y + 6), 10)
+            if (
+                ui_screen == UI_GAME
+                and game.game_state
+                == GAME_OVER
+            ):
 
-        slider_hitbox = pygame.Rect(slider_x - 5, slider_y - 10, slider_w + 10, 32)
-        if mouse_click and slider_hitbox.collidepoint(mouse_x, mouse_y):
-            dragging_volume = True
+                if event.key == pygame.K_ESCAPE:
 
-        if dragging_volume:
-            rel_x = max(0, min(mouse_x - slider_x, slider_w))
-            volume = int((rel_x / slider_w) * 100)
+                    ui_overlay = "settings"
 
-        # 畫面大小控制
-        res_label = font_ui.render(f"視窗大小: {screen_width} x {screen_height}", True, (255, 255, 255))
-        screen.blit(res_label, (modal_x + 40, modal_y + 150))
-        
-        res_hint = font_ui.render("(可直接拖動視窗邊框任意調整大小)", True, (160, 160, 160))
-        screen.blit(res_hint, (modal_x + 40, modal_y + 180))
+                continue
 
-        btn_800 = pygame.Rect(modal_x + 280, modal_y + 145, 65, 30)
-        btn_1024 = pygame.Rect(modal_x + 355, modal_y + 145, 65, 30)
-        
-        h_800 = btn_800.collidepoint(mouse_x, mouse_y)
-        h_1024 = btn_1024.collidepoint(mouse_x, mouse_y)
 
-        if mouse_click:
-            if h_800:
-                screen_width, screen_height = 800, 600
-                screen = pygame.display.set_mode((800, 600), pygame.RESIZABLE)
-            elif h_1024:
-                screen_width, screen_height = 1024, 768
-                screen = pygame.display.set_mode((1024, 768), pygame.RESIZABLE)
+            # ------------------------------------------------
+            # SUCCESS
+            # ------------------------------------------------
 
-        draw_button(screen, "800", btn_800.x, btn_800.y, 65, 30, h_800)
-        draw_button(screen, "1024", btn_1024.x, btn_1024.y, 65, 30, h_1024)
+            if (
+                ui_screen == UI_GAME
+                and game.game_state
+                == SUCCESS
+            ):
 
-        # 更換外型控制
-        look_label = font_ui.render("更換外型 / 顏色:", True, (255, 255, 255))
-        screen.blit(look_label, (modal_x + 40, modal_y + 225))
+                if event.key == pygame.K_ESCAPE:
 
-        pygame.draw.rect(screen, looks[current_look_index], (modal_x + 200, modal_y + 220, 30, 30), border_radius=4)
-        
-        btn_change_look = pygame.Rect(modal_x + 250, modal_y + 220, 110, 30)
-        h_look = btn_change_look.collidepoint(mouse_x, mouse_y)
-        if mouse_click and h_look:
-            current_look_index = (current_look_index + 1) % len(looks)
+                    ui_overlay = "settings"
 
-        draw_button(screen, "切換外型", btn_change_look.x, btn_change_look.y, 110, 30, h_look)
+                continue
 
-        # 底部按鈕：[回到主選單] 與 [確定關閉]
-        btn_menu = pygame.Rect(modal_x + 50, modal_y + 300, 160, 40)
-        btn_close = pygame.Rect(modal_x + 250, modal_y + 300, 160, 40)
 
-        h_menu = btn_menu.collidepoint(mouse_x, mouse_y)
-        h_close = btn_close.collidepoint(mouse_x, mouse_y)
+    # ========================================================
+    # Update
+    # ========================================================
 
-        if mouse_click:
-            if h_menu:
-                current_state = STATE_MENU  # 返回主選單
-                is_settings_open = False     # 關閉設定視窗
-            elif h_close:
-                is_settings_open = False     # 關閉設定視窗
+    if (
+        ui_screen == UI_GAME
+        and game.game_state
+        == DIALOGUE
+        and ui_overlay is None
+    ):
 
-        draw_button(screen, "回到主選單", btn_menu.x, btn_menu.y, 160, 40, h_menu, bg_color=(90, 90, 110))
-        draw_button(screen, "確定關閉", btn_close.x, btn_close.y, 160, 40, h_close, bg_color=(180, 60, 60))
+        dialogue_controller.update(
+            dt
+        )
+
+
+    # ========================================================
+    # Render Main Menu
+    # ========================================================
+
+    if ui_screen == UI_MENU:
+
+        menu_buttons = (
+            game_ui.draw_main_menu(
+                screen,
+                mouse_pos
+            )
+        )
+
+
+    # ========================================================
+    # Render Codex
+    # ========================================================
+
+    elif ui_screen == UI_CODEX:
+
+        codex_buttons = (
+            codex_ui.draw(
+                screen,
+                game,
+                mouse_pos
+            )
+        )
+
+
+    # ========================================================
+    # Render Game
+    # ========================================================
+
+    elif ui_screen == UI_GAME:
+
+        # ----------------------------------------------------
+        # Dialogue
+        # ----------------------------------------------------
+
+        if game.game_state == DIALOGUE:
+
+            dialogue_id = (
+                dialogue_controller
+                .dialogue_id
+            )
+
+            if dialogue_id == "intro":
+
+                game_ui.draw_intro_background(
+                    screen,
+                    dialogue_controller
+                )
+
+            elif dialogue_id in (
+                "scene_04_choice_result",
+            ):
+
+                game_ui.draw_room_307(
+                    screen
+                )
+
+            elif dialogue_id == "photo_back_story":
+
+                # 照片劇情仍發生於Space C
+                game_ui.draw_space(
+                    screen,
+                    game,
+                    mouse_pos,
+                    looks[
+                        current_look_index
+                    ]
+                )
+
+            elif dialogue_id == "chapter_1_end":
+
+                screen.fill(
+                    (235, 235, 235)
+                )
+
+                corridor_text = (
+                    game_ui.font_large
+                    .render(
+                        (
+                            "無限白色走廊 "
+                            "/ Background Placeholder"
+                        ),
+                        True,
+                        (45, 45, 50)
+                    )
+                )
+
+                screen.blit(
+                    corridor_text,
+                    corridor_text.get_rect(
+                        center=(
+                            screen.get_width()
+                            // 2,
+
+                            80
+                        )
+                    )
+                )
+
+            else:
+
+                game_ui.draw_room_307(
+                    screen
+                )
+
+            draw_dialogue_box(
+                screen,
+                dialogue_controller,
+                game_ui.font_ui,
+                game_ui.font_ui
+            )
+
+            settings_button_rect = (
+                game_ui
+                .draw_settings_button(
+                    screen,
+                    mouse_pos
+                )
+            )
+
+
+        # ----------------------------------------------------
+        # Choice
+        # ----------------------------------------------------
+
+        elif game.game_state == CHOICE:
+
+            game_ui.draw_room_307(
+                screen
+            )
+
+            choice_rects = (
+                draw_choice_panel(
+                    screen,
+                    choice_controller,
+                    game_ui.font_large,
+                    game_ui.font_ui,
+                    mouse_pos
+                )
+            )
+
+            settings_button_rect = (
+                game_ui
+                .draw_settings_button(
+                    screen,
+                    mouse_pos
+                )
+            )
+
+
+        # ----------------------------------------------------
+        # SPACE
+        # ----------------------------------------------------
+
+        elif game.game_state == SPACE:
+
+            object_rects = (
+                game_ui.draw_space(
+                    screen,
+                    game,
+                    mouse_pos,
+                    looks[
+                        current_look_index
+                    ]
+                )
+            )
+
+            settings_button_rect = (
+                game_ui
+                .draw_settings_button(
+                    screen,
+                    mouse_pos
+                )
+            )
+
+            hotbar_data = (
+                game_ui.draw_hotbar(
+                    screen,
+                    game,
+                    selected_slot,
+                    hotbar_offset,
+                    mouse_pos
+                )
+            )
+
+
+        # ----------------------------------------------------
+        # PASSWORD
+        #
+        # Password本身由InteractionUI顯示，
+        # 底層仍保留目前Space畫面。
+        # ----------------------------------------------------
+
+        elif game.game_state == PASSWORD:
+
+            object_rects = (
+                game_ui.draw_space(
+                    screen,
+                    game,
+                    mouse_pos,
+                    looks[
+                        current_look_index
+                    ]
+                )
+            )
+
+            hotbar_data = (
+                game_ui.draw_hotbar(
+                    screen,
+                    game,
+                    selected_slot,
+                    hotbar_offset,
+                    mouse_pos
+                )
+            )
+
+
+        # ----------------------------------------------------
+        # GAME OVER
+        # ----------------------------------------------------
+
+        elif game.game_state == GAME_OVER:
+
+            game_over_buttons = (
+                draw_game_over(
+                    mouse_pos
+                )
+            )
+
+
+        # ----------------------------------------------------
+        # SUCCESS
+        # ----------------------------------------------------
+
+        elif game.game_state == SUCCESS:
+
+            ending_buttons = (
+                draw_chapter_end(
+                    mouse_pos
+                )
+            )
+
+
+        # ====================================================
+        # Interaction Overlay
+        # ====================================================
+
+        if (
+            interaction_ui.is_open()
+            and ui_overlay is None
+        ):
+
+            interaction_buttons = (
+                interaction_ui.draw(
+                    screen,
+                    mouse_pos
+                )
+            )
+
+
+    # ========================================================
+    # Settings Overlay
+    # ========================================================
+
+    if ui_overlay == "settings":
+
+        settings_buttons = (
+            game_ui.draw_settings_overlay(
+                screen,
+                mouse_pos,
+                volume,
+                current_look_index,
+                looks
+            )
+        )
+
+
+    # ========================================================
+    # Mouse Click
+    # ========================================================
+
+    if mouse_clicked:
+
+        # ----------------------------------------------------
+        # Settings Overlay
+        # ----------------------------------------------------
+
+        if ui_overlay == "settings":
+
+            if settings_buttons:
+
+                if settings_buttons[
+                    "slider"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    dragging_volume = True
+
+
+                elif settings_buttons[
+                    "800"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    screen_width = 800
+                    screen_height = 600
+
+                    screen = (
+                        pygame.display
+                        .set_mode(
+                            (
+                                screen_width,
+                                screen_height
+                            ),
+                            pygame.RESIZABLE
+                        )
+                    )
+
+
+                elif settings_buttons[
+                    "1024"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    screen_width = 1024
+                    screen_height = 768
+
+                    screen = (
+                        pygame.display
+                        .set_mode(
+                            (
+                                screen_width,
+                                screen_height
+                            ),
+                            pygame.RESIZABLE
+                        )
+                    )
+
+
+                elif settings_buttons[
+                    "look"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    current_look_index = (
+                        current_look_index
+                        + 1
+                    ) % len(looks)
+
+
+                elif settings_buttons[
+                    "codex"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    open_codex(
+                        from_settings=True
+                    )
+
+
+                elif settings_buttons[
+                    "menu"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    interaction_ui.close()
+
+                    ui_screen = UI_MENU
+
+                    ui_overlay = None
+
+
+                elif settings_buttons[
+                    "close"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    ui_overlay = None
+
+
+        # ----------------------------------------------------
+        # Main Menu
+        # ----------------------------------------------------
+
+        elif ui_screen == UI_MENU:
+
+            if menu_buttons[
+                "start"
+            ].collidepoint(
+                mouse_pos
+            ):
+
+                start_new_game()
+
+
+            elif menu_buttons[
+                "codex"
+            ].collidepoint(
+                mouse_pos
+            ):
+
+                open_codex(
+                    from_settings=False
+                )
+
+
+            elif menu_buttons[
+                "settings"
+            ].collidepoint(
+                mouse_pos
+            ):
+
+                ui_overlay = (
+                    "settings"
+                )
+
+
+            elif menu_buttons[
+                "exit"
+            ].collidepoint(
+                mouse_pos
+            ):
+
+                running = False
+
+
+        # ----------------------------------------------------
+        # Codex
+        # ----------------------------------------------------
+
+        elif ui_screen == UI_CODEX:
+
+            modal_buttons = (
+                codex_buttons.get(
+                    "modal",
+                    {}
+                )
+            )
+
+            # Item Modal優先攔截
+            if (
+                codex_ui.selected_item
+                is not None
+            ):
+
+                if (
+                    "close"
+                    in modal_buttons
+                    and modal_buttons[
+                        "close"
+                    ].collidepoint(
+                        mouse_pos
+                    )
+                ):
+
+                    codex_ui.close_item()
+
+            else:
+
+                if codex_buttons[
+                    "back"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    close_codex()
+
+                else:
+
+                    for (
+                        item_id,
+                        rect
+                    ) in codex_buttons[
+                        "items"
+                    ].items():
+
+                        if rect.collidepoint(
+                            mouse_pos
+                        ):
+
+                            codex_ui.select_item(
+                                item_id
+                            )
+
+                            break
+
+
+        # ----------------------------------------------------
+        # Game
+        # ----------------------------------------------------
+
+        elif ui_screen == UI_GAME:
+
+            # =================================================
+            # Interaction優先於所有底層遊戲點擊
+            # =================================================
+
+            if interaction_ui.is_open():
+
+                handle_interaction_click(
+                    interaction_buttons,
+                    mouse_pos
+                )
+
+
+            # =================================================
+            # Settings Button
+            # =================================================
+
+            elif (
+                settings_button_rect
+                is not None
+                and settings_button_rect
+                .collidepoint(
+                    mouse_pos
+                )
+            ):
+
+                ui_overlay = (
+                    "settings"
+                )
+
+
+            # =================================================
+            # Dialogue
+            # =================================================
+
+            elif game.game_state == DIALOGUE:
+
+                result = (
+                    dialogue_controller
+                    .advance()
+                )
+
+                if (
+                    result
+                    == "dialogue_finished"
+                ):
+
+                    finish_dialogue_action()
+
+
+            # =================================================
+            # Choice
+            # =================================================
+
+            elif game.game_state == CHOICE:
+
+                for (
+                    option_rect,
+                    option
+                ) in choice_rects:
+
+                    if (
+                        option_rect
+                        .collidepoint(
+                            mouse_pos
+                        )
+                    ):
+
+                        start_choice_result(
+                            option
+                        )
+
+                        break
+
+
+            # =================================================
+            # Space
+            # =================================================
+
+            elif game.game_state == SPACE:
+
+                object_clicked = False
+
+                # ---------------------------------------------
+                # Scene Object
+                # ---------------------------------------------
+
+                for (
+                    object_id,
+                    rect
+                ) in object_rects.items():
+
+                    if rect.collidepoint(
+                        mouse_pos
+                    ):
+
+                        interaction_ui.open_object(
+                            object_id
+                        )
+
+                        object_clicked = True
+
+                        break
+
+
+                # ---------------------------------------------
+                # Hotbar
+                # ---------------------------------------------
+
+                if (
+                    not object_clicked
+                    and hotbar_data
+                    is not None
+                ):
+
+                    slot_rects = (
+                        hotbar_data[
+                            "slots"
+                        ]
+                    )
+
+                    visible_items = (
+                        hotbar_data[
+                            "visible_items"
+                        ]
+                    )
+
+                    for (
+                        index,
+                        rect
+                    ) in enumerate(
+                        slot_rects
+                    ):
+
+                        if (
+                            rect.collidepoint(
+                                mouse_pos
+                            )
+                            and index
+                            < len(
+                                visible_items
+                            )
+                        ):
+
+                            selected_slot = (
+                                index
+                            )
+
+                            selected_item = (
+                                visible_items[
+                                    index
+                                ]
+                            )
+
+                            open_hotbar_item(
+                                selected_item
+                            )
+
+                            object_clicked = (
+                                True
+                            )
+
+                            break
+
+
+                    if not object_clicked:
+
+                        arrow_left = (
+                            hotbar_data[
+                                "left"
+                            ]
+                        )
+
+                        arrow_right = (
+                            hotbar_data[
+                                "right"
+                            ]
+                        )
+
+                        visible_slots = (
+                            ui_layout[
+                                "hotbar"
+                            ].get(
+                                "visible_slots",
+                                5
+                            )
+                        )
+
+                        max_offset = max(
+                            0,
+                            len(
+                                game.inventory
+                            )
+                            - visible_slots
+                        )
+
+                        if (
+                            arrow_left
+                            is not None
+                            and arrow_left
+                            .collidepoint(
+                                mouse_pos
+                            )
+                        ):
+
+                            hotbar_offset = max(
+                                0,
+                                hotbar_offset - 1
+                            )
+
+                            selected_slot = 0
+
+
+                        elif (
+                            arrow_right
+                            is not None
+                            and arrow_right
+                            .collidepoint(
+                                mouse_pos
+                            )
+                        ):
+
+                            hotbar_offset = min(
+                                max_offset,
+                                hotbar_offset + 1
+                            )
+
+                            selected_slot = 0
+
+
+            # =================================================
+            # GAME OVER
+            # =================================================
+
+            elif game.game_state == GAME_OVER:
+
+                if game_over_buttons[
+                    "restart"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    start_new_game()
+
+
+                elif game_over_buttons[
+                    "menu"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    ui_screen = (
+                        UI_MENU
+                    )
+
+
+                elif game_over_buttons[
+                    "settings"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    ui_overlay = (
+                        "settings"
+                    )
+
+
+            # =================================================
+            # SUCCESS
+            # =================================================
+
+            elif game.game_state == SUCCESS:
+
+                if ending_buttons[
+                    "settings"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    ui_overlay = (
+                        "settings"
+                    )
+
+
+                elif ending_buttons[
+                    "menu"
+                ].collidepoint(
+                    mouse_pos
+                ):
+
+                    ui_screen = (
+                        UI_MENU
+                    )
+
+
+    # ========================================================
+    # Volume Slider Drag
+    # ========================================================
+
+    if (
+        dragging_volume
+        and ui_overlay == "settings"
+        and settings_buttons
+    ):
+
+        slider_rect = (
+            settings_buttons[
+                "slider"
+            ]
+        )
+
+        relative_x = (
+            mouse_pos[0]
+            - slider_rect.x
+        )
+
+        relative_x = max(
+            0,
+            min(
+                relative_x,
+                slider_rect.width
+            )
+        )
+
+        volume = int(
+            relative_x
+            / slider_rect.width
+            * 100
+        )
+
 
     pygame.display.flip()
-    clock.tick(60)
+
+
+# ============================================================
+# Quit
+# ============================================================
 
 pygame.quit()
+
 sys.exit()
