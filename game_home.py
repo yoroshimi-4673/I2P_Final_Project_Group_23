@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pygame
 
-from codex_ui import CodexUI
+from ui.codex_ui import CodexUI
 
-from dialogue_ui import (
+from ui.dialogue_ui import (
     DialogueController,
     ChoiceController,
     draw_dialogue_box,
@@ -24,9 +24,9 @@ from game_states import (
     GAME_OVER
 )
 
-from game_ui import GameUI
+from ui.game_ui import GameUI
 
-from interaction_ui import InteractionUI
+from ui.interaction_ui import InteractionUI
 
 from interaction_manager import (
     finish_photo_story_dialogue,

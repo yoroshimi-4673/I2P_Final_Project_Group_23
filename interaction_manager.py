@@ -315,7 +315,7 @@ def submit_password(
                 f"請輸入完整{required_length}位密碼。"
             ),
             "remaining_attempts": (
-                game.get_remaining_attempts(
+                game.get_puzzle_attempts(
                     object_id,
                     puzzle.get(
                         "max_attempts",
@@ -334,7 +334,7 @@ def submit_password(
             "status": "invalid_password_format",
             "message": "密碼只能包含數字。",
             "remaining_attempts": (
-                game.get_remaining_attempts(
+                game.get_puzzle_attempts(
                     object_id,
                     puzzle.get(
                         "max_attempts",
@@ -407,7 +407,7 @@ def submit_password(
     # --------------------------------------------------------
 
     remaining_attempts = (
-        game.get_remaining_attempts(
+        game.get_puzzle_attempts(
             object_id,
             puzzle.get(
                 "max_attempts",

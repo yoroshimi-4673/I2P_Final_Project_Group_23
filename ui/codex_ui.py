@@ -1,6 +1,6 @@
 import pygame
 
-from dialogue_ui import wrap_text
+from ui.dialogue_ui import wrap_text
 
 
 class CodexUI:

@@ -1,6 +1,6 @@
 import pygame
 
-from dialogue_ui import wrap_text
+from ui.dialogue_ui import wrap_text
 
 
 class InteractionUI:
@@ -187,8 +187,6 @@ class InteractionUI:
 
         elif object_type == "puzzle":
 
-            self.mode = "password"
-
             self.password_input = ""
 
             self.result = (
@@ -198,6 +196,15 @@ class InteractionUI:
                     self.objects
                 )
             )
+
+            if (
+                self.result["status"]
+                == "puzzle_solved"
+            ):
+                self.mode = "message"
+
+            else:
+                self.mode = "password"
 
         elif object_type == "door":
 

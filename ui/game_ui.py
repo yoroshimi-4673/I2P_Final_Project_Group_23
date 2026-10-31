@@ -1055,12 +1055,12 @@ class GameUI:
                 bg_color=(55, 55, 65)
             )
 
-        return (
-            slot_rects,
-            arrow_left,
-            arrow_right,
-            visible_inventory
-        )
+        return {
+            "slots": slot_rects,
+            "left": arrow_left,
+            "right": arrow_right,
+            "visible_items": visible_inventory
+        }
 
 
     # ========================================================
