@@ -2,7 +2,7 @@ import pygame
 
 
 class Player:
-    """管理玩家位置、移動、碰撞與顯示範圍。"""
+    """管理玩家位置、鍵盤滑鼠移動、碰撞與互動目標。"""
 
     def __init__(
         self,
@@ -21,12 +21,21 @@ class Player:
         )
 
         # 使用浮點向量保存玩家精確位置資訊
-        self.position = pygame.Vector2(x, y)
+        self.position = pygame.Vector2(
+            x,
+            y
+        )
 
         # 儲存玩家每秒移動的像素距離
         self.speed = speed
 
-    def get_direction(
+        # 記錄一般滑鼠點擊的移動目標
+        self.mouse_target = None
+
+        # 記錄目前想要靠近的互動物件
+        self.interaction_target = None
+
+    def get_keyboard_direction(
         self,
         pressed_keys
     ):
@@ -38,42 +47,228 @@ class Player:
             0
         )
 
-        # 左方向鍵或 A 被按住時向左移動
+        # 左方向鍵或A被按住時向左移動
         if (
             pygame.K_LEFT in pressed_keys
             or pygame.K_a in pressed_keys
         ):
             direction.x -= 1
 
-        # 右方向鍵或 D 被按住時向右移動
+        # 右方向鍵或D被按住時向右移動
         if (
             pygame.K_RIGHT in pressed_keys
             or pygame.K_d in pressed_keys
         ):
             direction.x += 1
 
-        # 上方向鍵或 W 被按住時向上移動
+        # 上方向鍵或W被按住時向上移動
         if (
             pygame.K_UP in pressed_keys
             or pygame.K_w in pressed_keys
         ):
             direction.y -= 1
 
-        # 下方向鍵或 S 被按住時向下移動
+        # 下方向鍵或S被按住時向下移動
         if (
             pygame.K_DOWN in pressed_keys
             or pygame.K_s in pressed_keys
         ):
             direction.y += 1
 
-        # 正規化方向向量，避免斜向移動速度較快
+        # 正規化方向向量避免斜向速度過快
         if direction.length_squared() > 0:
-
-            direction = (
-                direction.normalize()
-            )
+            direction = direction.normalize()
 
         return direction
+
+    def set_mouse_target(
+        self,
+        target_position
+    ):
+        """設定一般地面點擊後的移動目標。"""
+
+        # 將點擊座標保存成浮點向量
+        self.mouse_target = pygame.Vector2(
+            target_position
+        )
+
+        # 一般移動會取消原本互動目標
+        self.interaction_target = None
+
+    def get_interaction_stop_point(
+        self,
+        target
+    ):
+        """計算靠近物件時角色實際停下的位置。"""
+
+        object_rect = target[
+            "rect"
+        ]
+
+        interaction_rect = target[
+            "interaction_rect"
+        ]
+
+        player_center = pygame.Vector2(
+            self.rect.center
+        )
+
+        half_width = self.rect.width / 2
+        half_height = self.rect.height / 2
+
+        # 讓停靠點留在物件外側避免角色壓進碰撞區
+        margin = 2
+
+        min_y = (
+            interaction_rect.top
+            + half_height
+        )
+
+        max_y = (
+            interaction_rect.bottom
+            - half_height
+        )
+
+        min_x = (
+            interaction_rect.left
+            + half_width
+        )
+
+        max_x = (
+            interaction_rect.right
+            - half_width
+        )
+
+        # 互動範圍較小時改用物件中心避免上下限反轉
+        if min_y > max_y:
+            min_y = max_y = object_rect.centery
+
+        if min_x > max_x:
+            min_x = max_x = object_rect.centerx
+
+        clamped_y = max(
+            min_y,
+            min(
+                player_center.y,
+                max_y
+            )
+        )
+
+        clamped_x = max(
+            min_x,
+            min(
+                player_center.x,
+                max_x
+            )
+        )
+
+        # 建立物件四個方向可能使用的停靠點
+        candidates = [
+            pygame.Vector2(
+                object_rect.left
+                - half_width
+                - margin,
+                clamped_y
+            ),
+            pygame.Vector2(
+                object_rect.right
+                + half_width
+                + margin,
+                clamped_y
+            ),
+            pygame.Vector2(
+                clamped_x,
+                object_rect.top
+                - half_height
+                - margin
+            ),
+            pygame.Vector2(
+                clamped_x,
+                object_rect.bottom
+                + half_height
+                + margin
+            )
+        ]
+
+        # 選擇距離玩家目前位置最近的停靠點
+        return min(
+            candidates,
+            key=lambda point: (
+                point
+                - player_center
+            ).length_squared()
+        )
+
+    def set_interaction_target(
+        self,
+        target
+    ):
+        """設定需要自動靠近的互動物件。"""
+
+        # 如果已經在範圍內就不再自動移動
+        if self.can_interact(
+            target
+        ):
+            self.cancel_mouse_movement()
+            return
+
+        # 保存完整物件資料供移動期間使用
+        self.interaction_target = target
+
+        # 導航終點改成角色真正會停靠的位置
+        self.mouse_target = (
+            self.get_interaction_stop_point(
+                target
+            )
+        )
+
+    def cancel_mouse_movement(self):
+        """取消目前所有滑鼠自動移動。"""
+
+        self.mouse_target = None
+        self.interaction_target = None
+
+    def can_interact(
+        self,
+        target
+    ):
+        """判斷玩家是否已進入物件互動範圍。"""
+
+        return self.rect.colliderect(
+            target[
+                "interaction_rect"
+            ]
+        )
+
+    def get_mouse_direction(self):
+        """取得朝目前滑鼠目標前進的方向。"""
+
+        if self.mouse_target is None:
+            return pygame.Vector2(
+                0,
+                0
+            )
+
+        # 使用玩家中心計算朝目標的方向
+        player_center = pygame.Vector2(
+            self.rect.center
+        )
+
+        difference = (
+            self.mouse_target
+            - player_center
+        )
+
+        # 接近一般目標時視為已經抵達
+        if difference.length() < 4:
+            self.cancel_mouse_movement()
+
+            return pygame.Vector2(
+                0,
+                0
+            )
+
+        return difference.normalize()
 
     def move_x(
         self,
@@ -100,14 +295,12 @@ class Player:
 
                 # 向右移動時貼齊障礙物左側
                 if move_x > 0:
-
                     self.rect.right = (
                         obstacle.left
                     )
 
                 # 向左移動時貼齊障礙物右側
                 elif move_x < 0:
-
                     self.rect.left = (
                         obstacle.right
                     )
@@ -142,14 +335,12 @@ class Player:
 
                 # 向下移動時貼齊障礙物上側
                 if move_y > 0:
-
                     self.rect.bottom = (
                         obstacle.top
                     )
 
                 # 向上移動時貼齊障礙物下側
                 elif move_y < 0:
-
                     self.rect.top = (
                         obstacle.bottom
                     )
@@ -203,12 +394,42 @@ class Player:
         screen_width,
         screen_height
     ):
-        """更新玩家移動、碰撞與畫面邊界。"""
+        """更新玩家鍵盤或滑鼠移動與碰撞狀態。"""
 
-        # 取得本幀玩家移動方向
-        direction = self.get_direction(
-            pressed_keys
+        # 鍵盤輸入優先於任何滑鼠自動移動
+        keyboard_direction = (
+            self.get_keyboard_direction(
+                pressed_keys
+            )
         )
+
+        if keyboard_direction.length_squared() > 0:
+
+            # 手動操作時取消滑鼠自動移動
+            self.cancel_mouse_movement()
+
+            direction = keyboard_direction
+
+        else:
+
+            # 無鍵盤輸入時才依滑鼠目標移動
+            direction = self.get_mouse_direction()
+
+        # 已進入物件互動範圍就停止自動靠近
+        if (
+            self.interaction_target
+            is not None
+            and self.can_interact(
+                self.interaction_target
+            )
+        ):
+
+            self.cancel_mouse_movement()
+
+            direction = pygame.Vector2(
+                0,
+                0
+            )
 
         # 計算本幀水平移動距離
         move_x = (

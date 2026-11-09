@@ -1,9 +1,9 @@
 import json
 from pathlib import Path  # 匯入Path建立穩定可靠的專案檔案路徑
 
-from game_manager import GameManager
+from managers.game_manager import GameManager
 from game_states import GAME_OVER
-from interaction_manager import interact_with_object  # 匯入統一的場景物件互動處理函式
+from managers.interaction_manager import interact_with_object  # 匯入統一的場景物件互動處理函式
 
 # 執行遊戲請改從game_home.py執行，這裡是舊文字版遊戲Prototype入口
 

@@ -18,7 +18,7 @@
 
 ## 開發日誌格式
 
-每次更新程式時，建議依照以下格式新增一筆。
+每次更新程式時，建議依照以下格式新增一筆(參考用，只要看得懂就好)。
 
 ### YYYY-MM-DD — 負責人
 
@@ -95,7 +95,128 @@
 - 將目前的滑鼠互動逐步改為玩家靠近物件後按鍵互動。
 - 開始整合正式場景與素材。
 
+## 2026/11/8 — 張語恩
+
+- 建立玩家 movement。
+- 建立 collision。
+- 建立互動距離判斷。
+- 將目前的滑鼠互動逐步改為玩家靠近物件後按鍵互動。
+- 開始整合正式場景與素材。
+
+## 2026/11/9 — 張語恩
+
+### 1. Manager / Controller 架構整理
+
+進一步拆分 `game_home.py` 中過度集中的遊戲邏輯，讓不同模組負責各自的功能。
+
+目前主要架構：
+
+- `GameManager`
+  - 管理全域遊戲狀態與遊戲資料
+- `StoryManager`
+  - 管理第一章劇情流程與 Dialogue 後續事件
+- `MapManager`
+  - 管理 Space 版面、碰撞區域、互動範圍與 Player 出生位置
+- `InteractionController`
+  - 管理 Interaction UI 的鍵盤、滑鼠與焦點操作
+- `HotbarController`
+  - 管理 Hotbar 選擇、翻頁、鍵盤與滑鼠輸入
+
 ---
+
+### 2. InteractionController 重構
+
+將原本位於 `game_home.py` 的 Interaction 操作邏輯集中至 `InteractionController`。
+
+包含：
+
+- Interaction 焦點管理
+- 方向鍵操作
+- Enter 確認
+- Esc 返回 / 關閉
+- 滑鼠 hover 與鍵盤焦點同步
+- Container / Searchable / Inspectable
+- 裂隙移動
+- Password
+- Photo
+- Door
+- Item
+- Message 等 Interaction mode
+
+並保留裂隙移動時切換 Space 時的入口資訊，使玩家能從正確裂隙位置生成。
+
+---
+
+### 3. HotbarController 重構
+
+建立並完善 `HotbarController`，將道具欄的狀態與輸入邏輯從 `game_home.py` 移出。
+
+目前由 HotbarController 管理：
+
+- `selected_slot`
+- `selected_item`
+- `offset`
+- 滑鼠滾輪切換
+- 滑鼠點擊 Slot
+- 左右翻頁
+- ← / → 鍵切換
+- 1～5 數字鍵選擇
+- Enter 開啟目前選中物品
+- Hotbar reset
+
+修正 Hotbar 點擊事件的處理順序，避免：
+
+- 點擊空 Slot 後觸發角色地面移動
+- 未點擊 Slot 卻誤選第一格
+- 翻頁邏輯仍殘留在 `game_home.py`
+- 方向鍵 / 數字鍵誤觸發物品開啟
+
+### 4. Save / Load 底層功能整理
+
+完善既有 `save_manager.py`，目前已準備保存以下遊戲資料：
+
+- `game_state`
+- `current_scene` 
+- `current_space`
+- `inventory`
+- `discovered_items`
+- `unlocked_objects`
+- `inspected_objects`
+- `solved_puzzles`
+- `story_events`
+- `puzzle_attempts`
+- `chapter`
+- `game_over_reason`
+- `play_time`
+
+另外新增玩家位置、大小狀態：
+
+- `x`
+- `y`
+- `width`
+- `height`
+
+以及道具欄狀態：
+
+- `selected_slot`
+- `offset`
+
+讀檔時也會對應恢復：
+
+- GameManager 狀態
+- Player 位置與碰撞尺寸
+- Player 浮點位置
+- Hotbar 選擇與翻頁位置
+- 遊戲時間
+
+目前僅完成存檔、讀檔的底層資料處理，尚未接入正式遊戲 UI，也尚未加入自動存檔功能。
+
+---
+
+### 6. 目前狀態
+
+本次修改主要以整合與管理既有遊戲功能為原則：
+
 
 ## 簡易Timeline
 
