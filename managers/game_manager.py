@@ -33,8 +33,7 @@ class GameManager:
         self.current_space = space_name
         self.game_state = SPACE
 
-
-    # ======== Inventory ======== #
+    # ======== 圖鑑欄 ======== #
 
     def discover_item(self, item_id):  # 將曾經取得過的道具加入圖鑑紀錄
         if item_id not in self.discovered_items:
