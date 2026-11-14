@@ -39,8 +39,8 @@
     "spaces": {
         "A": {
             "background": {
-                "asset": null,
-                "label": "Space A / 病房 Placeholder"
+                "asset": "assets/素材庫/第一章/空間A/background.png",
+                "label": "Space A / 病房"
             },
             "player": {
                 "x": 350,
@@ -49,21 +49,89 @@
                 "height": 100,
                 "label": "黎琛 Placeholder"
             },
+            "walkable_polygon": [
+                [
+                    647,
+                    148
+                ],
+                [
+                    744,
+                    148
+                ],
+                [
+                    744,
+                    503
+                ],
+                [
+                    520,
+                    503
+                ],
+                [
+                    520,
+                    444
+                ],
+                [
+                    465,
+                    444
+                ],
+                [
+                    465,
+                    466
+                ],
+                [
+                    333,
+                    466
+                ],
+                [
+                    333,
+                    444
+                ],
+                [
+                    278,
+                    444
+                ],
+                [
+                    278,
+                    503
+                ],
+                [
+                    53,
+                    503
+                ],
+                [
+                    53,
+                    148
+                ],
+                [
+                    163,
+                    148
+                ],
+                [
+                    163,
+                    113
+                ],
+                [
+                    647,
+                    113
+                ]
+            ],
             "objects": {
                 "bed": {
                     "x": 70,
                     "y": 280,
-                    "width": 180,
+                    "width": 90,
                     "height": 110,
-                    "label": "病床 Placeholder",
+                    "asset": "assets/素材庫/第一章/空間A/bed_and_pillow.png",
+                    "label": "病床",
                     "interaction_padding": 40
                 },
                 "mirror": {
                     "x": 600,
-                    "y": 150,
+                    "y": 120,
                     "width": 100,
                     "height": 180,
-                    "label": "鏡子 Placeholder",
+                    "asset": "assets/素材庫/第一章/空間A/mirror.png",
+                    "label": "鏡子",
                     "interaction_padding": 40
                 },
                 "floor_rift_A": {
@@ -71,25 +139,28 @@
                     "y": 420,
                     "width": 160,
                     "height": 70,
-                    "label": "地板裂隙 Placeholder",
+                    "asset": "assets/素材庫/第一章/空間A/portal.png",
+                    "label": "地板裂隙",
                     "interaction_padding": 30
                 },
                 "wardrobe_rift": {
                     "x": 560,
                     "y": 360,
-                    "width": 150,
-                    "height": 120,
-                    "label": "衣櫃裂隙 Placeholder",
+                    "width": 90,
+                    "height": 100,
+                    "asset": "assets/素材庫/第一章/空間A/closet.png",
+                    "overlay_asset": "assets/素材庫/第一章/空間A/portal.png",
+                    "label": "衣櫃裂隙",
                     "interaction_padding": 30
                 }
             },
             "entry_spawns": {
                 "floor_rift_B": {
                     "x": 470,
-                    "y": 370
+                    "y": 350
                 },
                 "rift_C_A": {
-                    "x": 250,
+                    "x": 190,
                     "y": 405
                 }
             },
@@ -97,23 +168,30 @@
                 "bed_body": {
                     "x": 70,
                     "y": 280,
-                    "width": 180,
+                    "width": 90,
                     "height": 110,
                     "kind": "furniture"
                 },
                 "mirror_body": {
-                    "x": 600,
-                    "y": 150,
-                    "width": 100,
-                    "height": 180,
+                    "x": 610,
+                    "y": 160,
+                    "width": 80,
+                    "height": 110,
+                    "kind": "furniture"
+                },
+                "wardrobe_body": {
+                    "x": 560,
+                    "y": 360,
+                    "width": 90,
+                    "height": 100,
                     "kind": "furniture"
                 }
             }
         },
         "B": {
             "background": {
-                "asset": null,
-                "label": "Space B / 工作區 Placeholder"
+                "asset": "assets/素材庫/第一章/空間B/background.png",
+                "label": "Space B / 工作區"
             },
             "player": {
                 "x": 350,
@@ -122,71 +200,141 @@
                 "height": 100,
                 "label": "黎琛 Placeholder"
             },
+            "walkable_polygon": [
+                [
+                    647,
+                    148
+                ],
+                [
+                    744,
+                    148
+                ],
+                [
+                    744,
+                    503
+                ],
+                [
+                    520,
+                    503
+                ],
+                [
+                    520,
+                    444
+                ],
+                [
+                    465,
+                    444
+                ],
+                [
+                    465,
+                    466
+                ],
+                [
+                    333,
+                    466
+                ],
+                [
+                    333,
+                    444
+                ],
+                [
+                    278,
+                    444
+                ],
+                [
+                    278,
+                    503
+                ],
+                [
+                    53,
+                    503
+                ],
+                [
+                    53,
+                    148
+                ],
+                [
+                    163,
+                    148
+                ],
+                [
+                    163,
+                    113
+                ],
+                [
+                    647,
+                    113
+                ]
+            ],
             "objects": {
                 "workbench": {
-                    "x": 80,
-                    "y": 270,
-                    "width": 200,
-                    "height": 120,
-                    "label": "工作檯 Placeholder",
+                    "x": 70,
+                    "y": 195,
+                    "width": 230,
+                    "height": 150,
+                    "asset": "assets/素材庫/第一章/空間B/desk.png",
+                    "label": "工作檯",
                     "interaction_padding": 40
                 },
                 "calendar": {
-                    "x": 570,
-                    "y": 130,
-                    "width": 110,
-                    "height": 160,
-                    "label": "日曆 Placeholder",
+                    "x": 410,
+                    "y": 45,
+                    "width": 50,
+                    "height": 70,
+                    "asset": "assets/素材庫/第一章/空間B/calender.png",
+                    "label": "日曆",
                     "interaction_padding": 40
                 },
                 "floor_rift_B": {
-                    "x": 100,
-                    "y": 430,
-                    "width": 150,
-                    "height": 70,
-                    "label": "地板裂隙 Placeholder",
+                    "x": 85,
+                    "y": 420,
+                    "width": 165,
+                    "height": 100,
+                    "asset": "assets/素材庫/第一章/空間B/bricks.png",
+                    "label": "地板裂隙",
                     "interaction_padding": 30
                 },
                 "ceiling_rift": {
-                    "x": 540,
-                    "y": 70,
-                    "width": 170,
-                    "height": 80,
-                    "label": "通風管裂隙 Placeholder",
+                    "x": 535,
+                    "y": 55,
+                    "width": 185,
+                    "height": 130,
+                    "asset": "assets/素材庫/第一章/空間B/path.png",
+                    "label": "通風管裂隙",
                     "interaction_padding": 30
                 }
             },
             "entry_spawns": {
                 "wardrobe_rift": {
-                    "x": 260,
-                    "y": 400
+                    "x": 220,
+                    "y": 350
                 },
                 "rift_C_B": {
                     "x": 450,
-                    "y": 90
+                    "y": 130
                 }
             },
             "collision_zones": {
                 "workbench_body": {
-                    "x": 80,
-                    "y": 270,
-                    "width": 200,
-                    "height": 120,
+                    "x": 70,
+                    "y": 195,
+                    "width": 230,
+                    "height": 150,
                     "kind": "furniture"
                 },
                 "calendar_body": {
-                    "x": 570,
-                    "y": 130,
-                    "width": 110,
-                    "height": 160,
+                    "x": 410,
+                    "y": 45,
+                    "width": 50,
+                    "height": 70,
                     "kind": "furniture"
                 }
             }
         },
         "C": {
             "background": {
-                "asset": null,
-                "label": "Space C / 純白房間 Placeholder"
+                "asset": "assets/素材庫/第一章/空間C/background.png",
+                "label": "Space C / 純白房間"
             },
             "player": {
                 "x": 350,
@@ -195,6 +343,72 @@
                 "height": 100,
                 "label": "黎琛 Placeholder"
             },
+            "walkable_polygon": [
+                [
+                    647,
+                    148
+                ],
+                [
+                    744,
+                    148
+                ],
+                [
+                    744,
+                    503
+                ],
+                [
+                    520,
+                    503
+                ],
+                [
+                    520,
+                    444
+                ],
+                [
+                    465,
+                    444
+                ],
+                [
+                    465,
+                    466
+                ],
+                [
+                    333,
+                    466
+                ],
+                [
+                    333,
+                    444
+                ],
+                [
+                    278,
+                    444
+                ],
+                [
+                    278,
+                    503
+                ],
+                [
+                    53,
+                    503
+                ],
+                [
+                    53,
+                    148
+                ],
+                [
+                    163,
+                    148
+                ],
+                [
+                    163,
+                    113
+                ],
+                [
+                    647,
+                    113
+                ]
+            ],
             "objects": {
                 "password_panel": {
                     "x": 315,
@@ -210,7 +424,8 @@
                     "width": 150,
                     "height": 120,
                     "label": "裂隙 α Placeholder",
-                    "interaction_padding": 30
+                    "interaction_padding": 30,
+                    "asset": "assets/素材庫/第一章/空間C/portal α.png"
                 },
                 "rift_C_B": {
                     "x": 570,
@@ -218,15 +433,17 @@
                     "width": 150,
                     "height": 120,
                     "label": "裂隙 β Placeholder",
-                    "interaction_padding": 30
+                    "interaction_padding": 30,
+                    "asset": "assets/素材庫/第一章/空間C/portal β.png"
                 },
                 "exit_door": {
-                    "x": 320,
-                    "y": 40,
-                    "width": 160,
-                    "height": 120,
+                    "x": 337,
+                    "y": 28,
+                    "width": 126,
+                    "height": 84,
                     "label": "出口門 Placeholder",
-                    "interaction_padding": 40
+                    "interaction_padding": 40,
+                    "asset": "assets/素材庫/第一章/空間C/door.png"
                 }
             },
             "entry_spawns": {
@@ -246,13 +463,6 @@
                     "width": 170,
                     "height": 100,
                     "kind": "furniture"
-                },
-                "exit_door_body": {
-                    "x": 320,
-                    "y": 40,
-                    "width": 160,
-                    "height": 120,
-                    "kind": "wall_object"
                 }
             }
         }

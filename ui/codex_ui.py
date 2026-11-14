@@ -543,26 +543,27 @@ class CodexUI:
                         item_id
                     )
 
-                    icon_text = (
-                        self.game_ui
-                        .font_small
-                        .render(
-                            "Item",
-                            True,
-                            (
-                                225,
-                                225,
-                                235
+                    if not self.game_ui.draw_item_asset(screen, item_id, icon_rect):
+                        icon_text = (
+                            self.game_ui
+                            .font_small
+                            .render(
+                                "Item",
+                                True,
+                                (
+                                    225,
+                                    225,
+                                    235
+                                )
                             )
                         )
-                    )
 
-                    screen.blit(
-                        icon_text,
-                        icon_text.get_rect(
-                            center=icon_rect.center
+                        screen.blit(
+                            icon_text,
+                            icon_text.get_rect(
+                                center=icon_rect.center
+                            )
                         )
-                    )
 
                 else:
 
@@ -1044,24 +1045,25 @@ class CodexUI:
 
         if unlocked:
 
-            placeholder = (
-                self.game_ui.font_small.render(
-                    "Item Placeholder",
-                    True,
-                    (
-                        225,
-                        225,
-                        235
+            if not self.game_ui.draw_item_asset(screen, item_id, icon_rect):
+                placeholder = (
+                    self.game_ui.font_small.render(
+                        "Item Placeholder",
+                        True,
+                        (
+                            225,
+                            225,
+                            235
+                        )
                     )
                 )
-            )
 
-            screen.blit(
-                placeholder,
-                placeholder.get_rect(
-                    center=icon_rect.center
+                screen.blit(
+                    placeholder,
+                    placeholder.get_rect(
+                        center=icon_rect.center
+                    )
                 )
-            )
 
         else:
 

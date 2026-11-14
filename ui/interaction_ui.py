@@ -304,6 +304,7 @@ class InteractionUI:
             self.mode = "item"
 
             self.result = {
+                "object_id": child_id,  # 保留子道具編號供圖片查詢
                 "name": child[
                     "name"
                 ],
@@ -771,6 +772,12 @@ class InteractionUI:
                 rect.collidepoint(
                     mouse_pos
                 )
+            )
+
+            # 容器內道具共用相同圖片入口
+            self.game_ui.draw_item_asset(
+                screen, child["object_id"],
+                pygame.Rect(rect.x + 4, rect.y + 2, 34, 34), padding=2
             )
 
             buttons[
@@ -1373,18 +1380,29 @@ class InteractionUI:
             140
         )
 
-        self.game_ui.draw_placeholder_rect(
-            screen,
-            picture_rect,
-            (
-                "照片正面 Placeholder"
-                if self.photo_side
-                == "front"
-                else
-                "照片背面 Placeholder"
-            ),
-            color=(115, 105, 95)
+        # 照片正面沿用共用道具圖片繪製
+        front_drawn = (
+            self.photo_side == "front"
+            and self.game_ui.draw_item_asset(
+                screen,
+                self.photo_id,
+                picture_rect
+            )
         )
+
+        if not front_drawn:
+            self.game_ui.draw_placeholder_rect(
+                screen,
+                picture_rect,
+                (
+                    "照片正面 Placeholder"
+                    if self.photo_side
+                    == "front"
+                    else
+                    "照片背面 Placeholder"
+                ),
+                color=(115, 105, 95)
+            )
 
         if self.photo_side == "front":
 
@@ -1626,11 +1644,15 @@ class InteractionUI:
             110
         )
 
-        self.game_ui.draw_placeholder_rect(
-            screen,
-            icon_rect,
-            "Item Placeholder"
-        )
+        # 依道具編號繪圖並保留缺圖備援
+        if not self.game_ui.draw_item_asset(
+            screen, self.result.get("object_id", self.current_object_id), icon_rect
+        ):
+            self.game_ui.draw_placeholder_rect(
+                screen,
+                icon_rect,
+                "Item Placeholder"
+            )
 
         self.draw_multiline_text(
             screen,
@@ -1677,7 +1699,7 @@ class InteractionUI:
         modal = self.draw_modal_base(
             screen,
             width=380,
-            height=240
+            height=340
         )
 
         title = self.game_ui.font_large.render(
@@ -1696,6 +1718,13 @@ class InteractionUI:
             )
         )
 
+        # 通知依道具編號顯示共用圖片
+        icon_rect = pygame.Rect(modal.centerx - 60, modal.y + 75, 120, 120)
+        if not self.game_ui.draw_item_asset(
+            screen, self.notification.get("item_id"), icon_rect
+        ):
+            self.game_ui.draw_placeholder_rect(screen, icon_rect, "Item Placeholder")
+
         item_name = self.notification[
             "name"
         ]
@@ -1711,7 +1740,7 @@ class InteractionUI:
             name_surface.get_rect(
                 center=(
                     modal.centerx,
-                    modal.centery
+                    modal.y + 225
                 )
             )
         )

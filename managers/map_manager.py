@@ -59,7 +59,7 @@ class MapManager:
         return object_rects
 
     def get_collision_rects(self, space_id, screen):
-        """建立指定Space所有不可通行區域Rect。"""
+        """建立家具等局部障礙物的畫面Rect。"""
 
         space_layout = self.get_space_layout(
             space_id
@@ -81,6 +81,36 @@ class MapManager:
             )
 
         return collision_rects
+
+    def get_walkable_polygon(
+        self,
+        space_id,
+        screen
+    ):
+        """將Base座標的可行走Polygon縮放到目前視窗。"""
+
+        space_layout = self.get_space_layout(
+            space_id
+        )
+
+        polygon_layout = space_layout.get(
+            "walkable_polygon",
+            []
+        )
+
+        return [
+            (
+                self.game_ui.scale_x(
+                    screen,
+                    point[0]
+                ),
+                self.game_ui.scale_y(
+                    screen,
+                    point[1]
+                )
+            )
+            for point in polygon_layout
+        ]
 
     def get_interaction_rects(
         self,
@@ -138,7 +168,7 @@ class MapManager:
         return interaction_rects
 
     def build_space_runtime_data(self, space_id, screen):
-        """一次建立探索模式需要的所有Space Rect資料。"""
+        """一次建立探索模式需要的所有Space物理資料。"""
 
         object_rects = self.get_object_rects(
             space_id,
@@ -146,6 +176,11 @@ class MapManager:
         )
 
         collision_rects = self.get_collision_rects(
+            space_id,
+            screen
+        )
+
+        walkable_polygon = self.get_walkable_polygon(
             space_id,
             screen
         )
@@ -159,6 +194,7 @@ class MapManager:
         return {
             "object_rects": object_rects,
             "collision_rects": collision_rects,
+            "walkable_polygon": walkable_polygon,
             "interaction_rects": interaction_rects
         }
 
@@ -176,7 +212,6 @@ class MapManager:
         if default_layout is None:
             return None
 
-        # 複製資料避免入口座標改到預設出生點
         player_layout = dict(
             default_layout
         )
@@ -224,8 +259,7 @@ class MapManager:
             player_layout
         )
 
-
-        # 角色尺寸跟隨目前Space的Player版面，並將Player尺寸縮小至原版面的75%(原本太大)
+        # 角色尺寸跟隨目前Space的Player版面，並縮小至75%
         player_width = int(
             spawn_rect.width * 0.75
         )
@@ -239,7 +273,7 @@ class MapManager:
             player_height
         )
 
-        # 縮小後仍保持出生點中心不變
+        # 縮小後仍維持原本出生點中心位置
         player.rect.center = (
             spawn_rect.center
         )
@@ -249,7 +283,7 @@ class MapManager:
             player.rect.y
         )
 
-        # 切換Space時取消舊滑鼠導航目標
+        # 切換Space後取消舊的滑鼠移動目標
         player.cancel_mouse_movement()
 
         return True
