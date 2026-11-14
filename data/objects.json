@@ -104,9 +104,7 @@
         "type": "puzzle",
         "space": "C",
         "description": "純白房間中央懸浮著一個六位數密碼鎖。",
-        "correct_password": "100101",
-        "max_attempts": 3,
-        "reward_item": "photo_1"
+        "puzzle_id": "chapter1_password"
     },
 
     "photo_1": {

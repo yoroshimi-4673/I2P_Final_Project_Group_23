@@ -14,6 +14,8 @@ from ui.dialogue_ui import (
 )
 
 from managers.game_manager import GameManager
+from managers.puzzle_manager import PuzzleManager
+from controllers.puzzle_controller import PuzzleController
 from managers.map_manager import MapManager
 from managers.story_manager import StoryManager
 
@@ -114,6 +116,8 @@ objects = load_json(
     OBJECTS_PATH
 )
 
+puzzles = load_json(BASE_DIR / "data" / "puzzles.json")
+
 dialogues = load_json(
     DIALOGUE_PATH
 )
@@ -162,6 +166,8 @@ clock = pygame.time.Clock()
 # ============================================================
 
 game = GameManager()
+puzzle_manager = PuzzleManager(game, puzzles, objects)
+puzzle_controller = PuzzleController(puzzle_manager)  # 所有謎題共用單一輸入控制器
 
 game_ui = GameUI(
     ui_layout,
@@ -193,7 +199,8 @@ interaction_ui = InteractionUI(
     game_ui,
     game,
     objects,
-    levels
+    levels,
+    puzzle_controller
 )
 
 codex_ui = CodexUI(
@@ -205,7 +212,8 @@ codex_ui = CodexUI(
 interaction_controller = InteractionController(
     interaction_ui,
     story_manager,
-    game
+    game,
+    puzzle_controller
 )
 
 hotbar_controller = HotbarController(
@@ -1931,7 +1939,7 @@ while running:
                         # 每次重新開啟Interaction都從預設控制項開始
                         interaction_controller.reset_interaction_focus()
 
-                        interaction_ui.open_object(
+                        interaction_controller.open_object(
                             nearest_target[
                                 "id"
                             ]
