@@ -3,14 +3,12 @@
         "width": 800,
         "height": 600
     },
-
     "scenes": {
         "room_307": {
             "background": {
                 "asset": null,
                 "label": "307病房 Background Placeholder"
             },
-
             "characters": {
                 "li_chen": {
                     "x": 220,
@@ -19,7 +17,6 @@
                     "height": 220,
                     "label": "黎琛 Placeholder"
                 },
-
                 "li_nian": {
                     "x": 470,
                     "y": 190,
@@ -28,7 +25,6 @@
                     "label": "黎念 Placeholder"
                 }
             },
-
             "objects": {
                 "hospital_bed": {
                     "x": 500,
@@ -40,14 +36,12 @@
             }
         }
     },
-
     "spaces": {
         "A": {
             "background": {
                 "asset": null,
                 "label": "Space A / 病房 Placeholder"
             },
-
             "player": {
                 "x": 350,
                 "y": 300,
@@ -55,48 +49,72 @@
                 "height": 100,
                 "label": "黎琛 Placeholder"
             },
-
             "objects": {
                 "bed": {
                     "x": 70,
                     "y": 280,
                     "width": 180,
                     "height": 110,
-                    "label": "病床 Placeholder"
+                    "label": "病床 Placeholder",
+                    "interaction_padding": 40
                 },
-
                 "mirror": {
                     "x": 600,
                     "y": 150,
                     "width": 100,
                     "height": 180,
-                    "label": "鏡子 Placeholder"
+                    "label": "鏡子 Placeholder",
+                    "interaction_padding": 40
                 },
-
                 "floor_rift_A": {
                     "x": 80,
                     "y": 420,
                     "width": 160,
                     "height": 70,
-                    "label": "地板裂隙 Placeholder"
+                    "label": "地板裂隙 Placeholder",
+                    "interaction_padding": 30
                 },
-
                 "wardrobe_rift": {
                     "x": 560,
                     "y": 360,
                     "width": 150,
                     "height": 120,
-                    "label": "衣櫃裂隙 Placeholder"
+                    "label": "衣櫃裂隙 Placeholder",
+                    "interaction_padding": 30
+                }
+            },
+            "entry_spawns": {
+                "floor_rift_B": {
+                    "x": 470,
+                    "y": 370
+                },
+                "rift_C_A": {
+                    "x": 250,
+                    "y": 405
+                }
+            },
+            "collision_zones": {
+                "bed_body": {
+                    "x": 70,
+                    "y": 280,
+                    "width": 180,
+                    "height": 110,
+                    "kind": "furniture"
+                },
+                "mirror_body": {
+                    "x": 600,
+                    "y": 150,
+                    "width": 100,
+                    "height": 180,
+                    "kind": "furniture"
                 }
             }
         },
-
         "B": {
             "background": {
                 "asset": null,
                 "label": "Space B / 工作區 Placeholder"
             },
-
             "player": {
                 "x": 350,
                 "y": 300,
@@ -104,48 +122,72 @@
                 "height": 100,
                 "label": "黎琛 Placeholder"
             },
-
             "objects": {
                 "workbench": {
                     "x": 80,
                     "y": 270,
                     "width": 200,
                     "height": 120,
-                    "label": "工作檯 Placeholder"
+                    "label": "工作檯 Placeholder",
+                    "interaction_padding": 40
                 },
-
                 "calendar": {
                     "x": 570,
                     "y": 130,
                     "width": 110,
                     "height": 160,
-                    "label": "日曆 Placeholder"
+                    "label": "日曆 Placeholder",
+                    "interaction_padding": 40
                 },
-
                 "floor_rift_B": {
                     "x": 100,
                     "y": 430,
                     "width": 150,
                     "height": 70,
-                    "label": "地板裂隙 Placeholder"
+                    "label": "地板裂隙 Placeholder",
+                    "interaction_padding": 30
                 },
-
                 "ceiling_rift": {
                     "x": 540,
                     "y": 70,
                     "width": 170,
                     "height": 80,
-                    "label": "通風管裂隙 Placeholder"
+                    "label": "通風管裂隙 Placeholder",
+                    "interaction_padding": 30
+                }
+            },
+            "entry_spawns": {
+                "wardrobe_rift": {
+                    "x": 260,
+                    "y": 400
+                },
+                "rift_C_B": {
+                    "x": 450,
+                    "y": 90
+                }
+            },
+            "collision_zones": {
+                "workbench_body": {
+                    "x": 80,
+                    "y": 270,
+                    "width": 200,
+                    "height": 120,
+                    "kind": "furniture"
+                },
+                "calendar_body": {
+                    "x": 570,
+                    "y": 130,
+                    "width": 110,
+                    "height": 160,
+                    "kind": "furniture"
                 }
             }
         },
-
         "C": {
             "background": {
                 "asset": null,
                 "label": "Space C / 純白房間 Placeholder"
             },
-
             "player": {
                 "x": 350,
                 "y": 320,
@@ -153,43 +195,68 @@
                 "height": 100,
                 "label": "黎琛 Placeholder"
             },
-
             "objects": {
                 "password_panel": {
                     "x": 315,
                     "y": 170,
                     "width": 170,
                     "height": 100,
-                    "label": "六位數密碼鎖 Placeholder"
+                    "label": "六位數密碼鎖 Placeholder",
+                    "interaction_padding": 40
                 },
-
                 "rift_C_A": {
                     "x": 80,
                     "y": 250,
                     "width": 150,
                     "height": 120,
-                    "label": "裂隙 α Placeholder"
+                    "label": "裂隙 α Placeholder",
+                    "interaction_padding": 30
                 },
-
                 "rift_C_B": {
                     "x": 570,
                     "y": 250,
                     "width": 150,
                     "height": 120,
-                    "label": "裂隙 β Placeholder"
+                    "label": "裂隙 β Placeholder",
+                    "interaction_padding": 30
                 },
-
                 "exit_door": {
                     "x": 320,
                     "y": 40,
                     "width": 160,
                     "height": 120,
-                    "label": "出口門 Placeholder"
+                    "label": "出口門 Placeholder",
+                    "interaction_padding": 40
+                }
+            },
+            "entry_spawns": {
+                "floor_rift_A": {
+                    "x": 115,
+                    "y": 380
+                },
+                "ceiling_rift": {
+                    "x": 480,
+                    "y": 280
+                }
+            },
+            "collision_zones": {
+                "password_panel_body": {
+                    "x": 315,
+                    "y": 170,
+                    "width": 170,
+                    "height": 100,
+                    "kind": "furniture"
+                },
+                "exit_door_body": {
+                    "x": 320,
+                    "y": 40,
+                    "width": 160,
+                    "height": 120,
+                    "kind": "wall_object"
                 }
             }
         }
     },
-
     "hud": {
         "settings_button": {
             "x": 20,
@@ -197,7 +264,6 @@
             "width": 90,
             "height": 40
         },
-
         "space_info": {
             "x": 20,
             "y": 75,
@@ -205,7 +271,6 @@
             "height": 90
         }
     },
-
     "hotbar": {
         "visible_slots": 5,
         "slot_size": 55,
@@ -214,7 +279,6 @@
         "show_arrows": true,
         "newest_item_on_left": true
     },
-
     "popup": {
         "default_width": 460,
         "default_height": 300
