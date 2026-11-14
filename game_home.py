@@ -21,6 +21,8 @@ from player import Player #匯入角色移動模組
 
 from controllers.interaction_controller import InteractionController
 from controllers.hotbar_controller import HotbarController
+from controllers.codex_controller import CodexController
+from controllers.settings_controller import SettingsController
 
 from game_states import (
     DIALOGUE,
@@ -42,6 +44,22 @@ from ui.interaction_ui import InteractionUI
 
 pygame.init()
 pygame.key.stop_text_input()
+
+DEBUG_COLLISION = True  # 顯示Polygon與家具碰撞供校正
+POLYGON_EDITOR_ENABLED = True  # Enable mouse and keyboard polygon editing
+polygon_editor_active = False  # 記錄目前是否正在繪製Polygon
+polygon_editor_points = []  # 暫存本次繪製的Base座標頂點
+polygon_editor_space = None  # 記錄目前正在編輯哪一個Space
+polygon_editor_cursor = [400.0, 300.0]  # 保存鍵盤繪圖游標Base座標
+POLYGON_CURSOR_SPEED = 180  # 設定鍵盤繪圖游標每秒移動速度
+POLYGON_CURSOR_HOLD_MS = 1000
+polygon_editor_key_started = {}
+POLYGON_CURSOR_DIRECTIONS = {
+    pygame.K_LEFT: (-1, 0),
+    pygame.K_RIGHT: (1, 0),
+    pygame.K_UP: (0, -1),
+    pygame.K_DOWN: (0, 1)
+}
 
 BASE_DIR = Path(__file__).resolve().parent  # 取得目前專案根目錄位置
 
@@ -196,6 +214,14 @@ hotbar_controller = HotbarController(
     interaction_ui,
     interaction_controller
 )
+
+# 集中管理Codex導覽與輸入
+codex_controller = CodexController(
+    codex_ui
+)
+
+# 集中管理音量、外觀與Settings輸入
+settings_controller = SettingsController()
 
 # ============================================================
 # Player
@@ -448,6 +474,200 @@ def draw_interaction_prompt(
 
 
 # ============================================================
+# Polygon Editor Debug Tools
+# ============================================================
+
+
+def screen_to_base(position):
+    """將目前視窗座標換算成ui_layout使用的Base座標。"""
+
+    base_width = ui_layout["base_resolution"]["width"]
+    base_height = ui_layout["base_resolution"]["height"]
+
+    return (
+        round(position[0] * base_width / screen.get_width()),
+        round(position[1] * base_height / screen.get_height())
+    )
+
+
+def base_to_screen(point):
+    """將Base座標換算成目前視窗使用的座標。"""
+
+    base_width = ui_layout["base_resolution"]["width"]
+    base_height = ui_layout["base_resolution"]["height"]
+
+    return (
+        round(point[0] * screen.get_width() / base_width),
+        round(point[1] * screen.get_height() / base_height)
+    )
+
+
+def draw_polygon_editor(surface, base_points, cursor_base, space_id):
+    """繪製鍵盤操作的Polygon邊界編輯器。"""
+
+    screen_points = [
+        base_to_screen(point)
+        for point in base_points
+    ]
+
+    cursor_screen = base_to_screen(
+        cursor_base
+    )
+
+    if len(screen_points) >= 3:
+        overlay = pygame.Surface(
+            surface.get_size(),
+            pygame.SRCALPHA
+        )
+
+        pygame.draw.polygon(
+            overlay,
+            (0, 200, 255, 45),
+            screen_points
+        )
+
+        surface.blit(
+            overlay,
+            (0, 0)
+        )
+
+    if len(screen_points) >= 2:
+        pygame.draw.lines(
+            surface,
+            (0, 230, 255),
+            False,
+            screen_points,
+            width=3
+        )
+
+    if screen_points:
+        pygame.draw.line(
+            surface,
+            (120, 245, 255),
+            screen_points[-1],
+            cursor_screen,
+            width=2
+        )
+
+    if len(screen_points) >= 3:
+        pygame.draw.line(
+            surface,
+            (0, 190, 230),
+            screen_points[-1],
+            screen_points[0],
+            width=2
+        )
+
+    for index, (screen_point, base_point) in enumerate(
+        zip(screen_points, base_points)
+    ):
+        pygame.draw.circle(
+            surface,
+            (0, 245, 255),
+            screen_point,
+            6
+        )
+
+        label = game_ui.font_small.render(
+            f"{index}: ({base_point[0]}, {base_point[1]})",
+            True,
+            (220, 255, 255)
+        )
+
+        surface.blit(
+            label,
+            (screen_point[0] + 8, screen_point[1] - 18)
+        )
+
+    pygame.draw.circle(
+        surface,
+        (255, 230, 60),
+        cursor_screen,
+        8,
+        width=2
+    )
+
+    pygame.draw.line(
+        surface,
+        (255, 230, 60),
+        (cursor_screen[0] - 12, cursor_screen[1]),
+        (cursor_screen[0] + 12, cursor_screen[1]),
+        width=1
+    )
+
+    pygame.draw.line(
+        surface,
+        (255, 230, 60),
+        (cursor_screen[0], cursor_screen[1] - 12),
+        (cursor_screen[0], cursor_screen[1] + 12),
+        width=1
+    )
+
+    cursor_x = round(cursor_base[0])
+    cursor_y = round(cursor_base[1])
+
+    info_lines = [
+        f"Polygon Editor / Space {space_id}",
+        f"Cursor: ({cursor_x}, {cursor_y})",
+        f"Vertices: {len(base_points)}",
+        "Mouse: move; Arrows: 1px, hold 2s to move",
+        "Left click / Space: add; Right click / Backspace / Delete: undo",
+        "R：清空   Enter：套用並輸出JSON",
+        "F2 / Esc：離開編輯模式"
+    ]
+
+    panel_width = min(
+        500,
+        surface.get_width() - 20
+    )
+
+    panel_height = 24 + len(info_lines) * 21
+
+    panel_rect = pygame.Rect(
+        10,
+        10,
+        panel_width,
+        panel_height
+    )
+
+    panel = pygame.Surface(
+        panel_rect.size,
+        pygame.SRCALPHA
+    )
+
+    panel.fill((10, 20, 28, 215))
+    surface.blit(panel, panel_rect)
+
+    y = panel_rect.y + 9
+
+    for index, line in enumerate(info_lines):
+        font = (
+            game_ui.font_ui
+            if index == 0
+            else game_ui.font_small
+        )
+
+        color = (
+            (120, 245, 255)
+            if index == 0
+            else (230, 240, 245)
+        )
+
+        text_surface = font.render(
+            line,
+            True,
+            color
+        )
+
+        surface.blit(
+            text_surface,
+            (panel_rect.x + 10, y)
+        )
+
+        y += 25 if index == 0 else 21
+
+
+# ============================================================
 # UI State
 #
 # 注意：
@@ -461,27 +681,6 @@ UI_CODEX = "codex"
 ui_screen = UI_MENU  # 記錄目前主要顯示的UI頁面
 
 ui_overlay = None  # 記錄Settings等覆蓋式介面
-
-previous_ui_screen = UI_MENU  # 圖鑑返回時使用的上一個畫面
-
-codex_return_to_settings = False  # 記錄圖鑑是否由設定頁進入
-
-
-# ============================================================
-# Settings
-# ============================================================
-
-volume = 50
-
-looks = [
-    (255, 90, 90),
-    (90, 220, 120),
-    (100, 140, 255)
-]
-
-current_look_index = 0
-
-dragging_volume = False
 
 # ============================================================
 # Game Flow
@@ -583,20 +782,15 @@ def open_codex(
     """進入Codex並記錄正確返回位置。"""
 
     global ui_screen
-    global previous_ui_screen
     global ui_overlay
-    global codex_return_to_settings
 
-    previous_ui_screen = (
-        ui_screen
-    )
-
-    codex_return_to_settings = (
+    # 將返回來源交由CodexController保存
+    codex_controller.open(
+        ui_screen,
         from_settings
     )
 
     ui_screen = UI_CODEX
-
     ui_overlay = None
 
 
@@ -605,19 +799,17 @@ def close_codex():
 
     global ui_screen
     global ui_overlay
-    global codex_return_to_settings
 
-    codex_ui.close_item()
+    result = codex_controller.close()
 
-    ui_screen = (
-        previous_ui_screen
-    )
+    ui_screen = result[
+        "ui_screen"
+    ]
 
-    if codex_return_to_settings:
-
+    if result[
+        "open_settings"
+    ]:
         ui_overlay = "settings"
-
-    codex_return_to_settings = False
 
 
 # ============================================================
@@ -921,6 +1113,8 @@ while running:
 
     interaction_rects = {}
 
+    walkable_polygon = []
+
     choice_rects = []
 
     hotbar_data = None
@@ -983,13 +1177,63 @@ while running:
         # ====================================================
 
         elif (
+            event.type == pygame.MOUSEMOTION
+            and polygon_editor_active
+            and event.rel != (0, 0)
+        ):
+            polygon_editor_cursor = list(screen_to_base(event.pos))
+
+        elif (
             event.type
             == pygame.MOUSEBUTTONDOWN
             and event.button == 1
         ):
 
-            mouse_clicked = True
+            # Polygon編輯中可用一般滑鼠點擊操作
+            if polygon_editor_active:
 
+                base_point = screen_to_base(event.pos)
+
+                polygon_editor_cursor = [
+                    base_point[0],
+                    base_point[1]
+                ]
+
+                polygon_editor_points.append(
+                    (
+                        base_point[0],
+                        base_point[1]
+                    )
+                )
+
+                print(
+                    "[Polygon Editor] "
+                    f"新增頂點 "
+                    f"{len(polygon_editor_points) - 1}: "
+                    f"{polygon_editor_points[-1]}"
+                )
+
+            else:
+
+                mouse_clicked = True
+
+        elif (
+            event.type
+            == pygame.MOUSEBUTTONDOWN
+            and event.button == 3
+            and polygon_editor_active
+        ):
+
+            if polygon_editor_points:
+
+                removed_point = (
+                    polygon_editor_points.pop()
+                )
+
+                print(
+                    "[Polygon Editor] "
+                    f"撤銷頂點：{removed_point}"
+                )
 
         elif (
             event.type
@@ -997,11 +1241,9 @@ while running:
             and event.button == 1
         ):
 
-            dragging_volume = False
+            settings_controller.stop_volume_drag()
 
-            codex_ui.dragging_scrollbar = (
-                False
-            )
+            codex_controller.stop_dragging()
 
 
         # ====================================================
@@ -1012,7 +1254,7 @@ while running:
 
             if ui_screen == UI_CODEX:
 
-                codex_ui.handle_wheel(
+                codex_controller.handle_wheel(
                     event,
                     mouse_pos
                 )
@@ -1033,6 +1275,133 @@ while running:
         # ====================================================
 
         elif event.type == pygame.KEYDOWN:
+
+            # Polygon編輯器優先攔截探索模式鍵盤事件
+            if (
+                POLYGON_EDITOR_ENABLED
+                and ui_screen == UI_GAME
+                and game.game_state == SPACE
+                and ui_overlay is None
+                and not interaction_ui.is_open()
+            ):
+
+                if event.key == pygame.K_F2:
+                    polygon_editor_key_started.clear()
+                    polygon_editor_active = not polygon_editor_active
+
+                    if polygon_editor_active:
+                        polygon_editor_space = game.current_space
+                        polygon_editor_points = []
+
+                        polygon_editor_cursor = [
+                            ui_layout["base_resolution"]["width"] / 2,
+                            ui_layout["base_resolution"]["height"] / 2
+                        ]
+
+                        pressed_keys.clear()
+                        player.cancel_mouse_movement()
+
+                        print(
+                            "[Polygon Editor] "
+                            f"開始編輯 Space {polygon_editor_space}"
+                        )
+
+                    else:
+                        polygon_editor_points = []
+                        polygon_editor_space = None
+                        print("[Polygon Editor] 已離開")
+
+                    continue
+
+                if polygon_editor_active:
+
+                    if event.key in POLYGON_CURSOR_DIRECTIONS:
+                        if event.key not in polygon_editor_key_started:
+                            polygon_editor_key_started[event.key] = pygame.time.get_ticks()
+                            dx, dy = POLYGON_CURSOR_DIRECTIONS[event.key]
+                            polygon_editor_cursor[0] = max(0, min(
+                                polygon_editor_cursor[0] + dx,
+                                ui_layout["base_resolution"]["width"]
+                            ))
+                            polygon_editor_cursor[1] = max(0, min(
+                                polygon_editor_cursor[1] + dy,
+                                ui_layout["base_resolution"]["height"]
+                            ))
+
+                    elif event.key == pygame.K_ESCAPE:
+                        polygon_editor_active = False
+                        polygon_editor_points = []
+                        polygon_editor_space = None
+                        print("[Polygon Editor] 已取消")
+
+                    elif event.key == pygame.K_SPACE:
+                        new_point = (
+                            round(polygon_editor_cursor[0]),
+                            round(polygon_editor_cursor[1])
+                        )
+
+                        polygon_editor_points.append(new_point)
+
+                        print(
+                            "[Polygon Editor] "
+                            f"新增頂點 {len(polygon_editor_points) - 1}: "
+                            f"{new_point}"
+                        )
+
+                    elif event.key in (
+                        pygame.K_BACKSPACE,
+                        pygame.K_DELETE
+                    ):
+                        if polygon_editor_points:
+                            removed_point = polygon_editor_points.pop()
+
+                            print(
+                                "[Polygon Editor] "
+                                f"撤銷頂點：{removed_point}"
+                            )
+
+                    elif event.key == pygame.K_r:
+                        polygon_editor_points = []
+                        print("[Polygon Editor] 已清空全部頂點")
+
+                    elif event.key == pygame.K_RETURN:
+                        if len(polygon_editor_points) < 3:
+                            print("[Polygon Editor] 至少需要3個頂點。")
+
+                        else:
+                            polygon_data = [
+                                [point[0], point[1]]
+                                for point in polygon_editor_points
+                            ]
+
+                            ui_layout["spaces"][polygon_editor_space][
+                                "walkable_polygon"
+                            ] = polygon_data
+
+                            print(
+                                "\n[Polygon Editor] 請將以下內容貼入 "
+                                f"Space {polygon_editor_space}:"
+                            )
+
+                            print(
+                                '"walkable_polygon": '
+                                + json.dumps(
+                                    polygon_data,
+                                    ensure_ascii=False,
+                                    indent=4
+                                )
+                            )
+
+                            print(
+                                "[Polygon Editor] "
+                                "已暫時套用至目前遊戲。\n"
+                            )
+
+                            polygon_editor_active = False
+                            polygon_editor_points = []
+                            polygon_editor_space = None
+
+                    continue
 
             # 正常探索時才記錄WASD移動按鍵
             if (
@@ -1058,8 +1427,13 @@ while running:
 
             if ui_overlay == "settings":
 
-                if event.key == pygame.K_ESCAPE:
+                result = (
+                    settings_controller.handle_key(
+                        event
+                    )
+                )
 
+                if result == "close_settings":
                     ui_overlay = None
 
                 continue
@@ -1071,14 +1445,13 @@ while running:
 
             if ui_screen == UI_CODEX:
 
-                if codex_ui.selected_item is not None:
+                result = (
+                    codex_controller.handle_key(
+                        event
+                    )
+                )
 
-                    if event.key == pygame.K_ESCAPE:
-
-                        codex_ui.close_item()
-
-                elif event.key == pygame.K_ESCAPE:
-
+                if result == "close_codex":
                     close_codex()
 
                 continue
@@ -1224,6 +1597,8 @@ while running:
 
         elif event.type == pygame.KEYUP:
 
+            polygon_editor_key_started.pop(event.key, None)
+
             # WASD放開時移除玩家移動狀態
             if event.key in (
                 pygame.K_w,
@@ -1242,6 +1617,8 @@ while running:
         # ====================================================
 
         elif event.type == pygame.WINDOWFOCUSLOST:
+
+            polygon_editor_key_started.clear()
 
             # 視窗失焦時清除殘留的移動按鍵
             pressed_keys.clear()
@@ -1275,6 +1652,47 @@ while running:
         # 離開自由探索時取消滑鼠自動移動
         player.cancel_mouse_movement()
 
+
+    # ========================================================
+    # Polygon Editor Cursor
+    # ========================================================
+
+    if polygon_editor_active and pygame.key.get_focused():
+        now = pygame.time.get_ticks()
+        cursor_movement = pygame.Vector2(0, 0)
+
+        for key, started in polygon_editor_key_started.items():
+            # Only the portion of this frame after the two-second delay moves.
+            move_dt = min(dt, max(0, now - started - POLYGON_CURSOR_HOLD_MS) / 1000)
+            cursor_movement += pygame.Vector2(POLYGON_CURSOR_DIRECTIONS[key]) * move_dt
+
+        # Preserve the existing diagonal speed limit.
+        if cursor_movement.length() > dt:
+            cursor_movement.scale_to_length(dt)
+
+        polygon_editor_cursor[0] += cursor_movement.x * POLYGON_CURSOR_SPEED
+        polygon_editor_cursor[1] += cursor_movement.y * POLYGON_CURSOR_SPEED
+
+        base_width = ui_layout[
+            "base_resolution"
+        ]["width"]
+
+        base_height = ui_layout[
+            "base_resolution"
+        ]["height"]
+
+        polygon_editor_cursor[0] = max(
+            0,
+            min(polygon_editor_cursor[0], base_width)
+        )
+
+        polygon_editor_cursor[1] = max(
+            0,
+            min(polygon_editor_cursor[1], base_height)
+        )
+
+    else:
+        polygon_editor_key_started.clear()
 
     # ========================================================
     # Render Main Menu
@@ -1344,9 +1762,7 @@ while running:
                     screen,
                     game,
                     mouse_pos,
-                    looks[
-                        current_look_index
-                    ]
+                    settings_controller.get_current_look()
                 )
 
             elif dialogue_id == "chapter_1_end":
@@ -1460,9 +1876,7 @@ while running:
                 screen,
                 game,
                 mouse_pos,
-                looks[
-                    current_look_index
-                ]
+                settings_controller.get_current_look()
             )
 
             # MapManager集中建立探索模式需要的Rect資料
@@ -1485,6 +1899,10 @@ while running:
                 "interaction_rects"
             ]
 
+            walkable_polygon = space_data[
+                "walkable_polygon"
+            ]
+
             obstacles = list(
                 collision_rects.values()
             )
@@ -1493,6 +1911,7 @@ while running:
             if (
                 ui_overlay is None
                 and not interaction_ui.is_open()
+                and not polygon_editor_active
             ):
 
                 # E鍵只和目前範圍內最近的物件互動
@@ -1526,7 +1945,8 @@ while running:
                         pressed_keys,
                         obstacles,
                         screen_width,
-                        screen_height
+                        screen_height,
+                        walkable_polygon
                     )
 
             # 其他介面開啟時立即停止持續移動
@@ -1542,12 +1962,28 @@ while running:
                 screen
             )
 
+            if DEBUG_COLLISION:
+                game_ui.draw_debug_collision(
+                    screen,
+                    walkable_polygon,
+                    collision_rects
+                )
+
+            if (
+                polygon_editor_active
+                and polygon_editor_space == game.current_space
+            ):
+                draw_polygon_editor(
+                    screen,
+                    polygon_editor_points,
+                    polygon_editor_cursor,
+                    polygon_editor_space
+                )
+
             # 繪製正式Player取代舊有Placeholder
             player.draw(
                 screen,
-                looks[
-                    current_look_index
-                ]
+                settings_controller.get_current_look()
             )
 
             # 找出目前E鍵會作用的最近互動物件
@@ -1601,9 +2037,7 @@ while running:
                     screen,
                     game,
                     mouse_pos,
-                    looks[
-                        current_look_index
-                    ]
+                    settings_controller.get_current_look()
                 )
             )
 
@@ -1691,9 +2125,9 @@ while running:
             game_ui.draw_settings_overlay(
                 screen,
                 mouse_pos,
-                volume,
-                current_look_index,
-                looks
+                settings_controller.volume,
+                settings_controller.current_look_index,
+                settings_controller.looks
             )
         )
 
@@ -1710,102 +2144,62 @@ while running:
 
         if ui_overlay == "settings":
 
-            if settings_buttons:
-
-                if settings_buttons[
-                    "slider"
-                ].collidepoint(
+            result = (
+                settings_controller.handle_click(
+                    settings_buttons,
                     mouse_pos
-                ):
+                )
+            )
 
-                    dragging_volume = True
+            if result == "resolution_800":
 
+                screen_width = 800
+                screen_height = 600
 
-                elif settings_buttons[
-                    "800"
-                ].collidepoint(
-                    mouse_pos
-                ):
+                screen = pygame.display.set_mode(
+                    (
+                        screen_width,
+                        screen_height
+                    ),
+                    pygame.RESIZABLE
+                )
 
-                    screen_width = 800
-                    screen_height = 600
+                # 視窗縮放後重新套用出生座標比例
+                last_player_space = None
+                player.cancel_mouse_movement()
 
-                    screen = (
-                        pygame.display
-                        .set_mode(
-                            (
-                                screen_width,
-                                screen_height
-                            ),
-                            pygame.RESIZABLE
-                        )
-                    )
+            elif result == "resolution_1024":
 
+                screen_width = 1024
+                screen_height = 768
 
-                elif settings_buttons[
-                    "1024"
-                ].collidepoint(
-                    mouse_pos
-                ):
+                screen = pygame.display.set_mode(
+                    (
+                        screen_width,
+                        screen_height
+                    ),
+                    pygame.RESIZABLE
+                )
 
-                    screen_width = 1024
-                    screen_height = 768
+                # 視窗縮放後重新套用出生座標比例
+                last_player_space = None
+                player.cancel_mouse_movement()
 
-                    screen = (
-                        pygame.display
-                        .set_mode(
-                            (
-                                screen_width,
-                                screen_height
-                            ),
-                            pygame.RESIZABLE
-                        )
-                    )
+            elif result == "open_codex":
 
+                open_codex(
+                    from_settings=True
+                )
 
-                elif settings_buttons[
-                    "look"
-                ].collidepoint(
-                    mouse_pos
-                ):
+            elif result == "go_menu":
 
-                    current_look_index = (
-                        current_look_index
-                        + 1
-                    ) % len(looks)
+                interaction_ui.close()
+                ui_screen = UI_MENU
+                ui_overlay = None
 
+            elif result == "close_settings":
 
-                elif settings_buttons[
-                    "codex"
-                ].collidepoint(
-                    mouse_pos
-                ):
-
-                    open_codex(
-                        from_settings=True
-                    )
-
-
-                elif settings_buttons[
-                    "menu"
-                ].collidepoint(
-                    mouse_pos
-                ):
-
-                    interaction_ui.close()
-
-                    ui_screen = UI_MENU
-
-                    ui_overlay = None
-
-
-                elif settings_buttons[
-                    "close"
-                ].collidepoint(
-                    mouse_pos
-                ):
-
-                    ui_overlay = None
+                ui_overlay = None
 
 
         # ----------------------------------------------------
@@ -1860,59 +2254,15 @@ while running:
 
         elif ui_screen == UI_CODEX:
 
-            modal_buttons = (
-                codex_buttons.get(
-                    "modal",
-                    {}
+            result = (
+                codex_controller.handle_click(
+                    codex_buttons,
+                    mouse_pos
                 )
             )
 
-            # Item Modal優先攔截
-            if (
-                codex_ui.selected_item
-                is not None
-            ):
-
-                if (
-                    "close"
-                    in modal_buttons
-                    and modal_buttons[
-                        "close"
-                    ].collidepoint(
-                        mouse_pos
-                    )
-                ):
-
-                    codex_ui.close_item()
-
-            else:
-
-                if codex_buttons[
-                    "back"
-                ].collidepoint(
-                    mouse_pos
-                ):
-
-                    close_codex()
-
-                else:
-
-                    for (
-                        item_id,
-                        rect
-                    ) in codex_buttons[
-                        "items"
-                    ].items():
-
-                        if rect.collidepoint(
-                            mouse_pos
-                        ):
-
-                            codex_ui.select_item(
-                                item_id
-                            )
-
-                            break
+            if result == "close_codex":
+                close_codex()
 
 
         # ----------------------------------------------------
@@ -2001,6 +2351,10 @@ while running:
 
             elif game.game_state == SPACE:
 
+                click_is_walkable = (
+                    len(walkable_polygon) >= 3
+                    and player.point_in_polygon(mouse_pos, walkable_polygon)
+                )
                 click_handled = False
 
                 # ---------------------------------------------
@@ -2012,7 +2366,7 @@ while running:
                     rect
                 ) in object_rects.items():
 
-                    if rect.collidepoint(
+                    if click_is_walkable and rect.collidepoint(
                         mouse_pos
                     ):
 
@@ -2139,7 +2493,7 @@ while running:
                 # Empty Ground
                 # ---------------------------------------------
 
-                if not click_handled:
+                if not click_handled and click_is_walkable:
 
                     # 點空地時設定一般滑鼠移動目標
                     player.set_mouse_target(
@@ -2217,36 +2571,26 @@ while running:
     # ========================================================
 
     if (
-        dragging_volume
+        settings_controller.dragging_volume
         and ui_overlay == "settings"
         and settings_buttons
     ):
 
-        slider_rect = (
+        settings_controller.update_volume(
             settings_buttons[
                 "slider"
-            ]
+            ],
+            mouse_pos
         )
 
-        relative_x = (
-            mouse_pos[0]
-            - slider_rect.x
-        )
 
-        relative_x = max(
-            0,
-            min(
-                relative_x,
-                slider_rect.width
-            )
-        )
-
-        volume = int(
-            relative_x
-            / slider_rect.width
-            * 100
-        )
-
+    # 空間資訊最後繪製避免被場景遮擋
+    if (
+        ui_screen == UI_GAME
+        and game.current_space is not None
+        and game.game_state in (SPACE, PASSWORD, DIALOGUE)
+    ):
+        game_ui.draw_space_hud(screen, game)
 
     pygame.display.flip()
 
