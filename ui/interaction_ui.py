@@ -1267,17 +1267,16 @@ class InteractionUI:
             140
         )
 
-        # 照片正面沿用共用道具圖片繪製
-        front_drawn = (
-            self.photo_side == "front"
-            and self.game_ui.draw_item_asset(
-                screen,
-                self.photo_id,
-                picture_rect
-            )
+        # 照片正反面沿用同一圖片繪製入口
+        asset_key = "ui_asset" if self.photo_side == "front" else "ui_back_asset"
+        picture_drawn = self.game_ui.draw_item_asset(
+            screen,
+            self.photo_id,
+            picture_rect,
+            asset_key=asset_key
         )
 
-        if not front_drawn:
+        if not picture_drawn:
             self.game_ui.draw_placeholder_rect(
                 screen,
                 picture_rect,

@@ -113,6 +113,7 @@
         "description": "黎琛和女兒在公園鞦韆上。兩人都笑著。背景陽光明媚。",
         "back_text": "這不是你的記憶。這是空間D的。",
         "ui_asset": "assets/素材庫/第一章/空間C/photo.png",
+        "ui_back_asset": "assets/素材庫/第一章/空間C/photo_back.png",
         "collectable": true
     },
 

@@ -10,7 +10,8 @@ class Player:
         y,
         width=40,
         height=40,
-        speed=300
+        speed=300,
+        sprite_path=None
     ):
         # 建立玩家矩形，用來記錄位置與碰撞範圍
         self.rect = pygame.Rect(
@@ -34,6 +35,63 @@ class Player:
 
         # 記錄目前想要靠近的互動物件
         self.interaction_target = None
+
+        self.sprite_path = sprite_path  # 正式素材路徑獨立於角色位置狀態
+        self.animations = {}
+        self.direction = 0  # 方向欄依序代表下右上左
+        self.frame_index = 0
+        self.animation_timer = 0.0
+        self.animation_interval = 0.15
+        self.is_moving = False
+        if sprite_path is not None:
+            self.animations = self._load_sprite_sheet(sprite_path)
+
+    def _load_sprite_sheet(self, filename, cols=4, rows=3):
+        """保留原始透明影格，缺圖時使用矩形備援。"""
+        try:
+            sheet = pygame.image.load(filename)
+            if pygame.display.get_surface() is not None:
+                sheet = sheet.convert_alpha()
+            width, height = sheet.get_size()
+            if width < cols or height < rows or width % cols or height % rows:
+                return {}
+            frame_width, frame_height = width // cols, height // rows
+            animations = {col: [] for col in range(cols)}
+            for col in range(cols):
+                for row in range(rows):
+                    rect = pygame.Rect(
+                        col * frame_width, row * frame_height,
+                        frame_width, frame_height
+                    )
+                    animations[col].append(sheet.subsurface(rect).copy())
+            return animations  # 原始像素與透明度不進行去背處理
+        except (OSError, pygame.error):
+            return {}
+
+    def update_direction(self, direction):
+        """依主要移動軸更新面向，停止時保留方向。"""
+        if direction.length_squared() == 0:
+            return
+        if abs(direction.x) > abs(direction.y):
+            self.direction = 1 if direction.x > 0 else 3
+        else:
+            self.direction = 0 if direction.y > 0 else 2
+
+    def update_animation(self, dt, movement_direction):
+        """依經過秒數切換走路影格，停止回到待機。"""
+        self.is_moving = movement_direction.length_squared() > 0
+        if not self.is_moving:
+            self.frame_index = 0
+            self.animation_timer = 0.0
+            return
+        if self.frame_index == 0:
+            self.frame_index = 1
+        self.animation_timer += dt
+        steps = int(self.animation_timer / self.animation_interval)
+        if steps:
+            if steps % 2:
+                self.frame_index = 3 - self.frame_index
+            self.animation_timer -= steps * self.animation_interval  # 保留餘時避免不同幀率造成動畫漂移
 
     def get_keyboard_direction(
         self,
@@ -614,6 +672,9 @@ class Player:
                 0
             )
 
+        self.update_direction(direction)
+        self.update_animation(dt, direction)  # 動畫共用鍵盤與滑鼠計算出的方向
+
         move_x = (
             direction.x
             * self.speed
@@ -647,13 +708,19 @@ class Player:
 
     def draw(
         self,
-        screen,
-        color=(50, 205, 50)
+        screen
     ):
-        """將玩家矩形繪製到畫面。"""
-
-        pygame.draw.rect(
-            screen,
-            color,
-            self.rect
+        """等比例繪製像素角色，腳底貼齊既有碰撞矩形。"""
+        if not self.animations:
+            pygame.draw.rect(screen, (50, 205, 50), self.rect)
+            return
+        frame = self.animations[self.direction][self.frame_index]
+        scale = min(
+            self.rect.width / frame.get_width(),
+            self.rect.height / frame.get_height()
         )
+        size = (max(1, round(frame.get_width() * scale)),
+                max(1, round(frame.get_height() * scale)))
+        image = pygame.transform.scale(frame, size)  # 最近鄰縮放保留角色像素邊緣
+        image_rect = image.get_rect(midbottom=self.rect.midbottom)
+        screen.blit(image, image_rect)
