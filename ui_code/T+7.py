@@ -16,7 +16,7 @@ TEXT_COLOR = (205, 210, 220)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-FOLDERS = os.path.join(BASE_DIR, "..", "assets", "素材庫", "第二章", "T+7")
+FOLDERS = [os.path.join(BASE_DIR, "..", "assets", "素材庫", "第二章", "T+7")]
 
 def load_img(filename, size):
     if not filename:
@@ -45,11 +45,10 @@ bg_img = load_img("background.png", (800, 600))
 
 # 完全保留你原本的座標與長寬，對應 T+7 資料夾內的檔名
 items = [
-    (pygame.Rect(330, 70, 140, 45),  "門框",       None),
-    (pygame.Rect(550, 70, 120, 45),  "牆上的日曆", "date.png"),
+    (pygame.Rect(550, 100, 120, 45),  "牆上的日曆", "date.png"),
     (pygame.Rect(60, 230, 200, 115), "斷裂的床",   "bed.png"),
-    (pygame.Rect(630, 340, 110, 150),"書桌",       "desk_drawer.png"),
-    (pygame.Rect(630, 395, 40, 35),  "信",         "letter.png"),
+    (pygame.Rect(600, 170, 110, 150),"書桌",       "desk_drawer.png"),
+    (pygame.Rect(630, 190, 40, 35),  "信",         "letter.png"),
 ]
 
 # 預先載入圖片
