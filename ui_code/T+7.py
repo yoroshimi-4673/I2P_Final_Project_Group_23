@@ -43,15 +43,13 @@ def draw_box(rect, text, img=None):
 # 背景圖
 bg_img = load_img("background.png", (800, 600))
 
-# 完全保留你原本的座標與長寬，對應 T+7 資料夾內的檔名
 items = [
-    (pygame.Rect(550, 100, 120, 45),  "牆上的日曆", "date.png"),
-    (pygame.Rect(60, 230, 200, 115), "斷裂的床",   "bed.png"),
+    (pygame.Rect(570, 90, 60, 50),  "牆上的日曆", "date.png"),
+    (pygame.Rect(100, 230, 150, 115), "斷裂的床",   "bed.png"),
     (pygame.Rect(600, 170, 110, 150),"書桌",       "desk_drawer.png"),
     (pygame.Rect(630, 190, 40, 35),  "信",         "letter.png"),
 ]
 
-# 預先載入圖片
 loaded_items = [(rect, text, load_img(fname, rect.size)) for rect, text, fname in items]
 
 running = True
