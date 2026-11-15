@@ -360,6 +360,18 @@ def draw_player_navigation_guide(
     )
 
 
+def is_interaction_target_active(object_id):
+    """依房間完成事件切換重疊門框互動目標。"""
+
+    if game.current_space == "T0":
+        completed = game.has_event("t0_completed")
+        if object_id == "t0_height_marks":
+            return not completed
+        if object_id == "t0_exit_door":
+            return completed
+    return True
+
+
 def get_nearest_interaction_target(
     object_rects,
     interaction_rects
@@ -376,6 +388,9 @@ def get_nearest_interaction_target(
     for object_id, interaction_rect in (
         interaction_rects.items()
     ):
+
+        if not is_interaction_target_active(object_id):
+            continue
 
         # 玩家未進入範圍時不能使用E互動
         if not player.rect.colliderect(
@@ -438,9 +453,23 @@ def draw_interaction_prompt(
         object_id
     )
 
+    # 背景互動區隱藏名稱但維持原本目標編號
+    object_layout = ui_layout.get("spaces", {}).get(
+        game.current_space, {}
+    ).get("objects", {}).get(object_id, {})
+    if (
+        game.current_space == "CH2_CORRIDOR"
+        and objects.get(object_id, {}).get("type") == "time_door"
+    ):
+        prompt_text = f"[E] {object_name}"
+    elif object_layout.get("render_mode") == "background":
+        prompt_text = "[E] 互動"
+    else:
+        prompt_text = f"[E] 互動：{object_name}"
+
     prompt_surface = (
         game_ui.font_small.render(
-            f"[E] 互動：{object_name}",
+            prompt_text,
             True,
             (255, 245, 180)
         )
@@ -695,6 +724,22 @@ ui_overlay = None  # 記錄Settings等覆蓋式介面
 # Game Flow
 # ============================================================
 
+def finish_dialogue_and_open_ready_puzzle():
+    """對話結束後依準備事件開啟年齡介面。"""
+
+    story_manager.finish_dialogue_action()
+    if (
+        game.game_state == SPACE
+        and game.current_space == "CH2_CORRIDOR"
+        and game.has_event("anchor_age_puzzle_ready")
+        and not game.is_puzzle_solved("anchor_age_verification")
+        and not game.has_event("anchor_age_ui_opened")
+    ):
+        result = interaction_controller.open_anchor_age_verification()
+        if result.get("status") == "input_required":
+            game.complete_event("anchor_age_ui_opened")
+
+
 def start_new_game():
     """重設UI暫存狀態並交由StoryManager開始新遊戲。"""
 
@@ -704,6 +749,7 @@ def start_new_game():
     global last_player_space
 
     interaction_ui.close()
+    puzzle_controller.reset_anchor_slots()  # 新遊戲清除上局碎片暫存狀態
     codex_ui.close_item()
 
     # 新遊戲開始時清除殘留移動按鍵
@@ -1507,7 +1553,7 @@ while running:
                         == "dialogue_finished"
                     ):
 
-                        story_manager.finish_dialogue_action()
+                        finish_dialogue_and_open_ready_puzzle()
 
                 continue
 
@@ -1774,35 +1820,25 @@ while running:
                 )
                 player.draw(screen)
 
-            elif dialogue_id == "chapter_1_end":
+            elif dialogue_id in (
+                "chapter_1_end",
+                "scene_09_entry"
+            ):
 
-                screen.fill(
-                    (235, 235, 235)
-                )
+                screen.fill((255, 255, 255))
 
-                corridor_text = (
-                    game_ui.font_large
-                    .render(
-                        (
-                            "無限白色走廊 "
-                            "/ Background Placeholder"
-                        ),
-                        True,
-                        (45, 45, 50)
-                    )
-                )
+            elif dialogue_id in (
+                "time_door_T0",
+                "time_door_T7",
+                "time_door_T3",
+                "scene_10_entry",
+                "scene_11_entry",
+                "scene_12_warning",
+                "scene_12_entry"
+            ):
 
-                screen.blit(
-                    corridor_text,
-                    corridor_text.get_rect(
-                        center=(
-                            screen.get_width()
-                            // 2,
-
-                            80
-                        )
-                    )
-                )
+                # 時間門進場與警告統一深藍背景
+                screen.fill((12, 24, 48))
 
             else:
 
@@ -2323,7 +2359,7 @@ while running:
                     == "dialogue_finished"
                 ):
 
-                    story_manager.finish_dialogue_action()
+                    finish_dialogue_and_open_ready_puzzle()
 
 
             # =================================================
@@ -2371,6 +2407,9 @@ while running:
                     object_id,
                     rect
                 ) in object_rects.items():
+
+                    if not is_interaction_target_active(object_id):
+                        continue
 
                     if click_is_walkable and rect.collidepoint(
                         mouse_pos
