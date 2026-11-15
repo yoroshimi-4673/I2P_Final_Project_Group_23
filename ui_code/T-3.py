@@ -50,7 +50,7 @@ items = [
     (pygame.Rect(570, 90, 60, 50),  "牆上的日曆", "date.png"),
     (pygame.Rect(60, 220, 195, 110), "床",         "bed.png"),
     (pygame.Rect(80, 110, 300, 120), "衣櫃",       "closet.png"),
-    (pygame.Rect(600, 170, 110, 150),"書桌",       "desk_drawer.png"),
+    (pygame.Rect(600, 170, 100, 120),"書桌",       "desk_drawer.png"),
 ]
 
 # 預先載入圖片
