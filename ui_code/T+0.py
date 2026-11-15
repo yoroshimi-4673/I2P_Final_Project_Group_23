@@ -17,18 +17,21 @@ TEXT_COLOR = (205, 210, 220)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 FOLDERS = [
     os.path.join(BASE_DIR, "..", "assets", "素材庫", "第二章", "T+0"),
-    os.path.join(BASE_DIR, "..", "assets", "素材庫", "第二章", "T-3"),
+    os.path.join(BASE_DIR, "..", "assets", "素材庫", "第二章", "T+7"),
 ]
 
 def load_img(filename, size):
     if not filename:
         return None
-    path = os.path.join(FOLDER, filename)
-    try:
-        img = pygame.image.load(path).convert_alpha()
-        return pygame.transform.scale(img, size)
-    except Exception:
-        return None
+    for folder in FOLDERS:  # 依序從 FOLDERS 清單的每個資料夾尋找
+        path = os.path.join(folder, filename)
+        if os.path.exists(path):
+            try:
+                img = pygame.image.load(path).convert_alpha()
+                return pygame.transform.scale(img, size)
+            except Exception:
+                pass
+    return None
 
 def draw_box(rect, text, img=None):
     if img:
@@ -42,7 +45,6 @@ def draw_box(rect, text, img=None):
 # 背景圖
 bg_img = load_img("background.png", (800, 600))
 
-# 保留剩餘的 3 個物件與原本座標
 items = [
     (pygame.Rect(200, 170, 210, 115), "床",         "像素风星星兔子小床.png"),
     (pygame.Rect(160, 170, 110, 65),  "床頭抽屜",   "desk_drawer.png"),
