@@ -9,6 +9,90 @@ BASE_DIR = Path(__file__).resolve().parent  # 取得save_manager.py所在的專�
 SAVE_PATH = BASE_DIR / "data" / "save.json"  # 建立固定的存檔檔案位置
 
 
+LEGACY_PUZZLE_ID_MAP = {
+    "password_panel": (
+        "chapter1_password"
+    )
+}
+
+
+def migrate_legacy_puzzle_state(
+    save_data
+):
+    """將舊版Puzzle物件編號轉成新的Puzzle編號。"""
+
+    solved_puzzles = list(
+        save_data.get(
+            "solved_puzzles",
+            []
+        )
+    )
+
+    migrated_solved = []
+
+    for puzzle_id in solved_puzzles:
+
+        new_id = (
+            LEGACY_PUZZLE_ID_MAP.get(
+                puzzle_id,
+                puzzle_id
+            )
+        )
+
+        if new_id not in migrated_solved:
+
+            migrated_solved.append(
+                new_id
+            )
+
+    puzzle_attempts = dict(
+        save_data.get(
+            "puzzle_attempts",
+            {}
+        )
+    )
+
+    migrated_attempts = {}
+
+    for puzzle_id, remaining in (
+        puzzle_attempts.items()
+    ):
+
+        new_id = (
+            LEGACY_PUZZLE_ID_MAP.get(
+                puzzle_id,
+                puzzle_id
+            )
+        )
+
+        if new_id in migrated_attempts:
+
+            migrated_attempts[
+                new_id
+            ] = min(
+                migrated_attempts[
+                    new_id
+                ],
+                remaining
+            )
+
+        else:
+
+            migrated_attempts[
+                new_id
+            ] = remaining
+
+    save_data[
+        "solved_puzzles"
+    ] = migrated_solved
+
+    save_data[
+        "puzzle_attempts"
+    ] = migrated_attempts
+
+    return save_data
+
+
 def save_game(
     game,
     player = None,
@@ -75,6 +159,8 @@ def load_game(
 
     except (FileNotFoundError, json.JSONDecodeError):  # 沒有存檔或JSON損壞時視為無有效存檔
         return False
+
+    save_data = migrate_legacy_puzzle_state(save_data)  # 寫入遊戲狀態之前統一遷移舊編號
 
     game.game_state = save_data.get(
         "game_state",

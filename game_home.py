@@ -14,6 +14,8 @@ from ui.dialogue_ui import (
 )
 
 from managers.game_manager import GameManager
+from managers.puzzle_manager import PuzzleManager
+from controllers.puzzle_controller import PuzzleController
 from managers.map_manager import MapManager
 from managers.story_manager import StoryManager
 
@@ -114,6 +116,8 @@ objects = load_json(
     OBJECTS_PATH
 )
 
+puzzles = load_json(BASE_DIR / "data" / "puzzles.json")
+
 dialogues = load_json(
     DIALOGUE_PATH
 )
@@ -162,6 +166,8 @@ clock = pygame.time.Clock()
 # ============================================================
 
 game = GameManager()
+puzzle_manager = PuzzleManager(game, puzzles, objects)
+puzzle_controller = PuzzleController(puzzle_manager)  # 所有謎題共用單一輸入控制器
 
 game_ui = GameUI(
     ui_layout,
@@ -193,7 +199,8 @@ interaction_ui = InteractionUI(
     game_ui,
     game,
     objects,
-    levels
+    levels,
+    puzzle_controller
 )
 
 codex_ui = CodexUI(
@@ -205,7 +212,8 @@ codex_ui = CodexUI(
 interaction_controller = InteractionController(
     interaction_ui,
     story_manager,
-    game
+    game,
+    puzzle_controller
 )
 
 hotbar_controller = HotbarController(
@@ -220,7 +228,7 @@ codex_controller = CodexController(
     codex_ui
 )
 
-# 集中管理音量、外觀與Settings輸入
+# 集中管理音量與Settings輸入
 settings_controller = SettingsController()
 
 # ============================================================
@@ -233,7 +241,8 @@ player = Player(
     y=100,
     width=40,
     height=40,
-    speed=300
+    speed=300,
+    sprite_path=BASE_DIR / "assets" / "素材庫" / "角色" / "main_player.png"
 )
 
 # 儲存目前玩家持續按住的移動按鍵
@@ -1761,9 +1770,9 @@ while running:
                 game_ui.draw_space(
                     screen,
                     game,
-                    mouse_pos,
-                    settings_controller.get_current_look()
+                    mouse_pos
                 )
+                player.draw(screen)
 
             elif dialogue_id == "chapter_1_end":
 
@@ -1875,8 +1884,7 @@ while running:
             game_ui.draw_space(
                 screen,
                 game,
-                mouse_pos,
-                settings_controller.get_current_look()
+                mouse_pos
             )
 
             # MapManager集中建立探索模式需要的Rect資料
@@ -1931,7 +1939,7 @@ while running:
                         # 每次重新開啟Interaction都從預設控制項開始
                         interaction_controller.reset_interaction_focus()
 
-                        interaction_ui.open_object(
+                        interaction_controller.open_object(
                             nearest_target[
                                 "id"
                             ]
@@ -1982,8 +1990,7 @@ while running:
 
             # 繪製正式Player取代舊有Placeholder
             player.draw(
-                screen,
-                settings_controller.get_current_look()
+                screen
             )
 
             # 找出目前E鍵會作用的最近互動物件
@@ -2036,10 +2043,11 @@ while running:
                 game_ui.draw_space(
                     screen,
                     game,
-                    mouse_pos,
-                    settings_controller.get_current_look()
+                    mouse_pos
                 )
             )
+
+            player.draw(screen)  # 謎題開啟時保留角色所在位置
 
             hotbar_data = (
                 game_ui.draw_hotbar(
@@ -2125,9 +2133,7 @@ while running:
             game_ui.draw_settings_overlay(
                 screen,
                 mouse_pos,
-                settings_controller.volume,
-                settings_controller.current_look_index,
-                settings_controller.looks
+                settings_controller.volume
             )
         )
 

@@ -1,6 +1,6 @@
 import time
 
-from game_states import DIALOGUE, SPACE, GAME_OVER
+from game_states import DIALOGUE, SPACE
 
 
 class GameManager:
@@ -93,39 +93,6 @@ class GameManager:
 
     def is_puzzle_solved(self, puzzle_id):  # 檢查指定謎題目前是否已經解開
         return puzzle_id in self.solved_puzzles
-
-    def check_password(
-        self,
-        puzzle_id,
-        password,
-        correct_password,
-        max_attempts=3
-    ):  # 檢查謎題答案並管理該謎題自己的嘗試次數
-
-        if puzzle_id not in self.puzzle_attempts:
-            self.puzzle_attempts[puzzle_id] = max_attempts  # 第一次互動時建立此謎題剩餘次數
-
-        if password == correct_password:
-            return True
-
-        self.puzzle_attempts[puzzle_id] -= 1  # 答錯時只扣除目前這個謎題的次數
-
-        if self.puzzle_attempts[puzzle_id] <= 0:
-            self.game_state = GAME_OVER
-            self.game_over_reason = "space_c_locked"  # 記錄C空間因密碼失敗永久封鎖
-
-        return False
-
-    def get_puzzle_attempts(
-        self,
-        puzzle_id,
-        max_attempts=3
-    ):  # 取得指定謎題目前剩餘的可嘗試次數
-
-        return self.puzzle_attempts.get(
-            puzzle_id,
-            max_attempts
-        )
 
 
     # ======== Story Event ======== #

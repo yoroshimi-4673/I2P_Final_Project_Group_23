@@ -2,6 +2,7 @@ import json
 from pathlib import Path  # 匯入Path建立穩定可靠的專案檔案路徑
 
 from managers.game_manager import GameManager
+from managers.puzzle_manager import PuzzleManager
 from game_states import GAME_OVER
 from managers.interaction_manager import interact_with_object  # 匯入統一的場景物件互動處理函式
 
@@ -90,6 +91,8 @@ def play_first_choice(game, dialogues):  # 顯示Scene04，進行首次事件三
 # ======== 以下建立全新遊戲環境 ======== #
 
 game = GameManager()
+with open(BASE_DIR / "data" / "puzzles.json", encoding="utf-8") as file:
+    puzzle_manager = PuzzleManager(game, json.load(file), objects)
 
 game.reset_game()  # Prototype目前沒有存檔功能，每次執行都建立全新遊戲
 
@@ -156,7 +159,8 @@ while game.game_state != GAME_OVER and game.chapter < 1:
         game,
         selected_object_id,
         objects,
-        levels
+        levels,
+        puzzle_manager
     )  # 根據玩家選取物件執行對應互動流程
 
 

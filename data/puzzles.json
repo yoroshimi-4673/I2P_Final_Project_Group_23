@@ -1,0 +1,39 @@
+{
+    "chapter1_password": {
+        "chapter": 1,
+
+        "ui_mode": "password",
+
+        "input_type": "digits",
+        "length": 6,
+
+        "answer": "100101",
+
+        "max_attempts": 3,
+
+        "solved_flag": "chapter1_password_solved",
+
+        "success_message": "ACCESS GRANTED",
+
+        "wrong_message": "密碼錯誤。",
+
+        "rewards": [
+            {
+                "type": "item",
+                "value": "photo_1"
+            }
+        ],
+
+        "on_complete": {
+            "type": "open_photo",
+            "item_id": "photo_1",
+            "mode": "story"
+        },
+
+        "failure": {
+            "type": "game_over",
+            "reason": "space_c_locked",
+            "message": "錯誤次數已達上限。空間C已永久封鎖。"
+        }
+    }
+}

@@ -4,34 +4,7 @@ class SettingsController:
 
         self.volume = 50
 
-        self.looks = [
-            (255, 90, 90),
-            (90, 220, 120),
-            (100, 140, 255)
-        ]
-
-        self.current_look_index = 0
-
         self.dragging_volume = False
-
-
-    def get_current_look(self):
-        """取得目前選中的角色外觀顏色。"""
-
-        return self.looks[
-            self.current_look_index
-        ]
-
-
-    def next_look(self):
-        """切換到下一個角色外觀。"""
-
-        self.current_look_index = (
-            self.current_look_index
-            + 1
-        ) % len(
-            self.looks
-        )
 
 
     def start_volume_drag(self):
@@ -110,17 +83,6 @@ class SettingsController:
         ):
 
             return "resolution_1024"
-
-
-        if settings_buttons[
-            "look"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            self.next_look()
-
-            return "look_changed"
 
 
         if settings_buttons[

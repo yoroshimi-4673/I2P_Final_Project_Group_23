@@ -205,227 +205,6 @@ def enter_rift(game, object_id, objects, levels):
 
 
 # ============================================================
-# Puzzle / Password 核心邏輯
-# ============================================================
-
-
-# ======== 取得 Puzzle 資訊 ======== #
-
-def get_puzzle_info(game, object_id, objects):
-    """取得目前謎題資訊並準備進入密碼狀態。"""
-
-    puzzle = objects[object_id]  # 取得目前指定謎題完整資料
-
-    if game.is_puzzle_solved(object_id):
-        return {
-            "status": "puzzle_solved",
-            "object_id": object_id,
-            "name": puzzle["name"],
-            "description": "面板已經滑開，暗格裡現在是空的。"
-        }
-
-    correct_password = puzzle["correct_password"]
-
-    max_attempts = puzzle.get(
-        "max_attempts",
-        3
-    )
-
-    game.game_state = PASSWORD  # 玩家開始操作密碼鎖時進入密碼狀態
-
-    return {
-        "status": "password_required",
-        "object_id": object_id,
-        "name": puzzle["name"],
-        "description": puzzle["description"],
-        "password_length": len(correct_password),
-        "max_attempts": max_attempts,
-        "remaining_attempts": game.get_puzzle_attempts(
-            object_id,
-            max_attempts
-        )
-    }
-
-
-# ======== 離開 Puzzle ======== #
-
-def leave_puzzle(game):
-    """取消密碼輸入並回到目前探索空間。"""
-
-    if game.current_space is not None:
-        game.game_state = SPACE  # 離開密碼介面後恢復探索狀態
-
-    return {
-        "status": "puzzle_closed"
-    }
-
-
-# ======== 提交 Password ======== #
-
-def submit_password(
-    game,
-    object_id,
-    password,
-    objects
-):
-    """檢查玩家輸入的密碼並回傳結果。"""
-
-    puzzle = objects.get(
-        object_id
-    )
-
-    if puzzle is None:
-        return {
-            "status": "object_not_found",
-            "message": "找不到這個物件。"
-        }
-
-    # 如果謎題已經解開，不再重複給獎勵
-    if game.is_puzzle_solved(
-        object_id
-    ):
-        return {
-            "status": "puzzle_solved",
-            "message": "面板已經滑開，暗格裡現在是空的。"
-        }
-
-    correct_password = str(
-        puzzle.get(
-            "correct_password",
-            ""
-        )
-    )
-
-    required_length = len(
-        correct_password
-    )
-
-    password = str(
-        password
-    )
-
-    # --------------------------------------------------------
-    # 先檢查長度
-    # --------------------------------------------------------
-
-    if len(password) != required_length:
-        return {
-            "status": "incomplete_password",
-            "message": (
-                f"請輸入完整{required_length}位密碼。"
-            ),
-            "remaining_attempts": (
-                game.get_puzzle_attempts(
-                    object_id,
-                    puzzle.get(
-                        "max_attempts",
-                        3
-                    )
-                )
-            )
-        }
-
-    # --------------------------------------------------------
-    # 長度正確後才檢查是不是數字
-    # --------------------------------------------------------
-
-    if not password.isdigit():
-        return {
-            "status": "invalid_password_format",
-            "message": "密碼只能包含數字。",
-            "remaining_attempts": (
-                game.get_puzzle_attempts(
-                    object_id,
-                    puzzle.get(
-                        "max_attempts",
-                        3
-                    )
-                )
-            )
-        }
-
-    # --------------------------------------------------------
-    # 正式檢查密碼
-    # --------------------------------------------------------
-
-    password_correct = game.check_password(
-        object_id,
-        password,
-        correct_password,
-        puzzle.get(
-            "max_attempts",
-            3
-        )
-    )
-
-    # --------------------------------------------------------
-    # 正確
-    # --------------------------------------------------------
-
-    if password_correct:
-
-        game.solve_puzzle(
-            object_id
-        )
-
-        reward_item = puzzle.get(
-            "reward_item"
-        )
-
-        reward_result = None
-
-        if reward_item is not None:
-            reward_result = collect_item(
-                game,
-                reward_item,
-                objects
-            )
-
-        return {
-            "status": "password_correct",
-            "message": "ACCESS GRANTED",
-            "reward_item": reward_item,
-            "reward_result": reward_result
-        }
-
-    # --------------------------------------------------------
-    # 第三次輸入錯誤 → GAME OVER
-    # --------------------------------------------------------
-
-    if game.game_state == GAME_OVER:
-        return {
-            "status": "game_over",
-            "message": (
-                "錯誤次數已達上限。"
-                "空間C已永久封鎖。"
-            ),
-            "remaining_attempts": 0
-        }
-
-    # --------------------------------------------------------
-    # 一般錯誤
-    # --------------------------------------------------------
-
-    remaining_attempts = (
-        game.get_puzzle_attempts(
-            object_id,
-            puzzle.get(
-                "max_attempts",
-                3
-            )
-        )
-    )
-
-    return {
-        "status": "password_wrong",
-        "message": (
-            "密碼錯誤。"
-            f"剩餘嘗試次數：{remaining_attempts}"
-        ),
-        "remaining_attempts": remaining_attempts
-    }
-
-# ============================================================
 # Photo 核心邏輯
 # ============================================================
 
@@ -859,115 +638,55 @@ def interact_with_rift(game, object_id, objects, levels):
 # Password 文字版 Wrapper
 # ============================================================
 
-def interact_with_puzzle(game, object_id, objects):
-    """文字版密碼謎題介面。"""
+def interact_with_puzzle(game, object_id, objects, puzzle_manager):
+    """文字版謎題介面，共用正式謎題規則與完成設定。"""
 
-    puzzle_info = get_puzzle_info(
-        game,
-        object_id,
-        objects
-    )  # 取得目前密碼謎題狀態
+    from controllers.puzzle_controller import PuzzleController
 
-    if puzzle_info["status"] == "puzzle_solved":
-        print(puzzle_info["description"])
+    controller = PuzzleController(puzzle_manager)
+    current_object = objects[object_id]
+    result = controller.open_puzzle(current_object.get("puzzle_id"))
+
+    if result["status"] != "input_required":
+        print(result.get("message", ""))
+        controller.close_puzzle()
         return
 
-    print(puzzle_info["description"])
+    print(current_object.get("description", ""))
 
     while True:
-        print()
-        print(
-            "Attempts left:",
-            puzzle_info["remaining_attempts"]
-        )
+        remaining = controller.remaining_attempts
+        if remaining is not None:
+            print("Attempts left:", remaining)
 
-        password = input(
-            "Password (輸入0返回): "
-        )
-
-        # 文字版暫時使用單獨的 0 當作返回。
-        # 正式Pygame會用返回按鈕，不會有此限制。
-        if password == "0":
-            leave_puzzle(game)
+        answer = input("Answer (輸入0返回): ")
+        if answer == "0":
+            controller.close_puzzle()
             return
 
-        result = submit_password(
-            game,
-            object_id,
-            password,
-            objects
-        )  # 將玩家密碼送入純邏輯核心驗證
+        # 原始輸入直接交由核心驗證避免截斷答案
+        result = puzzle_manager.submit_answer(controller.current_puzzle_id, answer)
+        print(result.get("message", ""))
+        status = result["status"]
 
-        if result["status"] == "invalid_password_format":
-            print(result["message"])
+        if status in ("invalid_input", "incomplete_input", "wrong"):
             continue
 
-        if result["status"] == "incomplete_password":
-            print(result["message"])
-            continue
+        controller.close_puzzle()
+        if status == "correct":
+            for reward in result.get("rewards", []):
+                if reward["type"] == "item" and reward["result"]["status"] == "item_found":
+                    print("獲得：", reward["result"]["name"])
 
-        if result["status"] == "password_wrong":
-            print()
-            print(result["message"])
-            print(
-                "Attempts left:",
-                result["remaining_attempts"]
-            )
-
-            puzzle_info["remaining_attempts"] = result[
-                "remaining_attempts"
-            ]
-
-            continue
-
-        if result["status"] == "game_over":
-            print()
-            print("密碼錯誤。")
-            print("Attempts left: 0")
-            print()
-            print("警告：空間C正在封鎖……")
-            print()
-            print("空間C已永久封鎖。")
-            print("你將永遠被困在這個空間。")
-
-            return
-
-        if result["status"] == "password_correct":
-            print()
-            print("ACCESS GRANTED")
-            print()
-            print("正確輸入。")
-            print()
-            print("面板滑開。")
-            print("暗格裡放著一張照片。")
-
-            reward_item = result.get(
-                "reward_item"
-            )
-
-            if reward_item is not None:
-                reward_data = result.get(
-                    "reward_result"
-                )
-
-                if (
-                    reward_data is not None
-                    and reward_data["status"] == "item_found"
-                ):
-                    print()
-                    print(
-                        "獲得：",
-                        reward_data["name"]
-                    )
-
-                interact_with_photo(
-                    game,
-                    reward_item,
-                    objects,
-                    mode="story"
-                )
-
-            return
+            completion = result.get("on_complete") or {}
+            if completion.get("type") == "open_photo":
+                item_id = completion.get("item_id")
+                if item_id in objects:
+                    interact_with_photo(
+                        game, item_id, objects,
+                        mode=completion.get("mode", "inventory")
+                    )  # 完成後的顯示流程完全依照謎題設定
+        return
 
 
 # ============================================================
@@ -1173,7 +892,8 @@ def interact_with_object(
     game,
     object_id,
     objects,
-    levels
+    levels,
+    puzzle_manager
 ):
     """文字版入口，依照物件種類分派互動。"""
 
@@ -1209,7 +929,8 @@ def interact_with_object(
         interact_with_puzzle(
             game,
             object_id,
-            objects
+            objects,
+            puzzle_manager
         )
 
     elif object_type == "door":
