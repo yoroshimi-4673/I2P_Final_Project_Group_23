@@ -45,7 +45,6 @@ def draw_box(rect, text, img=None):
 # 背景圖
 bg_img = load_img("background.png", (800, 600))
 
-# 完全保留你原本的 7 個座標與長寬，對應 T-3 資料夾內的檔名
 items = [
     (pygame.Rect(350, 130, 45, 35),   "鐵盒",       "locker.png"),
     (pygame.Rect(570, 90, 60, 50),  "牆上的日曆", "date.png"),
