@@ -46,8 +46,9 @@ def draw_box(rect, text, img=None):
 bg_img = load_img("background.png", (800, 600))
 
 items = [
-    (pygame.Rect(200, 170, 210, 115), "床",         "像素风星星兔子小床.png"),
-    (pygame.Rect(160, 170, 110, 65),  "床頭抽屜",   "desk_drawer.png"),
+    (pygame.Rect(60, 220, 195, 110), "床",         "像素风星星兔子小床.png"),
+    (pygame.Rect(180, 180, 80, 80), "床頭抽屜",    "drawer.png"),
+    (pygame.Rect(600, 170, 110, 150),  "書桌",     "desk_drawer.png"),
     (pygame.Rect(500, 170, 120, 75),  "兒童保險箱", "locker.png"),
 ]
 
