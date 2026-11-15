@@ -15,7 +15,10 @@ BOX_BORDER = (180, 185, 198)
 TEXT_COLOR = (205, 210, 220)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-FOLDER = os.path.join(BASE_DIR, "..", "assets", "素材庫", "第二章", "T+0")
+FOLDERS = [
+    os.path.join(BASE_DIR, "..", "assets", "素材庫", "第二章", "T+0"),
+    os.path.join(BASE_DIR, "..", "assets", "素材庫", "第二章", "T-3"),
+]
 
 def load_img(filename, size):
     if not filename:
@@ -42,11 +45,10 @@ bg_img = load_img("background.png", (800, 600))
 # 保留剩餘的 3 個物件與原本座標
 items = [
     (pygame.Rect(200, 170, 210, 115), "床",         "像素风星星兔子小床.png"),
-    (pygame.Rect(160, 170, 110, 65),  "床頭抽屜",   "drawer.png"),
+    (pygame.Rect(160, 170, 110, 65),  "床頭抽屜",   "desk_drawer.png"),
     (pygame.Rect(500, 170, 120, 75),  "兒童保險箱", "locker.png"),
 ]
 
-# 預先載入圖片
 loaded_items = [(rect, text, load_img(fname, rect.size)) for rect, text, fname in items]
 
 running = True
