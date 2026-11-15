@@ -14,7 +14,8 @@ BOX_FILL = (78, 81, 94)
 BOX_BORDER = (180, 185, 198)
 TEXT_COLOR = (205, 210, 220)
 
-FOLDER = r"c:\assets\素材庫\第二章\T+0"  # 若資料夾在其他位置，可改成相對或絕對路徑
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FOLDER = os.path.join(BASE_DIR, "..", "assets", "素材庫", "第二章", "T+0")
 
 def load_img(filename, size):
     if not filename:
