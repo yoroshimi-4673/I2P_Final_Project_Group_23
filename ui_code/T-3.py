@@ -49,7 +49,7 @@ items = [
     (pygame.Rect(350, 130, 45, 35),   "鐵盒",       "locker.png"),
     (pygame.Rect(570, 90, 60, 50),  "牆上的日曆", "date.png"),
     (pygame.Rect(60, 220, 195, 110), "床",         "像素风星星兔子小床.png"),
-    (pygame.Rect(220, 430, 190, 65), "衣櫃",       None),
+    (pygame.Rect(80, 110, 300, 120), "衣櫃",       "closet.png"),
     (pygame.Rect(600, 170, 110, 150),"書桌",       "desk_drawer.png"),
 ]
 
