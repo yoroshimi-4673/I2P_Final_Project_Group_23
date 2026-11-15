@@ -46,7 +46,7 @@ bg_img = load_img("background.png", (800, 600))
 items = [
     (pygame.Rect(570, 90, 60, 50),  "牆上的日曆", "date.png"),
     (pygame.Rect(100, 230, 150, 115), "斷裂的床",   "bed.png"),
-    (pygame.Rect(600, 170, 100, 120),"書桌",       "desk_drawer.png"),
+    (pygame.Rect(600, 170, 100, 120),"書桌",       "desk.png"),
     (pygame.Rect(630, 190, 30, 24),  "信",         "letter.png"),
 ]
 
