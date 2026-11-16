@@ -360,16 +360,32 @@ def draw_player_navigation_guide(
     )
 
 
-def is_interaction_target_active(object_id):
-    """依房間完成事件切換重疊門框互動目標。"""
+def is_in_interaction_region(object_id, interaction_rect):
+    """先檢查矩形，再精確判斷非矩形互動區域。"""
 
-    if game.current_space == "T0":
-        completed = game.has_event("t0_completed")
-        if object_id == "t0_height_marks":
-            return not completed
-        if object_id == "t0_exit_door":
-            return completed
-    return True
+    if not player.rect.colliderect(interaction_rect):
+        return False
+
+    layout = ui_layout.get("spaces", {}).get(
+        game.current_space, {}
+    ).get("objects", {}).get(object_id, {})
+    points = layout.get("interaction_polygon", [])
+    if len(points) < 3:
+        return True
+
+    polygon = [
+        (game_ui.scale_x(screen, x), game_ui.scale_y(screen, y))
+        for x, y in points
+    ]
+    corners = (player.rect.topleft, player.rect.topright,
+               player.rect.bottomleft, player.rect.bottomright)
+    if any(player.point_in_polygon(point, polygon) for point in corners):
+        return True
+    return any(
+        player.rect.collidepoint(point)
+        or player.rect.clipline(point, polygon[(index + 1) % len(polygon)])
+        for index, point in enumerate(polygon)
+    )
 
 
 def get_nearest_interaction_target(
@@ -389,11 +405,9 @@ def get_nearest_interaction_target(
         interaction_rects.items()
     ):
 
-        if not is_interaction_target_active(object_id):
-            continue
-
         # 玩家未進入範圍時不能使用E互動
-        if not player.rect.colliderect(
+        if not is_in_interaction_region(
+            object_id,
             interaction_rect
         ):
             continue
@@ -432,11 +446,70 @@ def get_nearest_interaction_target(
     return nearest_target
 
 
+def draw_dialogue_background(
+    surface,
+    mouse_pos
+):
+    """依目前場景繪製背景，Dialogue Box再獨立疊上。"""
+
+    dialogue_id = (
+        dialogue_controller.dialogue_id
+    )
+
+    # 第一章開場仍保留原本特殊背景
+    if dialogue_id == "intro":
+
+        game_ui.draw_intro_background(
+            surface,
+            dialogue_controller
+        )
+
+        return
+
+    # 第一章選擇結果仍使用307病房
+    if dialogue_id == "scene_04_choice_result":
+
+        game_ui.draw_room_307(
+            surface
+        )
+
+        return
+
+    # 第一章結尾尚未正式切入第二章
+    if dialogue_id == "chapter_1_end":
+
+        surface.fill(
+            (255, 255, 255)
+        )
+
+        return
+
+    # 只要目前存在正式Space，就直接畫真正場景
+    if game.current_space is not None:
+
+        game_ui.draw_space(
+            surface,
+            game,
+            mouse_pos
+        )
+
+        player.draw(
+            surface
+        )
+
+        return
+
+    # 沒有Space資料時才使用第一章307備援
+    game_ui.draw_room_307(
+        surface
+    )
+
+
 def draw_interaction_prompt(
     surface,
     target
 ):
-    """在可互動物件旁顯示E鍵提示。"""
+    """依提示位置背景亮度自動產生高反差E鍵文字。"""
 
     if target is None:
         return
@@ -453,37 +526,81 @@ def draw_interaction_prompt(
         object_id
     )
 
-    # 背景互動區隱藏名稱但維持原本目標編號
-    object_layout = ui_layout.get("spaces", {}).get(
-        game.current_space, {}
-    ).get("objects", {}).get(object_id, {})
-    if (
-        game.current_space == "CH2_CORRIDOR"
-        and objects.get(object_id, {}).get("type") == "time_door"
-    ):
-        prompt_text = f"[E] {object_name}"
-    elif object_layout.get("render_mode") == "background":
-        prompt_text = "[E] 互動"
-    else:
-        prompt_text = f"[E] 互動：{object_name}"
+    object_layout = (
+        ui_layout
+        .get(
+            "spaces",
+            {}
+        )
+        .get(
+            game.current_space,
+            {}
+        )
+        .get(
+            "objects",
+            {}
+        )
+        .get(
+            object_id,
+            {}
+        )
+    )
 
-    prompt_surface = (
+    # 第二章時間門直接顯示門名
+    if (
+        game.current_space
+        == "CH2_CORRIDOR"
+        and objects.get(
+            object_id,
+            {}
+        ).get(
+            "type"
+        ) == "time_door"
+    ):
+
+        prompt_text = (
+            f"[E] {object_name}"
+        )
+
+    # 背景內建物件不顯示物件名稱
+    elif object_id in ("t0_height_marks", "t7_height_marks"):
+        prompt_text = "[E]互動: 門框"
+
+    elif (
+        object_layout.get(
+            "render_mode"
+        )
+        == "background"
+    ):
+
+        prompt_text = (
+            "[E] 互動"
+        )
+
+    else:
+
+        prompt_text = (
+            f"[E] 互動：{object_name}"
+        )
+
+    # 先用暫時文字取得真正尺寸
+    measurement_surface = (
         game_ui.font_small.render(
             prompt_text,
             True,
-            (255, 245, 180)
+            (255, 255, 255)
         )
     )
 
     prompt_x = (
         player.rect.centerx
-        - prompt_surface.get_width()
+        - measurement_surface.get_width()
         // 2
     )
 
     prompt_y = (
         player.rect.top
-        - prompt_surface.get_height()
+        - measurement_surface.get_height()
         - 10
     )
 
@@ -492,7 +609,7 @@ def draw_interaction_prompt(
         min(
             prompt_x,
             surface.get_width()
-            - prompt_surface.get_width()
+            - measurement_surface.get_width()
             - 8
         )
     )
@@ -500,6 +617,133 @@ def draw_interaction_prompt(
     prompt_y = max(
         8,
         prompt_y
+    )
+
+    sample_rect = pygame.Rect(
+        prompt_x - 5,
+        prompt_y - 4,
+        measurement_surface.get_width() + 10,
+        measurement_surface.get_height() + 8
+    )
+
+    # 避免取樣範圍超出螢幕
+    sample_rect = sample_rect.clip(surface.get_rect())
+    if sample_rect.width <= 0 or sample_rect.height <= 0:
+        return
+
+    # 讀取提示文字後方的平均背景顏色
+    average_color = (
+        pygame.transform.average_color(
+            surface.subsurface(
+                sample_rect
+            )
+        )
+    )
+
+    red = average_color[0]
+    green = average_color[1]
+    blue = average_color[2]
+
+    # 使用感知亮度，而不是單純RGB平均
+    luminance = (
+        0.2126 * red
+        + 0.7152 * green
+        + 0.0722 * blue
+    )
+
+    # 亮背景→黑字；暗背景→白字
+    if luminance >= 145:
+
+        text_color = (
+            20,
+            20,
+            25
+        )
+
+        outline_color = (
+            245,
+            245,
+            245
+        )
+
+        backing_color = (
+            255,
+            255,
+            255,
+            80
+        )
+
+    else:
+
+        text_color = (
+            245,
+            245,
+            245
+        )
+
+        outline_color = (
+            15,
+            15,
+            20
+        )
+
+        backing_color = (
+            0,
+            0,
+            0,
+            90
+        )
+
+    # 加一層半透明底框，處理花紋複雜背景
+    backing = pygame.Surface(
+        sample_rect.size,
+        pygame.SRCALPHA
+    )
+
+    backing.fill(
+        backing_color
+    )
+
+    surface.blit(
+        backing,
+        sample_rect.topleft
+    )
+
+    # 先畫反色外框
+    outline_surface = (
+        game_ui.font_small.render(
+            prompt_text,
+            True,
+            outline_color
+        )
+    )
+
+    for offset_x, offset_y in (
+        (-1, 0),
+        (1, 0),
+        (0, -1),
+        (0, 1),
+        (-1, -1),
+        (1, -1),
+        (-1, 1),
+        (1, 1)
+    ):
+
+        surface.blit(
+            outline_surface,
+            (
+                prompt_x + offset_x,
+                prompt_y + offset_y
+            )
+        )
+
+    # 最後畫真正文字
+    prompt_surface = (
+        game_ui.font_small.render(
+            prompt_text,
+            True,
+            text_color
+        )
     )
 
     surface.blit(
@@ -1790,61 +2034,8 @@ while running:
 
         if game.game_state == DIALOGUE:
 
-            dialogue_id = (
-                dialogue_controller
-                .dialogue_id
-            )
-
-            if dialogue_id == "intro":
-
-                game_ui.draw_intro_background(
-                    screen,
-                    dialogue_controller
-                )
-
-            elif dialogue_id in (
-                "scene_04_choice_result",
-            ):
-
-                game_ui.draw_room_307(
-                    screen
-                )
-
-            elif dialogue_id == "photo_back_story":
-
-                # 照片劇情仍發生於Space C
-                game_ui.draw_space(
-                    screen,
-                    game,
-                    mouse_pos
-                )
-                player.draw(screen)
-
-            elif dialogue_id in (
-                "chapter_1_end",
-                "scene_09_entry"
-            ):
-
-                screen.fill((255, 255, 255))
-
-            elif dialogue_id in (
-                "time_door_T0",
-                "time_door_T7",
-                "time_door_T3",
-                "scene_10_entry",
-                "scene_11_entry",
-                "scene_12_warning",
-                "scene_12_entry"
-            ):
-
-                # 時間門進場與警告統一深藍背景
-                screen.fill((12, 24, 48))
-
-            else:
-
-                game_ui.draw_room_307(
-                    screen
-                )
+            # 場景背景與對話框分開依序繪製
+            draw_dialogue_background(screen, mouse_pos)
 
             draw_dialogue_box(
                 screen,
@@ -2407,9 +2598,6 @@ while running:
                     object_id,
                     rect
                 ) in object_rects.items():
-
-                    if not is_interaction_target_active(object_id):
-                        continue
 
                     if click_is_walkable and rect.collidepoint(
                         mouse_pos

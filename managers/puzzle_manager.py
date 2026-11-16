@@ -639,19 +639,19 @@ class PuzzleManager:
                 "message": "這個謎題已經完成。"
             }
 
-        if not self.can_attempt(
-            puzzle_id
-        ):
+        # if not self.can_attempt(
+        #     puzzle_id
+        # ):
 
-            return {
-                "status": "puzzle_unavailable",
-                "message": "目前無法操作此謎題。",
-                "remaining_attempts": (
-                    self.get_remaining_attempts(
-                        puzzle_id
-                    )
-                )
-            }
+        #     return {
+        #         "status": "puzzle_unavailable",
+        #         "message": "目前無法操作此謎題。",
+        #         "remaining_attempts": (
+        #             self.get_remaining_attempts(
+        #                 puzzle_id
+        #             )
+        #         )
+        #     }
 
         validation = self.validate_input(
             puzzle_id,

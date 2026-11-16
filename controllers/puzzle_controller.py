@@ -96,17 +96,17 @@ class PuzzleController:
                 "message": "這個謎題已經完成。"
             }
 
-        elif not self.puzzle_manager.can_attempt(
-            puzzle_id
-        ):
+        # elif not self.puzzle_manager.can_attempt(
+        #     puzzle_id
+        # ):
 
-            result = {
-                "status": "puzzle_unavailable",
-                "message": "目前無法操作此謎題。",
-                "remaining_attempts": (
-                    self.remaining_attempts
-                )
-            }
+        #     result = {
+        #         "status": "puzzle_unavailable",
+        #         "message": "目前無法操作此謎題。",
+        #         "remaining_attempts": (
+        #             self.remaining_attempts
+        #         )
+        #     }
 
         else:
 
@@ -178,10 +178,10 @@ class PuzzleController:
         if self.current_puzzle_id is None:
             return
 
-        if not self.puzzle_manager.can_attempt(
-            self.current_puzzle_id
-        ):
-            return
+        # if not self.puzzle_manager.can_attempt(
+        #     self.current_puzzle_id
+        # ):
+        #     return
 
         value = str(
             value

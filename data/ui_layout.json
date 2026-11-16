@@ -787,20 +787,50 @@
                     "interaction_padding": 40
                 },
                 "t0_height_marks": {
-                    "x": 345,
-                    "y": 448,
-                    "width": 103,
-                    "height": 100,
+                    "x": 290,
+                    "y": 445,
+                    "width": 59,
+                    "height": 139,
                     "asset": null,
                     "label": "門框身高刻度",
                     "render_mode": "background",
-                    "interaction_padding": 0
+                    "interaction_padding": 0,
+                    "interaction_polygon": [
+                        [
+                            290,
+                            487
+                        ],
+                        [
+                            316,
+                            487
+                        ],
+                        [
+                            349,
+                            445
+                        ],
+                        [
+                            349,
+                            584
+                        ],
+                        [
+                            322,
+                            584
+                        ],
+                        [
+                            322,
+                            546
+                        ],
+                        [
+                            294,
+                            541
+                        ]
+                    ]
                 },
                 "t0_exit_door": {
-                    "x": 345,
-                    "y": 448,
-                    "width": 103,
-                    "height": 100,
+                    "x": 352,
+                    "y": 441,
+                    "width": 96,
+                    "height": 139,
                     "asset": null,
                     "label": "病房門",
                     "render_mode": "background",
@@ -820,9 +850,9 @@
             "entry_spawns": {},
             "collision_zones": {
                 "t0_bed_body": {
-                    "x": 60,
+                    "x": 121,
                     "y": 220,
-                    "width": 115,
+                    "width": 73,
                     "height": 110,
                     "kind": "furniture"
                 },
@@ -874,7 +904,104 @@
                 "height": 100,
                 "label": "黎琛"
             },
-            "walkable_polygon": [],
+            "walkable_polygon": [
+                [
+                    242,
+                    198
+                ],
+                [
+                    556,
+                    198
+                ],
+                [
+                    653,
+                    242
+                ],
+                [
+                    703,
+                    293
+                ],
+                [
+                    703,
+                    339
+                ],
+                [
+                    701,
+                    341
+                ],
+                [
+                    701,
+                    371
+                ],
+                [
+                    627,
+                    456
+                ],
+                [
+                    575,
+                    456
+                ],
+                [
+                    549,
+                    487
+                ],
+                [
+                    480,
+                    487
+                ],
+                [
+                    480,
+                    478
+                ],
+                [
+                    455,
+                    449
+                ],
+                [
+                    345,
+                    449
+                ],
+                [
+                    319,
+                    478
+                ],
+                [
+                    319,
+                    488
+                ],
+                [
+                    252,
+                    488
+                ],
+                [
+                    223,
+                    456
+                ],
+                [
+                    173,
+                    456
+                ],
+                [
+                    97,
+                    372
+                ],
+                [
+                    97,
+                    345
+                ],
+                [
+                    95,
+                    345
+                ],
+                [
+                    95,
+                    295
+                ],
+                [
+                    140,
+                    242
+                ]
+            ],
             "objects": {
                 "t7_broken_bed": {
                     "x": 100,
@@ -911,34 +1038,83 @@
                     "asset": "assets/素材庫/第二章/T+7/letter.png",
                     "label": "給爸爸的信",
                     "interaction_padding": 35
-                }
-            },
-            "entry_spawns": {},
-            "collision_zones": {},
-            "pending_objects": {
+                },
                 "t7_height_marks": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 0,
-                    "height": 0,
+                    "x": 290,
+                    "y": 445,
+                    "width": 59,
+                    "height": 139,
                     "asset": null,
                     "label": "門框身高刻度",
                     "render_mode": "background",
-                    "interaction_padding": 40,
-                    "reason": "等待人工確認背景座標"
+                    "interaction_padding": 0,
+                    "interaction_polygon": [
+                        [
+                            290,
+                            487
+                        ],
+                        [
+                            316,
+                            487
+                        ],
+                        [
+                            349,
+                            445
+                        ],
+                        [
+                            349,
+                            584
+                        ],
+                        [
+                            322,
+                            584
+                        ],
+                        [
+                            322,
+                            546
+                        ],
+                        [
+                            294,
+                            541
+                        ]
+                    ]
                 },
                 "t7_exit_door": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 0,
-                    "height": 0,
+                    "x": 352,
+                    "y": 441,
+                    "width": 96,
+                    "height": 139,
                     "asset": null,
                     "label": "病房門",
                     "render_mode": "background",
-                    "interaction_padding": 40,
-                    "reason": "等待人工確認背景座標"
+                    "interaction_padding": 0
                 }
-            }
+            },
+            "entry_spawns": {},
+            "collision_zones": {
+                "t7_broken_bed_body": {
+                    "x": 100,
+                    "y": 230,
+                    "width": 150,
+                    "height": 115,
+                    "kind": "furniture"
+                },
+                "t7_desk_drawer_body": {
+                    "x": 600,
+                    "y": 170,
+                    "width": 100,
+                    "height": 120,
+                    "kind": "furniture"
+                },
+                "t7_letter_body": {
+                    "x": 630,
+                    "y": 190,
+                    "width": 30,
+                    "height": 24,
+                    "kind": "furniture"
+                }
+            },
+            "pending_objects": {}
         },
         "T3": {
             "background": {
@@ -952,7 +1128,104 @@
                 "height": 100,
                 "label": "黎琛"
             },
-            "walkable_polygon": [],
+            "walkable_polygon": [
+                [
+                    242,
+                    198
+                ],
+                [
+                    556,
+                    198
+                ],
+                [
+                    653,
+                    242
+                ],
+                [
+                    703,
+                    293
+                ],
+                [
+                    703,
+                    339
+                ],
+                [
+                    701,
+                    341
+                ],
+                [
+                    701,
+                    371
+                ],
+                [
+                    627,
+                    456
+                ],
+                [
+                    575,
+                    456
+                ],
+                [
+                    549,
+                    487
+                ],
+                [
+                    480,
+                    487
+                ],
+                [
+                    480,
+                    478
+                ],
+                [
+                    455,
+                    449
+                ],
+                [
+                    345,
+                    449
+                ],
+                [
+                    319,
+                    478
+                ],
+                [
+                    319,
+                    488
+                ],
+                [
+                    252,
+                    488
+                ],
+                [
+                    223,
+                    456
+                ],
+                [
+                    173,
+                    456
+                ],
+                [
+                    97,
+                    372
+                ],
+                [
+                    97,
+                    345
+                ],
+                [
+                    95,
+                    345
+                ],
+                [
+                    95,
+                    295
+                ],
+                [
+                    140,
+                    242
+                ]
+            ],
             "objects": {
                 "t3_wardrobe": {
                     "x": 80,
@@ -991,6 +1264,16 @@
                     "label": "書桌",
                     "render_mode": "background",
                     "interaction_padding": 40
+                },
+                "t3_exit_door": {
+                    "x": 352,
+                    "y": 441,
+                    "width": 96,
+                    "height": 139,
+                    "asset": null,
+                    "label": "病房門",
+                    "render_mode": "background",
+                    "interaction_padding": 0
                 }
             },
             "decorations": {
@@ -1036,17 +1319,6 @@
                     "label": "床板底部",
                     "render_mode": "background",
                     "interaction_padding": 30,
-                    "reason": "等待人工確認背景座標"
-                },
-                "t3_exit_door": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 0,
-                    "height": 0,
-                    "asset": null,
-                    "label": "病房門",
-                    "render_mode": "background",
-                    "interaction_padding": 40,
                     "reason": "等待人工確認背景座標"
                 }
             }
