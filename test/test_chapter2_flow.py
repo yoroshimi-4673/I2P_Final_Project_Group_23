@@ -273,20 +273,28 @@ class Chapter2FlowTests(unittest.TestCase):
         self.click("leave")
         self.assertEqual(g.current_scene, "scene_13_anchor_terminal")
         g = self.game
+        self.expect_dialogue("scene_13_entry")
+        self.finish()
         self.open("ch2_terminal")
-        self.click("fragment:past_fragment")
+        buttons = self.ui.draw(self.screen, (0, 0))
+        self.interaction.start_anchor_drag(buttons, buttons["fragment:past_fragment"].center)
         attempts = copy.deepcopy(g.puzzle_attempts)
-        self.click("slot:present")
+        self.interaction.finish_anchor_drag(buttons, buttons["slot:present"].center)
         self.assertEqual(self.ui.result["status"], "wrong_slot")
         self.assertEqual(g.puzzle_attempts, attempts)
         self.assertEqual(self.ui.mode, "anchor_fragments")
         for item, slot in (("past_fragment", "past"), ("present_fragment", "present"),
                            ("future_fragment", "future")):
-            self.click("fragment:" + item)
-            self.click("slot:" + slot)
+            buttons = self.ui.draw(self.screen, (0, 0))
+            self.interaction.start_anchor_drag(buttons, buttons["fragment:" + item].center)
+            self.interaction.finish_anchor_drag(buttons, buttons["slot:" + slot].center)
         self.expect_dialogue("scene_13_terminal")
         self.finish()
         self.assertEqual(self.ui.mode, "multi_input")
+        self.click("back")
+        self.open("ch2_terminal")
+        self.assertEqual(self.ui.mode, "multi_input")
+        self.assertEqual(self.puzzle.multi_input, {"past": "", "present": "", "future": ""})
         for field, value in (("past", "4"), ("present", "7"), ("future", "14")):
             self.click("field:" + field)
             for digit in value:
@@ -325,8 +333,14 @@ class Chapter2FlowTests(unittest.TestCase):
             self.puzzle.set_active_field(field)
             self.puzzle.append_input(value)
         for stage in ("middle", "near", "consumed"):
+            self.puzzle.multi_input = {"past": "4", "present": "7", "future": "13"}
             self.interaction.submit_puzzle()
             self.assertEqual(self.manager.get_failure_stage("anchor_age_verification"), stage)
+            self.assertEqual(self.puzzle.multi_input, {"past": "", "present": "", "future": ""})
+        self.assertNotEqual(self.game.game_state, GAME_OVER)
+        self.assertEqual(self.puzzle.last_result["status"], "final_failure_pending")
+        self.assertEqual(self.puzzle.multi_input, {"past": "", "present": "", "future": ""})
+        self.click("ack_failure")
         self.assertEqual(self.game.game_state, GAME_OVER)
         self.assertEqual(self.game.game_over_reason, "white_wall_consumed_corridor")
 
@@ -339,7 +353,7 @@ class Chapter2FlowTests(unittest.TestCase):
             "asset": "fake.png", "overlay_asset": "fake_overlay.png"
         }
         ui = GameUI(layout, self.game_ui.levels, self.objects)
-        manager = MapManager(copy.deepcopy(layout), ui)
+        manager = MapManager(copy.deepcopy(layout), ui, self.game)
         self.game.enter_space("T3")
         with patch.object(ui, "draw_asset", wraps=ui.draw_asset) as asset, \
                 patch.object(ui, "draw_placeholder_rect", wraps=ui.draw_placeholder_rect) as placeholder, \
@@ -378,7 +392,7 @@ class Chapter2FlowTests(unittest.TestCase):
         for object_id, data in self.objects.items():
             if data.get("space"):
                 self.assertIn(object_id, represented)
-        manager = MapManager(copy.deepcopy(self.layout), self.game_ui)
+        manager = MapManager(copy.deepcopy(self.layout), self.game_ui, self.game)
         for space, layout in self.layout["spaces"].items():
             active = manager.get_object_rects(space, self.screen)
             self.assertFalse(set(active) & set(layout.get("pending_objects", {})))

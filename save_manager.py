@@ -115,6 +115,7 @@ def save_game(
     "story_events": game.story_events,
 
     "puzzle_attempts": game.puzzle_attempts,
+    "scene13_anchor_slots": game.scene13_anchor_slots,  # 保存已固定於時間凹槽的碎片
 
     "chapter": game.chapter,
     "game_over_reason": game.game_over_reason,
@@ -217,6 +218,11 @@ def load_game(
         "puzzle_attempts",
         {}
     )  # 恢復各個謎題自己的剩餘嘗試次數
+
+    loaded_anchor_slots = save_data.get("scene13_anchor_slots", {})  # 舊存檔缺少此欄位仍可正常載入
+    game.scene13_anchor_slots.clear()
+    game.scene13_anchor_slots.update({"past": None, "present": None, "future": None})
+    game.scene13_anchor_slots.update(loaded_anchor_slots)  # 保留原字典參照供控制器使用
 
     game.story_events = save_data.get(
         "story_events",

@@ -4,9 +4,10 @@
 class MapManager:
     """將ui_layout中的Space資料轉成遊戲執行時資料。"""
 
-    def __init__(self, ui_layout, game_ui):
+    def __init__(self, ui_layout, game_ui, game):
         self.ui_layout = ui_layout
         self.game_ui = game_ui
+        self.game = game  # 依劇情事件啟用場景物件與碰撞
 
         # 保存Player原始版面供出生點系統使用
         self.player_layouts = {
@@ -49,6 +50,9 @@ class MapManager:
                 {}
             ).items()
         ):
+            required_event = object_layout.get("visible_after_event")
+            if required_event and not self.game.has_event(required_event):
+                continue  # 未解鎖物件不建立地圖互動範圍
             object_rects[object_id] = (
                 self.game_ui.scale_rect(
                     screen,
@@ -73,6 +77,9 @@ class MapManager:
                 {}
             ).items()
         ):
+            required_event = zone_layout.get("visible_after_event")
+            if required_event and not self.game.has_event(required_event):
+                continue  # 物件尚未出現時不建立隱形碰撞
             collision_rects[zone_id] = (
                 self.game_ui.scale_rect(
                     screen,

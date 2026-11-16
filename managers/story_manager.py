@@ -595,10 +595,12 @@ class StoryManager:
                 "scene_13_anchor_terminal"
             )
 
-            self.game.complete_event(
-                "scene_13_started"
-            )
+            if not self.game.has_event("scene_13_started"):
+                self.game.complete_event("scene_13_started")
+                self.start_dialogue("scene_13_entry", after_action="return_to_space")  # 返回走廊後才播放終章開場
 
+        elif self.game.has_event("scene_13_started"):
+            self.game.current_scene = "scene_13_anchor_terminal"
         else:
             self.game.current_scene = (
                 "scene_09_corridor"

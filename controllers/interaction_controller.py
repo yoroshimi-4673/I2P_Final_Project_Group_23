@@ -83,8 +83,7 @@ class InteractionController:
                     self.interaction_ui.close()
                     self.interaction_ui.current_object_id = object_id
                     self.interaction_ui.mode = "anchor_fragments"
-                    if not any(self.puzzle_controller.anchor_slots.values()):
-                        self.puzzle_controller.reset_anchor_slots()
+                    self.puzzle_controller.reset_anchor_drag_state()
                 else:
                     self.interaction_ui.open_message("請等待終端機完成驗證準備。", object_id)
                 return
@@ -650,6 +649,16 @@ class InteractionController:
         if not self.interaction_ui.is_open():
             return
 
+        if self.interaction_ui.mode == "multi_input" and (self.puzzle_controller.last_result or {}).get("status") == "final_failure_pending":
+            if event.key == pygame.K_RETURN:
+                self.acknowledge_anchor_final_failure()
+            return  # 最終失敗確認前不接受其他輸入
+
+        if event.key == pygame.K_ESCAPE and self.interaction_ui.mode == "anchor_fragments":
+            self.puzzle_controller.reset_anchor_drag_state()
+            self.interaction_ui.close()
+            return
+
         # 密碼介面仍保留數字鍵與Backspace快速輸入
         if self.interaction_ui.mode in ("password", "multi_input"):
 
@@ -1045,29 +1054,17 @@ class InteractionController:
                 self.interaction_ui.close()
 
         elif mode == "anchor_fragments":
-
-            for button_id, rect in buttons.items():
-                if not rect.collidepoint(mouse_pos):
-                    continue
-                if button_id.startswith("fragment:"):
-                    self.puzzle_controller.select_anchor_fragment(button_id.split(":", 1)[1])
-                    return
-                if button_id.startswith("slot:"):
-                    result = self.puzzle_controller.place_anchor_fragment(
-                        button_id.split(":", 1)[1]
-                    )
-                    self.interaction_ui.result = result
-                    if result["status"] == "wrong_slot":
-                        result["message"] = "碎片與這個凹槽無法吻合。"
-                    elif result["status"] == "anchor_complete":
-                        self.interaction_ui.close()
-                        self.story_manager.complete_anchor_fragments()
-                    return
-                if button_id == "close":
-                    self.interaction_ui.close()
-                    return
+            if buttons["close"].collidepoint(mouse_pos):
+                self.puzzle_controller.reset_anchor_drag_state()
+                self.interaction_ui.close()
+            return
 
         elif mode == "multi_input":
+
+            if (self.puzzle_controller.last_result or {}).get("status") == "final_failure_pending":
+                if buttons["ack_failure"].collidepoint(mouse_pos):
+                    self.acknowledge_anchor_final_failure()
+                return
 
             for button_id, rect in buttons.items():
                 if button_id.startswith("field:") and rect.collidepoint(mouse_pos):
@@ -1409,6 +1406,57 @@ class InteractionController:
 
         return entry_object
 
+
+    def start_anchor_drag(self, buttons, mouse_pos):
+        """開始拖曳尚未固定於凹槽的時間碎片。"""
+        if buttons.get("close") and buttons["close"].collidepoint(mouse_pos):
+            self.puzzle_controller.reset_anchor_drag_state()
+            self.interaction_ui.close()
+            return True
+        pc = self.puzzle_controller
+        for key, rect in buttons.items():
+            if key.startswith("fragment:") and rect.collidepoint(mouse_pos):
+                item_id = key.split(":", 1)[1]
+                if not self.game.has_item(item_id) or item_id in pc.anchor_slots.values():
+                    return False
+                pc.anchor_dragging_fragment = item_id
+                pc.anchor_drag_offset = (mouse_pos[0] - rect.x, mouse_pos[1] - rect.y)
+                pc.anchor_fragment_positions[item_id] = rect.topleft
+                return True
+        return False
+
+    def update_anchor_drag(self, mouse_pos):
+        """滑鼠移動只更新碎片的暫時畫面座標。"""
+        pc = self.puzzle_controller
+        if pc.anchor_dragging_fragment:
+            pc.anchor_fragment_positions[pc.anchor_dragging_fragment] = (
+                mouse_pos[0] - pc.anchor_drag_offset[0], mouse_pos[1] - pc.anchor_drag_offset[1]
+            )
+
+    def finish_anchor_drag(self, buttons, mouse_pos):
+        """放對凹槽才固定碎片並保存放置狀態。"""
+        pc = self.puzzle_controller
+        item_id = pc.anchor_dragging_fragment
+        if item_id is None:
+            return
+        result = None
+        for key, rect in buttons.items():
+            if key.startswith("slot:") and rect.collidepoint(mouse_pos):
+                result = pc.place_anchor_fragment(item_id, key.split(":", 1)[1])
+                break
+        pc.reset_anchor_drag_state()  # 空白與錯槽放置皆回到原本位置
+        if result:
+            self.interaction_ui.result = result
+            if result["status"] == "anchor_complete":
+                self.interaction_ui.close()
+                self.story_manager.complete_anchor_fragments()
+
+    def acknowledge_anchor_final_failure(self):
+        """確認白牆完全吞沒走廊後結束遊戲。"""
+        from game_states import GAME_OVER
+        if (self.puzzle_controller.last_result or {}).get("status") == "final_failure_pending":
+            self.interaction_ui.close()
+            self.game.game_state = GAME_OVER
 
     def start_diary_drag(
         self,

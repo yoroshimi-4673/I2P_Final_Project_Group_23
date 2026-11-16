@@ -560,6 +560,14 @@ class PuzzleManager:
             == "game_over"
         ):
 
+            if puzzle_id == "anchor_age_verification":
+                self.game.game_over_reason = failure.get("reason")
+                return {
+                    "status": "final_failure_pending",
+                    "message": failure.get("message", "白牆吞沒了整條走廊。"),
+                    "remaining_attempts": 0
+                }  # 最終白牆先顯示並等待玩家確認
+
             self.game.game_state = (
                 GAME_OVER
             )

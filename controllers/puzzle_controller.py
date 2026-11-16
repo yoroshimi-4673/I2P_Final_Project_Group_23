@@ -26,7 +26,8 @@ class PuzzleController:
         self.sequence_input = []  # 記錄排序類謎題目前選擇順序
         self.multi_input = {}  # 記錄多欄輸入謎題各欄內容
         self.active_field_id = None  # 記錄目前正在輸入的欄位
-        self.reset_anchor_slots()
+        self.anchor_selected_fragment = None
+        self.reset_anchor_drag_state()  # 控制器重建只清除拖曳暫存資料
         self.reset_diary_drag_state()
         self.diary_reader_page = 0
 
@@ -247,6 +248,9 @@ class PuzzleController:
     def submit(self):
         """提交目前Puzzle輸入內容。"""
 
+        if (self.last_result or {}).get("status") == "final_failure_pending":
+            return self.last_result  # 確認最終失敗前禁止重複提交答案
+
         if self.current_puzzle_id is None:
 
             return {
@@ -298,6 +302,12 @@ class PuzzleController:
         elif self.ui_mode == "password":
 
             self.clear_input()
+
+        elif self.ui_mode == "multi_input" and self.last_result.get("status") in ("wrong", "final_failure_pending"):
+            fields = self.puzzle.get("fields", [])
+            self.multi_input = {field["id"]: "" for field in fields}  # 年齡輸錯後清空全部輸入欄位
+            if fields:
+                self.active_field_id = fields[0]["id"]
 
         return self.last_result
 
@@ -423,16 +433,28 @@ class PuzzleController:
         ] = current[:-1]
 
 
+    @property
+    def anchor_slots(self):
+        """直接讀取角色保存的三枚錨點位置。"""
+        return self.puzzle_manager.game.scene13_anchor_slots
+
     def reset_anchor_slots(self):
         """重設Scene13三個錨點凹槽。"""
 
         self.anchor_selected_fragment = None
 
-        self.anchor_slots = {
+        self.puzzle_manager.game.scene13_anchor_slots = {
             "past": None,
             "present": None,
             "future": None
         }
+        self.reset_anchor_drag_state()
+
+    def reset_anchor_drag_state(self):
+        """清除拖曳暫存並保留已固定的碎片。"""
+        self.anchor_dragging_fragment = None
+        self.anchor_drag_offset = (0, 0)
+        self.anchor_fragment_positions = {}
 
 
     def select_anchor_fragment(
@@ -461,19 +483,15 @@ class PuzzleController:
 
     def place_anchor_fragment(
         self,
+        item_id,
         slot_id
     ):
         """將目前選取碎片放入指定凹槽。"""
 
-        item_id = (
-            self.anchor_selected_fragment
-        )
-
-        if item_id is None:
-
-            return {
-                "status": "no_fragment_selected"
-            }
+        if item_id not in ANCHOR_FRAGMENT_TARGETS:
+            return {"status": "invalid_fragment"}
+        if not self.puzzle_manager.game.has_item(item_id):
+            return {"status": "fragment_missing"}
 
         expected_slot = (
             ANCHOR_FRAGMENT_TARGETS.get(

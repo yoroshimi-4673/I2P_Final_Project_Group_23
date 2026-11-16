@@ -178,7 +178,8 @@ game_ui = GameUI(
 # 集中管理Space版面、碰撞、互動範圍與出生點
 map_manager = MapManager(
     ui_layout,
-    game_ui
+    game_ui,
+    game
 )
 
 dialogue_controller = DialogueController(
@@ -1487,23 +1488,30 @@ while running:
 
         # 日記拖放直接使用上幀的頁面與槽位
         elif (
-            interaction_ui.mode == "diary_drag"
+            interaction_ui.mode in ("diary_drag", "anchor_fragments")
             and ui_overlay is None
             and ui_screen == UI_GAME
             and event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP)
         ):
-            if event.type == pygame.MOUSEMOTION:
-                interaction_controller.update_diary_drag(event.pos)
-            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                interaction_controller.handle_click(
-                    interaction_controller.last_buttons, event.pos
-                )
-            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                interaction_controller.update_diary_drag(event.pos)
-                interaction_controller.finish_diary_drag(
-                    interaction_controller.last_buttons, event.pos
-                )
-
+            if interaction_ui.mode == "anchor_fragments":
+                if event.type == pygame.MOUSEMOTION:
+                    interaction_controller.update_anchor_drag(event.pos)
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    interaction_controller.start_anchor_drag(interaction_controller.last_buttons, event.pos)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    interaction_controller.finish_anchor_drag(interaction_controller.last_buttons, event.pos)
+            else:
+                if event.type == pygame.MOUSEMOTION:
+                    interaction_controller.update_diary_drag(event.pos)
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    interaction_controller.handle_click(
+                        interaction_controller.last_buttons, event.pos
+                    )
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    interaction_controller.update_diary_drag(event.pos)
+                    interaction_controller.finish_diary_drag(
+                        interaction_controller.last_buttons, event.pos
+                    )
         elif (
             event.type == pygame.MOUSEMOTION
             and polygon_editor_active
