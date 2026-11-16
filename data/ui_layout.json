@@ -624,7 +624,20 @@
                     "interaction_padding": 0
                 }
             },
-            "entry_spawns": {},
+            "entry_spawns": {
+                "door_t0": {
+                    "x": 231,
+                    "y": 279
+                },
+                "door_t3": {
+                    "x": 231,
+                    "y": 103
+                },
+                "door_t7": {
+                    "x": 231,
+                    "y": 481
+                }
+            },
             "collision_zones": {},
             "pending_objects": {
                 "ch2_terminal": {
@@ -641,7 +654,7 @@
         },
         "T0": {
             "background": {
-                "asset": "assets/素材庫/第二章/T+0/background.png",
+                "asset": "assets/素材庫/第二章/T+0/background_withblack.png",
                 "label": "T+0／307病房"
             },
             "player": {
@@ -894,7 +907,7 @@
         },
         "T7": {
             "background": {
-                "asset": "assets/素材庫/第二章/T+7/background.png",
+                "asset": "assets/素材庫/第二章/T+7/background_withblack.png",
                 "label": "T+7／307病房"
             },
             "player": {
@@ -1118,7 +1131,7 @@
         },
         "T3": {
             "background": {
-                "asset": "assets/素材庫/第二章/T-3/background.png",
+                "asset": "assets/素材庫/第二章/T-3/background_withblack.png",
                 "label": "T-3／307病房"
             },
             "player": {
@@ -1243,16 +1256,17 @@
                     "height": 35,
                     "asset": "assets/素材庫/第二章/T-3/locker.png",
                     "label": "時間膠囊",
-                    "interaction_padding": 35
+                    "interaction_padding": 35,
+                    "visible_after_event": "t3_time_capsule_found"
                 },
                 "t3_bed": {
                     "x": 60,
                     "y": 220,
                     "width": 195,
                     "height": 110,
-                    "asset": null,
+                    "asset": "assets/素材庫/第二章/T-3/bed.png",
                     "label": "床",
-                    "render_mode": "background",
+                    "render_mode": "normal",
                     "interaction_padding": 40
                 },
                 "t3_desk": {
@@ -1260,9 +1274,9 @@
                     "y": 170,
                     "width": 100,
                     "height": 120,
-                    "asset": null,
+                    "asset": "assets/素材庫/第二章/T+7/desk.png",
                     "label": "書桌",
-                    "render_mode": "background",
+                    "render_mode": "normal",
                     "interaction_padding": 40
                 },
                 "t3_exit_door": {
@@ -1274,6 +1288,56 @@
                     "label": "病房門",
                     "render_mode": "background",
                     "interaction_padding": 0
+                },
+                "t3_windowsill": {
+                    "x": 286,
+                    "y": 43,
+                    "width": 41,
+                    "height": 137,
+                    "asset": null,
+                    "label": "窗台",
+                    "render_mode": "background",
+                    "interaction_padding": 0
+                },
+                "t3_height_marks": {
+                    "x": 290,
+                    "y": 445,
+                    "width": 59,
+                    "height": 139,
+                    "asset": null,
+                    "label": "門框身高刻度",
+                    "render_mode": "background",
+                    "interaction_padding": 0,
+                    "interaction_polygon": [
+                        [
+                            290,
+                            487
+                        ],
+                        [
+                            316,
+                            487
+                        ],
+                        [
+                            349,
+                            445
+                        ],
+                        [
+                            349,
+                            584
+                        ],
+                        [
+                            322,
+                            584
+                        ],
+                        [
+                            322,
+                            546
+                        ],
+                        [
+                            294,
+                            541
+                        ]
+                    ]
                 }
             },
             "decorations": {
@@ -1283,45 +1347,40 @@
                     "width": 55,
                     "height": 75,
                     "asset": "assets/素材庫/角色/daughter.png",
-                    "label": "四歲黎念"
+                    "label": "四歲黎念",
+                    "sprite_sheet": {
+                        "columns": 4,
+                        "rows": 3,
+                        "column": 0,
+                        "row": 0
+                    }
                 }
             },
             "entry_spawns": {},
-            "collision_zones": {},
-            "pending_objects": {
-                "t3_windowsill": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 0,
-                    "height": 0,
-                    "asset": null,
-                    "label": "窗台",
-                    "render_mode": "background",
-                    "interaction_padding": 40,
-                    "reason": "等待人工確認背景座標"
+            "collision_zones": {
+                "t3_bed_body": {
+                    "x": 60,
+                    "y": 220,
+                    "width": 195,
+                    "height": 110,
+                    "fit_object_asset": "t3_bed"
                 },
-                "t3_knife": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 0,
-                    "height": 0,
-                    "asset": "assets/素材庫/第二章/T-3/knoife.png",
-                    "label": "美工刀",
-                    "interaction_padding": 30,
-                    "reason": "等待人工確認背景座標"
+                "t3_wardrobe_body": {
+                    "x": 80,
+                    "y": 110,
+                    "width": 300,
+                    "height": 120,
+                    "fit_object_asset": "t3_wardrobe"
                 },
-                "t3_bed_board": {
-                    "x": 0,
-                    "y": 0,
-                    "width": 0,
-                    "height": 0,
-                    "asset": null,
-                    "label": "床板底部",
-                    "render_mode": "background",
-                    "interaction_padding": 30,
-                    "reason": "等待人工確認背景座標"
+                "t3_desk_body": {
+                    "x": 600,
+                    "y": 170,
+                    "width": 100,
+                    "height": 120,
+                    "fit_object_asset": "t3_desk"
                 }
-            }
+            },
+            "pending_objects": {}
         }
     },
     "hud": {

@@ -16,7 +16,8 @@ class PuzzleManager:
         self.objects = objects
 
         self.reward_handlers = {
-            "item": self._reward_item
+            "item": self._reward_item,
+            "consume_items": self._reward_consume_items
         }  # 將不同獎勵類型集中由同一入口處理
 
 
@@ -190,7 +191,7 @@ class PuzzleManager:
         # 依介面模式保留排序與多欄格式
         ui_mode = puzzle.get("ui_mode", "password")
 
-        if ui_mode == "sequence":
+        if ui_mode in ("sequence", "diary_drag"):
 
             if not isinstance(
                 answer,
@@ -337,7 +338,7 @@ class PuzzleManager:
             "answer"
         )
 
-        if ui_mode == "sequence":
+        if ui_mode in ("sequence", "diary_drag"):
 
             return isinstance(answer, list) and answer == expected
 
@@ -444,7 +445,7 @@ class PuzzleManager:
                 )
 
             reward_result = handler(
-                value
+                reward if reward_type == "consume_items" else value
             )
 
             results.append(
@@ -639,19 +640,19 @@ class PuzzleManager:
                 "message": "這個謎題已經完成。"
             }
 
-        # if not self.can_attempt(
-        #     puzzle_id
-        # ):
+        if not self.can_attempt(
+            puzzle_id
+        ):
 
-        #     return {
-        #         "status": "puzzle_unavailable",
-        #         "message": "目前無法操作此謎題。",
-        #         "remaining_attempts": (
-        #             self.get_remaining_attempts(
-        #                 puzzle_id
-        #             )
-        #         )
-        #     }
+            return {
+                "status": "puzzle_unavailable",
+                "message": "目前無法操作此謎題。",
+                "remaining_attempts": (
+                    self.get_remaining_attempts(
+                        puzzle_id
+                    )
+                )
+            }
 
         validation = self.validate_input(
             puzzle_id,
@@ -684,3 +685,26 @@ class PuzzleManager:
         return self.apply_failure(
             puzzle_id
         )
+
+
+    def _reward_consume_items(
+        self,
+        reward
+    ):
+        """移除完成Puzzle後被合併使用的背包物品。"""
+
+        item_ids = reward.get(
+            "values",
+            []
+        )
+
+        for item_id in item_ids:
+
+            self.game.remove_item(
+                item_id
+            )
+
+        return {
+            "type": "consume_items",
+            "values": item_ids
+        }

@@ -175,8 +175,14 @@ class Chapter2FlowTests(unittest.TestCase):
         self.click("ok")
         self.open("t0_diary")
         for page in (2, 4, 5):
-            self.click(f"page:t0_diary_page_{page}")
-        self.click("submit")
+            buttons = self.ui.draw(self.screen, (0, 0))
+            item = f"t0_diary_page_{page}"
+            rect = buttons["_drag_rects"][item]
+            self.interaction.start_diary_drag(item, rect, rect.center)
+            target = buttons[f"diary_slot:page_{page}"].center
+            self.interaction.update_diary_drag(target)
+            self.interaction.finish_diary_drag(buttons, target)
+        self.click("confirm")
         self.assertTrue(g.is_puzzle_solved("t0_diary_restore"))
         self.password("t0_child_safe", "21")
         self.expect_dialogue("scene_10_fragment")
@@ -186,6 +192,7 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(g.current_space, "T0")
         self.assertTrue(g.has_event("t0_completed"))
         self.open("t0_exit_door")
+        self.click("leave")
         self.open("door_t7")
         self.finish()
         self.expect_dialogue("scene_11_entry")
@@ -216,6 +223,7 @@ class Chapter2FlowTests(unittest.TestCase):
         self.finish()
         self.assertEqual(g.current_space, "T7")
         self.open("t7_exit_door")
+        self.click("leave")
         g.add_item("t7_letter")
         self.open("door_t3")
         self.finish()
@@ -230,10 +238,12 @@ class Chapter2FlowTests(unittest.TestCase):
         for item in ("present_fragment", "future_fragment"):
             self.assertTrue(g.has_item(item))
         self.finish()
-        for object_id in ("t3_bed", "t3_desk", "t3_wardrobe"):
+        for object_id in ("t3_bed", "t3_wardrobe"):
             self.open(object_id)
-            self.assertEqual(self.ui.mode, "inspectable")
-            self.click("back")
+            self.expect_dialogue("scene_12_wrong_search")
+            self.finish()
+            self.assertEqual(self.ui.mode, "container" if object_id == "t3_bed" else "inspectable")
+            self.ui.close()
         self.open("t3_time_capsule")
         self.assertEqual(self.ui.mode, "message")
         self.assertIsNone(self.puzzle.current_puzzle_id)
@@ -246,15 +256,21 @@ class Chapter2FlowTests(unittest.TestCase):
         self.finish()
         self.open("t3_bed_board")
         self.assertEqual(self.ui.mode, "message")
-        self.open("t3_knife")
+        self.open("t3_desk")
+        self.expect_dialogue("scene_12_wrong_search")
+        self.assertFalse(g.has_item("t3_knife"))
+        self.finish()
         self.assertTrue(g.has_item("t3_knife"))
         self.click("ok")
         g = self.game
-        self.open("t3_bed_board")
+        self.open("t3_bed")
+        self.finish()
+        self.click("t3_bed_board")
         self.expect_dialogue("scene_12_carving")
         self.finish()
         self.assertTrue(g.has_event("t3_completed"))
         self.open("t3_exit_door")
+        self.click("leave")
         self.assertEqual(g.current_scene, "scene_13_anchor_terminal")
         g = self.game
         self.open("ch2_terminal")

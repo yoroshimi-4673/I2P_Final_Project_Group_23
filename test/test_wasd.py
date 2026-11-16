@@ -1,3 +1,7 @@
+if __name__ != "__main__":
+    import unittest
+    raise unittest.SkipTest("Interactive Pygame harness; run this file directly.")
+
 import pygame
 
 pygame.init()

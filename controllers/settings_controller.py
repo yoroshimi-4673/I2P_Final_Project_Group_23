@@ -112,3 +112,15 @@ class SettingsController:
             return "close_settings"
 
         return None
+    def handle_key(
+        self,
+        event
+    ):
+        """處理Settings畫面的鍵盤輸入。"""
+
+        import pygame
+
+        if event.key == pygame.K_ESCAPE:
+            return "close_settings"
+
+        return None

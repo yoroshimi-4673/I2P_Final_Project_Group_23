@@ -405,6 +405,12 @@ def get_nearest_interaction_target(
         interaction_rects.items()
     ):
 
+        # 未發現物件不列入鄰近互動目標
+        object_layout = ui_layout["spaces"][game.current_space].get("objects", {}).get(object_id, {})
+        required_event = object_layout.get("visible_after_event")
+        if required_event and not game.has_event(required_event):
+            continue
+
         # 玩家未進入範圍時不能使用E互動
         if not is_in_interaction_region(
             object_id,
@@ -563,7 +569,7 @@ def draw_interaction_prompt(
         )
 
     # 背景內建物件不顯示物件名稱
-    elif object_id in ("t0_height_marks", "t7_height_marks"):
+    elif object_id in ("t0_height_marks", "t7_height_marks", "t3_height_marks"):
         prompt_text = "[E]互動: 門框"
 
     elif (
@@ -971,7 +977,10 @@ ui_overlay = None  # 記錄Settings等覆蓋式介面
 def finish_dialogue_and_open_ready_puzzle():
     """對話結束後依準備事件開啟年齡介面。"""
 
-    story_manager.finish_dialogue_action()
+    continuation = story_manager.finish_dialogue_action()
+    # 搜尋提示結束後交回原有互動控制器繼續處理
+    if continuation and continuation.get("type") == "complete_t3_search":
+        interaction_controller.complete_t3_search(continuation["object_id"])
     if (
         game.game_state == SPACE
         and game.current_space == "CH2_CORRIDOR"
@@ -1004,6 +1013,7 @@ def start_new_game():
 
     # 新遊戲不保留上一局的裂隙入口資料
     interaction_controller.pending_entry_rift = None
+    interaction_controller.pending_entry_object = None
 
     hotbar_controller.reset()
 
@@ -1474,6 +1484,25 @@ while running:
         # ====================================================
         # Mouse
         # ====================================================
+
+        # 日記拖放直接使用上幀的頁面與槽位
+        elif (
+            interaction_ui.mode == "diary_drag"
+            and ui_overlay is None
+            and ui_screen == UI_GAME
+            and event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP)
+        ):
+            if event.type == pygame.MOUSEMOTION:
+                interaction_controller.update_diary_drag(event.pos)
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                interaction_controller.handle_click(
+                    interaction_controller.last_buttons, event.pos
+                )
+            elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                interaction_controller.update_diary_drag(event.pos)
+                interaction_controller.finish_diary_drag(
+                    interaction_controller.last_buttons, event.pos
+                )
 
         elif (
             event.type == pygame.MOUSEMOTION
@@ -2095,7 +2124,8 @@ while running:
                     player,
                     game.current_space,
                     screen,
-                    interaction_controller.pending_entry_rift
+                    interaction_controller.pending_entry_rift,
+                    interaction_controller.pending_entry_object
                 )
 
                 last_player_space = (
@@ -2104,6 +2134,7 @@ while running:
 
                 # 出生點套用完成後清除一次性入口資訊
                 interaction_controller.pending_entry_rift = None
+                interaction_controller.pending_entry_object = None
 
                 pressed_keys.clear()
 
