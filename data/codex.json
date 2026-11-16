@@ -8,6 +8,27 @@
                 "fragment_2",
                 "photo_1"
             ]
+        },
+        {
+            "id": "chapter_2",
+            "title": "Chapter 2",
+            "items": [
+                "t0_diary_page_2",
+                "t0_diary_page_4",
+                "t0_diary_page_5",
+                "pencil",
+                "rubbing_paper",
+                "present_fragment",
+                "future_fragment",
+                "past_fragment",
+                "t3_note",
+                "t3_knife"
+            ]
+        },
+        {
+            "id": "chapter_3",
+            "title": "Chapter 3",
+            "items": []
         }
     ]
 }

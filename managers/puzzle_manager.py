@@ -152,6 +152,16 @@ class PuzzleManager:
             ):
                 return False
 
+        for knowledge_id in requirements.get(
+            "knowledge",
+            []
+        ):
+
+            if not self.game.has_knowledge(
+                knowledge_id
+            ):
+                return False
+
         return True
 
 
@@ -175,6 +185,92 @@ class PuzzleManager:
             return {
                 "status": "puzzle_not_found",
                 "message": "找不到這個謎題。"
+            }
+
+        # 依介面模式保留排序與多欄格式
+        ui_mode = puzzle.get("ui_mode", "password")
+
+        if ui_mode == "sequence":
+
+            if not isinstance(
+                answer,
+                list
+            ):
+
+                return {
+                    "status": "invalid_input",
+                    "message": "頁面排列資料格式錯誤。"
+                }
+
+            expected_length = len(
+                puzzle.get(
+                    "answer",
+                    []
+                )
+            )
+
+            if len(answer) != expected_length:
+
+                return {
+                    "status": "incomplete_input",
+                    "message": "還有日記頁尚未放回。"
+                }
+
+            return {
+                "status": "valid"
+            }
+
+        if ui_mode == "multi_input":
+
+            if not isinstance(
+                answer,
+                dict
+            ):
+
+                return {
+                    "status": "invalid_input",
+                    "message": "輸入資料格式錯誤。"
+                }
+
+            fields = puzzle.get(
+                "fields",
+                []
+            )
+
+            for field in fields:
+
+                field_id = field.get(
+                    "id"
+                )
+
+                value = str(
+                    answer.get(
+                        field_id,
+                        ""
+                    )
+                )
+
+                if value == "":
+
+                    return {
+                        "status": "incomplete_input",
+                        "message": "請填寫三個時間的年齡。"
+                    }
+
+                if (
+                    puzzle.get(
+                        "input_type"
+                    ) == "digits"
+                    and not value.isdigit()
+                ):
+
+                    return {
+                        "status": "invalid_input",
+                        "message": "年齡只能輸入數字。"
+                    }
+
+            return {
+                "status": "valid"
             }
 
         answer = str(
@@ -223,7 +319,7 @@ class PuzzleManager:
         puzzle_id,
         answer
     ):
-        """只判斷答案是否正確，不修改遊戲狀態。"""
+        """依Puzzle UI模式比較玩家答案。"""
 
         puzzle = self.get_puzzle(
             puzzle_id
@@ -232,14 +328,63 @@ class PuzzleManager:
         if puzzle is None:
             return False
 
+        ui_mode = puzzle.get(
+            "ui_mode",
+            "password"
+        )
+
+        expected = puzzle.get(
+            "answer"
+        )
+
+        if ui_mode == "sequence":
+
+            return isinstance(answer, list) and answer == expected
+
+        if ui_mode == "multi_input":
+
+            if not isinstance(
+                answer,
+                dict
+            ):
+                return False
+
+            return all(
+                str(answer.get(field_id, ""))
+                == str(expected_value)
+                for field_id, expected_value
+                in expected.items()
+            )
+
         return (
             str(answer)
-            == str(
-                puzzle.get(
-                    "answer",
-                    ""
-                )
-            )
+            == str(expected)
+        )
+
+
+    def get_failure_stage(
+        self,
+        puzzle_id
+    ):
+        """依剩餘嘗試次數推導Puzzle視覺失敗階段。"""
+
+        if puzzle_id != "anchor_age_verification":
+            return None
+
+        remaining = self.get_remaining_attempts(
+            puzzle_id
+        )
+
+        stages = {
+            3: "far",
+            2: "middle",
+            1: "near",
+            0: "consumed"
+        }
+
+        return stages.get(
+            remaining,
+            "far"
         )
 
 
@@ -433,21 +578,27 @@ class PuzzleManager:
                 "remaining_attempts": 0
             }
 
+        base_message = puzzle.get(
+            "wrong_message",
+            "答案錯誤。"
+        )
+
         if remaining is None:
 
-            message = puzzle.get(
-                "wrong_message",
-                "答案錯誤。"
+            message = base_message
+
+        elif remaining == 1:
+
+            message = (
+                f"{base_message}\n"
+                "剩餘嘗試次數：1。最後一次。"
             )
 
         else:
 
-            message = puzzle.get(
-                "wrong_message",
-                (
-                    "答案錯誤。"
-                    f"剩餘嘗試次數：{remaining}"
-                )
+            message = (
+                f"{base_message}\n"
+                f"剩餘嘗試次數：{remaining}"
             )
 
         return {
@@ -488,19 +639,19 @@ class PuzzleManager:
                 "message": "這個謎題已經完成。"
             }
 
-        if not self.can_attempt(
-            puzzle_id
-        ):
+        # if not self.can_attempt(
+        #     puzzle_id
+        # ):
 
-            return {
-                "status": "puzzle_unavailable",
-                "message": "目前無法操作此謎題。",
-                "remaining_attempts": (
-                    self.get_remaining_attempts(
-                        puzzle_id
-                    )
-                )
-            }
+        #     return {
+        #         "status": "puzzle_unavailable",
+        #         "message": "目前無法操作此謎題。",
+        #         "remaining_attempts": (
+        #             self.get_remaining_attempts(
+        #                 puzzle_id
+        #             )
+        #         )
+        #     }
 
         validation = self.validate_input(
             puzzle_id,

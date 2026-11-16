@@ -1,7 +1,8 @@
 """負責interaction的鍵盤焦點與輸入處理"""
 import pygame
 from managers.interaction_manager import (
-    search_object
+    search_object,
+    collect_item
 )
 
 class InteractionController:
@@ -37,9 +38,225 @@ class InteractionController:
             ]
         )
 
-        if current_object[
-            "type"
-        ] != "puzzle":
+        object_type = current_object["type"]
+
+        # 特殊互動交由劇情或既有介面處理
+        if object_id == "ch2_terminal":
+
+            if self.game.current_scene == "scene_09_corridor":
+                self.interaction_ui.close()
+                self.story_manager.inspect_chapter2_terminal()
+                return
+
+            if self.game.current_scene == "scene_13_anchor_terminal":
+                if self.game.is_puzzle_solved("anchor_age_verification"):
+                    self.interaction_ui.open_message("錨點驗證已經完成。", object_id)
+                elif self.game.has_event("anchor_age_puzzle_ready"):
+                    self.open_anchor_age_verification()
+                elif not self.game.has_event("anchor_fragments_placed"):
+                    self.interaction_ui.close()
+                    self.interaction_ui.current_object_id = object_id
+                    self.interaction_ui.mode = "anchor_fragments"
+                    if not any(self.puzzle_controller.anchor_slots.values()):
+                        self.puzzle_controller.reset_anchor_slots()
+                else:
+                    self.interaction_ui.open_message("請等待終端機完成驗證準備。", object_id)
+                return
+
+        if object_type == "time_door":
+
+            target_space = current_object.get(
+                "target_space"
+            )
+
+            self.interaction_ui.close()
+
+            self.story_manager.inspect_time_door(
+                target_space
+            )
+
+            return
+
+        if object_type == "time_exit":
+
+            self.interaction_ui.close()
+
+            self.story_manager.return_to_chapter2_corridor()
+
+            return
+
+        if object_type == "rubbing_target":
+
+            required_items = (
+                current_object.get(
+                    "required_items",
+                    []
+                )
+            )
+
+            has_all_items = all(
+                self.game.has_item(item_id)
+                for item_id in required_items
+            )
+
+            if not has_all_items:
+
+                self.interaction_ui.open_message(
+                    "刻痕已經太淡了。需要某種方法把它保存下來。",
+                    object_id
+                )
+
+                return
+
+            if self.game.has_event(
+                "t7_rubbing_completed"
+            ):
+
+                self.interaction_ui.open_message(
+                    "床板上的刻痕已經完成拓印。",
+                    object_id
+                )
+
+                return
+
+            self.interaction_ui.close()
+
+            self.story_manager.complete_t7_rubbing()
+
+            return
+
+        if object_type == "readable":
+
+            self.interaction_ui.open_readable(
+                object_id
+            )
+
+            return
+
+        if object_type == "searchable_location":
+
+            if object_id == "t3_windowsill":
+
+                if not self.game.has_event(
+                    "t3_time_capsule_found"
+                ):
+
+                    self.game.complete_event(
+                        "t3_time_capsule_found"
+                    )
+
+                    self.interaction_ui.open_message(
+                        "夕陽照著窗台。下面藏著一只巴掌大的鐵盒，上面刻著：「給七歲的你」。",
+                        object_id
+                    )
+
+                else:
+
+                    self.interaction_ui.open_message(
+                        "時間膠囊就在窗台下。",
+                        object_id
+                    )
+
+                return
+
+        if (
+            object_id == "t3_time_capsule"
+            and not self.game.has_event(
+                "t3_time_capsule_found"
+            )
+        ):
+
+            self.interaction_ui.open_message(
+                "現在還沒有發現這個盒子。",
+                object_id
+            )
+
+            return
+
+        if object_id == "t3_knife":
+
+            if self.game.has_discovered_item(
+                "t3_knife"
+            ):
+
+                self.interaction_ui.open_message(
+                    "這把美工刀已經拿走了。",
+                    object_id
+                )
+
+                return
+
+            result = collect_item(
+                self.game,
+                "t3_knife",
+                self.interaction_ui.objects
+            )
+
+            self.interaction_ui.current_object_id = (
+                "t3_knife"
+            )
+
+            self.interaction_ui.result = result
+            self.interaction_ui.notification = result
+            self.interaction_ui.mode = (
+                "item_notification"
+            )
+
+            return
+
+        if object_type == "carving_target":
+
+            if not self.game.has_event(
+                "t3_capsule_opened"
+            ):
+
+                self.interaction_ui.open_message(
+                    "床板底部目前沒有什麼值得注意的地方。",
+                    object_id
+                )
+
+                return
+
+            if not self.game.has_item(
+                "t3_knife"
+            ):
+
+                self.interaction_ui.open_message(
+                    "需要一個能在木板上留下刻痕的工具。",
+                    object_id
+                )
+
+                return
+
+            if not self.game.has_knowledge(
+                "number_0347"
+            ):
+
+                self.interaction_ui.open_message(
+                    "黎琛想不起該留下什麼數字。",
+                    object_id
+                )
+
+                return
+
+            if self.game.has_event(
+                "t3_0347_carved"
+            ):
+
+                self.interaction_ui.open_message(
+                    "床板底下已經刻著：0 3 4 7。",
+                    object_id
+                )
+
+                return
+
+            self.interaction_ui.close()
+
+            self.story_manager.complete_t3_carving()
+
+            return
+
+        if object_type != "puzzle":
 
             self.interaction_ui.open_object(
                 object_id
@@ -80,6 +297,22 @@ class InteractionController:
             self.interaction_ui.mode = (
                 "message"
             )
+
+    def open_anchor_age_verification(self):
+        """共用自動開啟與重新查看年齡謎題入口。"""
+
+        self.interaction_ui.close()
+        result = self.puzzle_controller.open_puzzle("anchor_age_verification")
+        self.interaction_ui.current_object_id = "ch2_terminal"
+        self.interaction_ui.result = result
+        self.interaction_ui.mode = (
+            self.puzzle_controller.ui_mode
+            if result.get("status") == "input_required"
+            else "message"
+        )
+        self.reset_interaction_focus()
+        return result
+
 
     def submit_puzzle(self):
         """提交目前Puzzle並處理通用完成流程。"""
@@ -172,12 +405,14 @@ class InteractionController:
                 )
             ):
 
-                self.story_manager.start_puzzle_event(
+                handled = self.story_manager.start_puzzle_event(
                     event_id,
                     completion
                 )
 
-                return
+                if handled is True:
+                    self.interaction_ui.close()
+                    return
 
         self.interaction_ui.mode = (
             "message"
@@ -414,7 +649,7 @@ class InteractionController:
             return
 
         # 密碼介面仍保留數字鍵與Backspace快速輸入
-        if self.interaction_ui.mode == "password":
+        if self.interaction_ui.mode in ("password", "multi_input"):
 
             if (
                 pygame.K_0
@@ -458,7 +693,10 @@ class InteractionController:
         # Escape統一處理返回或關閉互動視窗
         if event.key == pygame.K_ESCAPE:
 
-            if self.interaction_ui.mode == "password":
+            if self.interaction_ui.mode == "readable":
+                self.close_readable()
+
+            elif self.interaction_ui.mode == "password":
                 self.interaction_ui.close()
 
             elif self.interaction_ui.parent_stack:
@@ -466,6 +704,16 @@ class InteractionController:
 
             else:
                 self.interaction_ui.close()
+
+    def close_readable(self):
+        """關閉文件並僅於首次閱讀後播放劇情。"""
+
+        object_id = self.interaction_ui.current_object_id
+        self.interaction_ui.close()
+
+        if object_id == "t7_letter" and not self.game.has_event("t7_letter_read"):
+            self.story_manager.complete_t7_letter()
+
 
     def handle_click(
         self,
@@ -603,6 +851,64 @@ class InteractionController:
         # ========================================================
         # Password
         # ========================================================
+
+        elif mode == "sequence":
+
+            for button_id, rect in buttons.items():
+                if button_id.startswith("page:") and rect.collidepoint(mouse_pos):
+                    item_id = button_id.split(":", 1)[1]
+                    if item_id in self.puzzle_controller.sequence_input:
+                        self.puzzle_controller.remove_sequence_item(item_id)
+                    else:
+                        self.puzzle_controller.append_sequence_item(item_id)
+                    return
+
+            if buttons["clear"].collidepoint(mouse_pos):
+                self.puzzle_controller.clear_sequence()
+            elif buttons["submit"].collidepoint(mouse_pos):
+                self.submit_puzzle()
+            elif buttons["back"].collidepoint(mouse_pos):
+                self.interaction_ui.close()
+
+        elif mode == "anchor_fragments":
+
+            for button_id, rect in buttons.items():
+                if not rect.collidepoint(mouse_pos):
+                    continue
+                if button_id.startswith("fragment:"):
+                    self.puzzle_controller.select_anchor_fragment(button_id.split(":", 1)[1])
+                    return
+                if button_id.startswith("slot:"):
+                    result = self.puzzle_controller.place_anchor_fragment(
+                        button_id.split(":", 1)[1]
+                    )
+                    self.interaction_ui.result = result
+                    if result["status"] == "wrong_slot":
+                        result["message"] = "碎片與這個凹槽無法吻合。"
+                    elif result["status"] == "anchor_complete":
+                        self.interaction_ui.close()
+                        self.story_manager.complete_anchor_fragments()
+                    return
+                if button_id == "close":
+                    self.interaction_ui.close()
+                    return
+
+        elif mode == "multi_input":
+
+            for button_id, rect in buttons.items():
+                if button_id.startswith("field:") and rect.collidepoint(mouse_pos):
+                    self.puzzle_controller.set_active_field(button_id.split(":", 1)[1])
+                    return
+            for digit in map(str, range(10)):
+                if buttons[digit].collidepoint(mouse_pos):
+                    self.puzzle_controller.append_input(digit)
+                    return
+            if buttons["clear"].collidepoint(mouse_pos):
+                self.puzzle_controller.clear_active_multi_input()
+            elif buttons["submit"].collidepoint(mouse_pos):
+                self.submit_puzzle()
+            elif buttons["back"].collidepoint(mouse_pos):
+                self.interaction_ui.close()
 
         elif mode == "password":
 
@@ -759,6 +1065,11 @@ class InteractionController:
         # ========================================================
         # Item
         # ========================================================
+
+        elif mode == "readable":
+
+            if buttons["close"].collidepoint(mouse_pos):
+                self.close_readable()
 
         elif mode == "item":
 

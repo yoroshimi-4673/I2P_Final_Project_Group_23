@@ -119,6 +119,109 @@ class InteractionUI:
     # Open Interaction
     # ========================================================
 
+    def open_message(
+        self,
+        message,
+        object_id=None
+    ):
+        """開啟單純訊息視窗。"""
+
+        self.current_object_id = (
+            object_id
+        )
+
+        self.result = {
+            "status": "message",
+            "description": message
+        }
+
+        self.mode = "message"
+
+
+    def open_readable(
+        self,
+        object_id
+    ):
+        """開啟可閱讀圖片。"""
+
+        self.current_object_id = (
+            object_id
+        )
+
+        current_object = (
+            self.objects[
+                object_id
+            ]
+        )
+
+        self.result = {
+            "status": "readable",
+            "object_id": object_id,
+            "name": current_object.get(
+                "name",
+                object_id
+            ),
+            "description": current_object.get(
+                "description",
+                ""
+            ),
+            "asset": current_object.get(
+                "ui_asset"
+            )
+        }
+
+        self.mode = "readable"
+
+
+    def draw_readable(
+        self,
+        screen,
+        mouse_pos
+    ):
+        """繪製置中的可閱讀文件。"""
+
+        modal = self.draw_modal_base(
+            screen,
+            width=600,
+            height=500
+        )
+
+        image_rect = pygame.Rect(
+            modal.x + 60,
+            modal.y + 40,
+            modal.width - 120,
+            modal.height - 120
+        )
+
+        self.game_ui.draw_asset(
+            screen,
+            self.result.get(
+                "asset"
+            ),
+            image_rect
+        )
+
+        close_rect = pygame.Rect(
+            modal.centerx - 55,
+            modal.bottom - 60,
+            110,
+            36
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "關閉",
+            close_rect,
+            close_rect.collidepoint(
+                mouse_pos
+            )
+        )
+
+        return {
+            "close": close_rect
+        }
+
+
     def open_object(
         self,
         object_id
@@ -159,6 +262,28 @@ class InteractionUI:
                     self.objects
                 )
             )
+
+        elif object_type == "searchable":
+
+            self.mode = "searchable"
+
+            self.result = {
+                "status": "searchable",
+                "object_id": object_id,
+                "name": current_object["name"],
+                "description": current_object.get(
+                    "description",
+                    ""
+                ),
+                "search_prompt": current_object.get(
+                    "search_prompt",
+                    "要繼續搜索嗎？"
+                )
+            }
+
+        elif object_type == "readable":
+
+            self.open_readable(object_id)
 
         elif object_type == "inspectable":
 
@@ -575,10 +700,14 @@ class InteractionUI:
             "inspectable": self.draw_inspectable,
             "rift": self.draw_rift,
             "password": self.draw_password,
+            "sequence": self.draw_sequence,
+            "anchor_fragments": self.draw_anchor_fragments,
+            "multi_input": self.draw_multi_input,
             "photo": self.draw_photo,
             "door": self.draw_door,
             "item": self.draw_item,
             "item_notification": self.draw_item_notification,
+            "readable": self.draw_readable,
             "message": self.draw_message
         }
 
@@ -936,6 +1065,185 @@ class InteractionUI:
     # ========================================================
     # Password
     # ========================================================
+
+    def draw_sequence(self, screen, mouse_pos):
+        """依控制器目前順序繪製日記頁卡片。"""
+
+        modal = self.draw_modal_base(screen, width=700, height=500)
+        title = self.game_ui.font_large.render("陪伴日記", True, (255, 220, 140))
+        screen.blit(title, title.get_rect(center=(modal.centerx, modal.y + 35)))
+        page_ids = self.puzzle_controller.puzzle.get("answer", [])
+        selected = self.puzzle_controller.sequence_input
+        buttons = {}
+        card_width = (modal.width - 80) // max(1, len(page_ids))
+
+        for index, item_id in enumerate(page_ids):
+            rect = pygame.Rect(modal.x + 40 + index * card_width, modal.y + 85,
+                               card_width - 15, 145)
+            label = self.objects.get(item_id, {}).get("name", item_id)
+            self.game_ui.draw_button(screen, label, rect, rect.collidepoint(mouse_pos))
+            image_rect = rect.inflate(-12, -36)
+            if self.objects.get(item_id, {}).get("ui_asset"):
+                pygame.draw.rect(screen, (55, 58, 72), rect, border_radius=6)
+                self.game_ui.draw_item_asset(screen, item_id, image_rect)
+                text = self.game_ui.font_small.render(label, True, (240, 240, 245))
+                screen.blit(text, text.get_rect(center=(rect.centerx, rect.bottom - 14)))
+            if item_id in selected:
+                pygame.draw.rect(screen, (255, 220, 140), rect, 3, border_radius=6)
+            buttons["page:" + item_id] = rect
+
+        order = [self.objects.get(item, {}).get("name", item) for item in selected]
+        order_text = "目前順序：" + " → ".join(
+            f"{index + 1}. {name}" for index, name in enumerate(order)
+        )
+        self.draw_multiline_text(screen, order_text, modal.x + 35, modal.y + 250,
+                                 modal.width - 70)
+        message = (self.result or {}).get("message", "")
+        self.draw_multiline_text(screen, message, modal.x + 35, modal.y + 320,
+                                 modal.width - 70, font=self.game_ui.font_small)
+        for index, (key, label) in enumerate((("clear", "清除"), ("submit", "確認"),
+                                               ("back", "返回"))):
+            rect = pygame.Rect(modal.x + 35 + index * (modal.width - 70) // 3,
+                               modal.bottom - 60, (modal.width - 100) // 3, 36)
+            self.game_ui.draw_button(screen, label, rect, rect.collidepoint(mouse_pos))
+            buttons[key] = rect
+        return buttons
+
+
+    def draw_u_groove(self, screen, rect, label, filled=False):
+        """沿用原型上方開口與三面槽牆造型。"""
+
+        wall_x = max(1, self.game_ui.scale_x(screen, 25))
+        wall_y = max(1, self.game_ui.scale_y(screen, 25))
+        fill = (100, 105, 115) if filled else (78, 81, 94)
+        border = (180, 185, 198)
+        # 三面牆直接畫成凹形，保留透明的上方開口
+        points = [(rect.left, rect.top), (rect.left + wall_x, rect.top),
+                  (rect.left + wall_x, rect.bottom - wall_y),
+                  (rect.right - wall_x, rect.bottom - wall_y),
+                  (rect.right - wall_x, rect.top), (rect.right, rect.top),
+                  (rect.right, rect.bottom), (rect.left, rect.bottom)]
+        pygame.draw.polygon(screen, fill, points)
+        pygame.draw.polygon(screen, border, points, width=2)
+        text = self.game_ui.font_ui.render(label, True, (205, 210, 220))
+        screen.blit(text, text.get_rect(center=(rect.centerx,
+                    rect.bottom + self.game_ui.scale_y(screen, 25))))
+
+
+    def draw_anchor_fragments(self, screen, mouse_pos):
+        """繪製持續保存狀態的三枚錨點凹槽。"""
+
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((20, 20, 25, 210))
+        screen.blit(overlay, (0, 0))
+        layout = self.game_ui.ui_layout["puzzle_layouts"]["anchor_fragment_slots"]
+        title = self.game_ui.font_large.render(layout["title"], True, (255, 220, 140))
+        screen.blit(title, title.get_rect(center=(screen.get_width() // 2,
+                    self.game_ui.scale_y(screen, 55))))
+        buttons = {}
+        slots = self.puzzle_controller.anchor_slots
+        for slot_id, data in layout["slots"].items():
+            rect = self.game_ui.scale_rect(screen, data)
+            item_id = slots.get(slot_id)
+            self.draw_u_groove(screen, rect, data["label"], filled=item_id is not None)
+            if item_id:
+                icon = rect.inflate(-self.game_ui.scale_x(screen, 60),
+                                    -self.game_ui.scale_y(screen, 70))
+                if not self.game_ui.draw_item_asset(screen, item_id, icon):
+                    self.draw_multiline_text(screen, self.objects[item_id]["name"],
+                                             icon.x, icon.centery, icon.width,
+                                             font=self.game_ui.font_small)
+            buttons["slot:" + slot_id] = rect
+
+        for index, item_id in enumerate(("past_fragment", "present_fragment", "future_fragment")):
+            if not self.game.has_item(item_id) or item_id in slots.values():
+                continue
+            rect = self.game_ui.scale_rect(screen, {
+                "x": 90 + index * 220, "y": 500, "width": 180, "height": 48
+            })
+            self.game_ui.draw_button(screen, self.objects[item_id]["name"], rect,
+                                     rect.collidepoint(mouse_pos))
+            if self.puzzle_controller.anchor_selected_fragment == item_id:
+                pygame.draw.rect(screen, (255, 220, 140), rect, 3, border_radius=5)
+            buttons["fragment:" + item_id] = rect
+
+        close = self.game_ui.scale_rect(screen, {
+            "x": 700, "y": 20, "width": 80, "height": 36
+        })
+        self.game_ui.draw_button(screen, "關閉", close, close.collidepoint(mouse_pos))
+        buttons["close"] = close
+        self.draw_multiline_text(screen, (self.result or {}).get("message", ""),
+                                 self.game_ui.scale_x(screen, 100),
+                                 self.game_ui.scale_y(screen, 565),
+                                 self.game_ui.scale_x(screen, 600),
+                                 font=self.game_ui.font_small)
+        return buttons
+
+
+    def draw_white_wall(self, screen):
+        """由剩餘次數與版面設定推導白牆範圍。"""
+
+        if self.puzzle_controller.current_puzzle_id != "anchor_age_verification":
+            return
+        config = self.game_ui.ui_layout["chapter2_effects"]["white_wall"]
+        stage = self.puzzle_controller.puzzle_manager.get_failure_stage(
+            "anchor_age_verification"
+        )
+        ratio = config["stages"].get(stage, 0)
+        width = int(screen.get_width() * ratio)
+        if width > 0:
+            wall = pygame.Surface((width, screen.get_height()), pygame.SRCALPHA)
+            wall.fill((*config["color"], config["alpha"]))
+            screen.blit(wall, (screen.get_width() - width, 0))
+
+
+    def draw_multi_input(self, screen, mouse_pos):
+        """分別顯示三個時間年齡及共用數字輸入。"""
+
+        self.draw_white_wall(screen)
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((20, 20, 25, 150))
+        screen.blit(overlay, (0, 0))
+        layout = self.game_ui.ui_layout["puzzle_layouts"]["anchor_age_verification"]
+        title = self.game_ui.font_large.render(layout["title"], True, (255, 220, 140))
+        screen.blit(title, title.get_rect(center=(screen.get_width() // 2,
+                    self.game_ui.scale_y(screen, 100))))
+        buttons = {}
+        for field_id, data in layout["fields"].items():
+            rect = self.game_ui.scale_rect(screen, data)
+            label = self.game_ui.font_ui.render(data["label"], True, (235, 235, 240))
+            screen.blit(label, label.get_rect(midbottom=(rect.centerx, rect.top - 8)))
+            pygame.draw.rect(screen, (42, 44, 56), rect, border_radius=6)
+            active = self.puzzle_controller.active_field_id == field_id
+            pygame.draw.rect(screen, (255, 220, 140) if active else (160, 165, 180),
+                             rect, 3 if active else 2, border_radius=6)
+            text = self.game_ui.font_large.render(
+                self.puzzle_controller.multi_input.get(field_id, ""), True, (245, 245, 245)
+            )
+            screen.blit(text, text.get_rect(center=rect.center))
+            buttons["field:" + field_id] = rect
+
+        for index in range(10):
+            rect = self.game_ui.scale_rect(screen, {
+                "x": 140 + index * 52, "y": 325, "width": 44, "height": 36
+            })
+            self.game_ui.draw_button(screen, str(index), rect, rect.collidepoint(mouse_pos))
+            buttons[str(index)] = rect
+        for key, label, data in (
+            ("clear", "清除此欄", {"x": 80, "y": 380, "width": 160, "height": 60}),
+            ("submit", layout["submit"]["label"], layout["submit"]),
+            ("back", "返回", {"x": 560, "y": 380, "width": 160, "height": 60})
+        ):
+            rect = self.game_ui.scale_rect(screen, data)
+            self.game_ui.draw_button(screen, label, rect, rect.collidepoint(mouse_pos))
+            buttons[key] = rect
+        self.draw_multiline_text(screen, (self.result or {}).get("message", ""),
+                                 self.game_ui.scale_x(screen, 100),
+                                 self.game_ui.scale_y(screen, 465),
+                                 self.game_ui.scale_x(screen, 600),
+                                 font=self.game_ui.font_small)
+        return buttons
+
 
     def draw_password(
         self,

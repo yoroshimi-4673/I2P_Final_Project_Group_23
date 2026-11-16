@@ -141,5 +141,254 @@
         "locked_description": "出口門就在那裡，但現在還無法打開。",
         "required_event": "photo_back_seen",
         "target_scene": "chapter_1_end"
+    },
+    "ch2_terminal": {
+        "name": "時間終端機",
+        "type": "inspectable",
+        "space": "CH2_CORRIDOR",
+        "description": "終端機記錄著三個時間的通行規則。"
+    },
+    "door_t0": {
+        "name": "T+0",
+        "type": "time_door",
+        "space": "CH2_CORRIDOR",
+        "target_space": "T0",
+        "required_event": "t0_unlocked",
+        "locked_description": "還沒到時候。"
+    },
+    "door_t7": {
+        "name": "T+7",
+        "type": "time_door",
+        "space": "CH2_CORRIDOR",
+        "target_space": "T7",
+        "required_event": "t7_unlocked",
+        "locked_description": "還沒到時候。"
+    },
+    "door_t3": {
+        "name": "T-3",
+        "type": "time_door",
+        "space": "CH2_CORRIDOR",
+        "target_space": "T3",
+        "required_event": "t3_unlocked",
+        "locked_description": "還沒到時候。"
+    },
+    "door_d": {
+        "name": "D",
+        "type": "door",
+        "space": "CH2_CORRIDOR",
+        "required_event": "space_d_unlocked",
+        "target_scene": "scene_14"
+    },
+    "t0_height_marks": {
+        "name": "門框身高刻度",
+        "type": "inspectable",
+        "space": "T0",
+        "description": "門框上留著一排身高刻度。最後一道寫著：「7歲 121」。"
+    },
+    "t0_bed": {
+        "name": "床",
+        "type": "container",
+        "space": "T0",
+        "description": "病床上的床單有些凌亂。",
+        "contents": [
+            "t0_pillow"
+        ]
+    },
+    "t0_pillow": {
+        "name": "枕頭",
+        "type": "searchable",
+        "description": "枕頭下面似乎壓著什麼。",
+        "search_prompt": "要翻開枕頭看看嗎？",
+        "item": "t0_diary_page_2",
+        "empty_text": "枕頭下面已經沒有其他東西。"
+    },
+    "t0_curtain": {
+        "name": "窗簾",
+        "type": "searchable",
+        "space": "T0",
+        "description": "窗簾的夾層裡似乎塞著一張紙。",
+        "search_prompt": "要檢查窗簾夾層嗎？",
+        "item": "t0_diary_page_5",
+        "empty_text": "窗簾夾層已經空了。"
+    },
+    "t0_bedside_drawer": {
+        "name": "床頭抽屜",
+        "type": "puzzle",
+        "space": "T0",
+        "description": "抽屜裝著三位數密碼鎖。旁邊寫著：「她長到這裡，我就把秘密還給她。」",
+        "puzzle_id": "t0_bedside_drawer"
+    },
+    "t0_diary": {
+        "name": "陪伴日記",
+        "type": "puzzle",
+        "space": "T0",
+        "description": "一本由黎琛寫下、卻沒有記憶的陪伴日記。",
+        "puzzle_id": "t0_diary_restore"
+    },
+    "t0_child_safe": {
+        "name": "兒童保險箱",
+        "type": "puzzle",
+        "space": "T0",
+        "description": "兩位數密碼鎖旁貼著：「寫給還沒到的那個月」。",
+        "puzzle_id": "t0_child_safe"
+    },
+    "t0_diary_page_2": {
+        "name": "日記第2頁",
+        "type": "item",
+        "description": "二月的日記頁。本月缺席：3次。",
+        "collectable": true
+    },
+    "t0_diary_page_4": {
+        "name": "日記第4頁",
+        "type": "item",
+        "description": "四月的日記頁。本月缺席：8次。",
+        "collectable": true
+    },
+    "t0_diary_page_5": {
+        "name": "日記第5頁",
+        "type": "item",
+        "description": "五月的日記頁。本月缺席：13次。",
+        "collectable": true
+    },
+    "pencil": {
+        "name": "鉛筆",
+        "type": "item",
+        "description": "一支普通的鉛筆，可以用來進行拓印。",
+        "collectable": true
+    },
+    "rubbing_paper": {
+        "name": "拓印紙",
+        "type": "item",
+        "description": "一張空白紙，可以覆在刻痕上進行拓印。",
+        "collectable": true
+    },
+    "present_fragment": {
+        "name": "碎片（現在）",
+        "type": "item",
+        "description": "金屬碎片上刻著：「……現在，只能被選擇……」",
+        "collectable": true
+    },
+    "t0_exit_door": {
+        "name": "病房門",
+        "type": "time_exit",
+        "space": "T0",
+        "target_space": "CH2_CORRIDOR"
+    },
+    "t7_height_marks": {
+        "name": "門框身高刻度",
+        "type": "inspectable",
+        "space": "T7",
+        "description": "刻度只停在「7歲 121」，之後再也沒有新的痕跡。"
+    },
+    "t7_broken_bed": {
+        "name": "斷裂的床",
+        "type": "rubbing_target",
+        "space": "T7",
+        "description": "床板底下有被磨損的刻痕，肉眼已經看不清楚。",
+        "required_items": [
+            "rubbing_paper",
+            "pencil"
+        ],
+        "knowledge_reward": "number_0347"
+    },
+    "t7_letter": {
+        "name": "給爸爸的信",
+        "type": "readable",
+        "space": "T7",
+        "description": "一封泛黃的信，信封上寫著：「給爸爸」。",
+        "ui_asset": "assets/素材庫/第二章/T+7/letter.png",
+        "knowledge_reward": "future_age_14"
+    },
+    "t7_calendar": {
+        "name": "牆上的日曆",
+        "type": "inspectable",
+        "space": "T7",
+        "description": "日曆停在某一天，那一天被特別圈了起來。"
+    },
+    "t7_desk_drawer": {
+        "name": "書桌抽屜",
+        "type": "puzzle",
+        "space": "T7",
+        "description": "書桌抽屜上裝著三位數密碼鎖。",
+        "puzzle_id": "t7_desk_drawer"
+    },
+    "future_fragment": {
+        "name": "碎片（未來）",
+        "type": "item",
+        "description": "金屬碎片上刻著：「……未來，是還沒被數完的數……」",
+        "collectable": true
+    },
+    "t7_exit_door": {
+        "name": "病房門",
+        "type": "time_exit",
+        "space": "T7",
+        "target_space": "CH2_CORRIDOR"
+    },
+    "t3_bed": {
+        "name": "床",
+        "type": "inspectable",
+        "space": "T3",
+        "description": "這裡是睡覺的地方。"
+    },
+    "t3_desk": {
+        "name": "書桌",
+        "type": "inspectable",
+        "space": "T3",
+        "description": "這裡是畫畫的地方。"
+    },
+    "t3_windowsill": {
+        "name": "窗台",
+        "type": "searchable_location",
+        "space": "T3",
+        "description": "夕陽正照在窗台上。",
+        "correct_search": true,
+        "reveals": "t3_time_capsule"
+    },
+    "t3_wardrobe": {
+        "name": "衣櫃",
+        "type": "inspectable",
+        "space": "T3",
+        "description": "衣櫃裡沒有找到要找的東西。"
+    },
+    "t3_time_capsule": {
+        "name": "時間膠囊",
+        "type": "puzzle",
+        "space": "T3",
+        "description": "巴掌大的鐵盒上刻著：「給七歲的你」。",
+        "puzzle_id": "t3_time_capsule"
+    },
+    "past_fragment": {
+        "name": "碎片（過去）",
+        "type": "item",
+        "description": "金屬碎片上刻著：「……過去，不能被改寫……」",
+        "collectable": true
+    },
+    "t3_note": {
+        "name": "黎琛的字條",
+        "type": "item",
+        "description": "如果你看見這個，說明你已經去過未來了。床底下，有一塊空白的木板。刻上你手心的數字，這樣七年後，才有人看得見。",
+        "collectable": true
+    },
+    "t3_knife": {
+        "name": "美工刀",
+        "type": "item",
+        "space": "T3",
+        "description": "桌上放著一把小美工刀。",
+        "ui_asset": "assets/素材庫/第二章/T-3/knoife.png",
+        "collectable": true
+    },
+    "t3_bed_board": {
+        "name": "床板底部",
+        "type": "carving_target",
+        "space": "T3",
+        "description": "床板底面很光滑，目前沒有任何刻痕。",
+        "required_item": "t3_knife",
+        "required_knowledge": "number_0347"
+    },
+    "t3_exit_door": {
+        "name": "病房門",
+        "type": "time_exit",
+        "space": "T3",
+        "target_space": "CH2_CORRIDOR"
     }
 }
