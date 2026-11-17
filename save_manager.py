@@ -3,6 +3,7 @@
 import json
 import time
 from pathlib import Path  # 匯入Path建立穩定可靠的存檔路徑
+from game_states import PASSWORD, SPACE
 
 
 BASE_DIR = Path(__file__).resolve().parent  # 取得save_manager.py所在的專案根目錄
@@ -105,6 +106,7 @@ def save_game(
 
     "inventory": game.inventory,
     "discovered_items": game.discovered_items,
+    "knowledge": game.knowledge,
 
     "unlocked_objects": game.unlocked_objects,
     "inspected_objects": game.inspected_objects,
@@ -113,6 +115,7 @@ def save_game(
     "story_events": game.story_events,
 
     "puzzle_attempts": game.puzzle_attempts,
+    "scene13_anchor_slots": game.scene13_anchor_slots,  # 保存已固定於時間凹槽的碎片
 
     "chapter": game.chapter,
     "game_over_reason": game.game_over_reason,
@@ -177,6 +180,10 @@ def load_game(
         None
     )
 
+    # 謎題介面暫存不存檔，讀取後回探索重新開啟
+    if game.game_state == PASSWORD and game.current_space is not None:
+        game.game_state = SPACE
+
     game.inventory = save_data.get(
         "inventory",
         []
@@ -186,6 +193,11 @@ def load_game(
         "discovered_items",
         game.inventory.copy()
     )  # 舊存檔沒有此欄時直接由背包補建圖鑑
+
+    game.knowledge = save_data.get(
+        "knowledge",
+        []
+    )  # 舊存檔沒有knowledge時自動使用空清單
 
     game.unlocked_objects = save_data.get(
         "unlocked_objects",
@@ -206,6 +218,11 @@ def load_game(
         "puzzle_attempts",
         {}
     )  # 恢復各個謎題自己的剩餘嘗試次數
+
+    loaded_anchor_slots = save_data.get("scene13_anchor_slots", {})  # 舊存檔缺少此欄位仍可正常載入
+    game.scene13_anchor_slots.clear()
+    game.scene13_anchor_slots.update({"past": None, "present": None, "future": None})
+    game.scene13_anchor_slots.update(loaded_anchor_slots)  # 保留原字典參照供控制器使用
 
     game.story_events = save_data.get(
         "story_events",

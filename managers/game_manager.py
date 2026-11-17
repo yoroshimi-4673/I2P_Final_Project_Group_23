@@ -11,6 +11,7 @@ class GameManager:
 
         self.inventory = []  # 記錄玩家目前實際持有的所有道具
         self.discovered_items = []  # 記錄玩家曾經取得過的所有道具
+        self.knowledge = []  # 記錄角色已知且不屬於實體道具的情報
 
         self.unlocked_objects = []  # 保留給未來章節，記錄已解鎖場景物件
         self.inspected_objects = []  # 保留給未來章節，記錄已調查場景物件
@@ -19,6 +20,7 @@ class GameManager:
         self.puzzle_attempts = {}  # 分別記錄每一個謎題剩餘的嘗試次數
 
         self.story_events = []  # 記錄目前已經發生的重要劇情事件
+        self.scene13_anchor_slots = {"past": None, "present": None, "future": None}  # 永久保存三枚時間碎片放置狀態
 
         self.chapter = 0  # 記錄玩家目前完成到哪一個遊戲章節
         self.game_over_reason = None  # 記錄玩家進入失敗狀態的具體原因
@@ -63,6 +65,24 @@ class GameManager:
 
     def has_discovered_item(self, item_id):  # 檢查玩家是否曾經取得指定道具
         return item_id in self.discovered_items
+
+
+    # ======== Knowledge ======== #
+
+    def learn_knowledge(self, knowledge_id):
+        """記錄角色已經取得指定的重要情報。"""
+
+        if knowledge_id not in self.knowledge:
+            self.knowledge.append(knowledge_id)
+            return True
+
+        return False
+
+
+    def has_knowledge(self, knowledge_id):
+        """檢查角色目前是否已經知道指定情報。"""
+
+        return knowledge_id in self.knowledge
 
 
     # ======== Object Unlock ======== #
@@ -137,6 +157,7 @@ class GameManager:
 
         self.inventory = []
         self.discovered_items = []  # 新遊戲同步清空圖鑑解鎖紀錄
+        self.knowledge = []  # 新遊戲清空所有角色已知情報
 
         self.unlocked_objects = []
         self.inspected_objects = []
@@ -145,6 +166,7 @@ class GameManager:
         self.puzzle_attempts = {}
 
         self.story_events = []
+        self.scene13_anchor_slots = {"past": None, "present": None, "future": None}  # 新遊戲清空所有時間碎片凹槽
 
         self.chapter = 0
         self.game_over_reason = None

@@ -1,6 +1,7 @@
 from game_states import (
     DIALOGUE,
     CHOICE,
+    SPACE,
     SUCCESS
 )
 
@@ -24,11 +25,20 @@ class StoryManager:
         self.choice_controller = choice_controller
         self.dialogues = dialogues
 
+        self.chapter2_space_scenes = {
+            "CH2_CORRIDOR": "scene_09_corridor",
+            "T0": "scene_10_t0",
+            "T7": "scene_11_t7",
+            "T3": "scene_12_t3"
+        }  # 統一保存第二章空間與劇情場景對應
+
         # 暫存Choice結果播放後要前往的空間
         self.pending_target_space = None
 
         # 記錄目前Dialogue結束後要執行的流程
         self.dialogue_after_action = None
+
+        self.pending_t3_search = None  # 只暫存對話後要繼續搜尋的物件
 
         # 保存第一章結尾最後顯示的文字內容
         self.chapter_end_text = (
@@ -42,6 +52,7 @@ class StoryManager:
 
         self.pending_target_space = None
         self.dialogue_after_action = None
+        self.pending_t3_search = None
 
         self.chapter_end_text = (
             "你只解開了一把鎖。"
@@ -226,8 +237,481 @@ class StoryManager:
         self.game.game_state = DIALOGUE
 
         self.dialogue_after_action = (
-            "show_chapter_end"
+            "start_chapter2"
         )
+
+
+    def start_dialogue(
+        self,
+        dialogue_id,
+        after_action=None
+    ):
+        """播放指定Dialogue並保存結束後流程。"""
+
+        dialogue_lines = self.dialogues.get(
+            dialogue_id,
+            []
+        )
+
+        self.dialogue_controller.start(
+            dialogue_id,
+            dialogue_lines
+        )
+
+        self.game.game_state = DIALOGUE
+        self.dialogue_after_action = after_action
+
+    def start_chapter2(self):
+        """進入第二章白色通道並播放Scene 09開場。"""
+
+        self.game.chapter = max(
+            self.game.chapter,
+            2
+        )
+
+        self.game.current_scene = (
+            "scene_09_corridor"
+        )
+
+        self.game.complete_event(
+            "t0_unlocked"
+        )
+
+        self.game.enter_space(
+            "CH2_CORRIDOR"
+        )
+
+        self.start_dialogue(
+            "scene_09_entry",
+            after_action="return_to_space"
+        )
+
+    def inspect_chapter2_terminal(self):
+        """播放白色通道終端機規則說明。"""
+
+        self.start_dialogue(
+            "scene_09_terminal",
+            after_action="return_to_space"
+        )
+
+    def is_time_door_unlocked(
+        self,
+        target_space
+    ):
+        """確認指定時間門目前是否已經解鎖。"""
+
+        required_events = {
+            "T0": "t0_unlocked",
+            "T7": "t7_unlocked",
+            "T3": "t3_unlocked"
+        }
+
+        event_id = required_events.get(
+            target_space
+        )
+
+        if event_id is None:
+            return False
+
+        return self.game.has_event(
+            event_id
+        )
+
+    def enter_t0(self):
+        """進入Scene 10目前時間病房。"""
+
+        if not self.is_time_door_unlocked(
+            "T0"
+        ):
+            return False
+
+        self.game.current_scene = (
+            "scene_10_t0"
+        )
+
+        self.game.enter_space(
+            "T0"
+        )
+
+        self.start_dialogue(
+            "scene_10_entry",
+            after_action="return_to_space"
+        )
+
+        return True
+
+    def start_puzzle_event(
+        self,
+        event_id,
+        completion=None
+    ):
+        """集中處理Puzzle完成後觸發的劇情事件。"""
+
+        if event_id == "t0_completed":
+
+            self.complete_t0()
+
+        elif event_id == "t7_completed":
+
+            self.complete_t7()
+
+        elif event_id == "t3_capsule_opened":
+
+            self.complete_t3_capsule()
+
+        elif event_id == "anchor_verified":
+
+            self.complete_anchor_verification()
+
+        else:
+            return False
+
+        return True  # 回報劇情已接手以關閉舊介面
+
+
+    def complete_t0(self):
+        """完成T+0並解鎖未來時間。"""
+
+        self.game.complete_event(
+            "t0_completed"
+        )
+
+        self.game.complete_event(
+            "t7_unlocked"
+        )
+
+        self.start_dialogue(
+            "scene_10_fragment",
+            after_action="return_to_space"
+        )
+
+    def enter_t7(self):
+        """進入Scene 11未來病房。"""
+
+        if not self.is_time_door_unlocked(
+            "T7"
+        ):
+            return False
+
+        self.game.current_scene = (
+            "scene_11_t7"
+        )
+
+        self.game.enter_space(
+            "T7"
+        )
+
+        self.start_dialogue(
+            "scene_11_entry",
+            after_action="return_to_space"
+        )
+
+        return True
+
+    def complete_t7_rubbing(self):
+        """保存0347情報並播放拓印劇情。"""
+
+        self.game.learn_knowledge(
+            "number_0347"
+        )
+
+        self.game.complete_event(
+            "t7_rubbing_completed"
+        )
+
+        self.start_dialogue(
+            "scene_11_rubbing",
+            after_action="return_to_space"
+        )
+
+    def complete_t7_letter(self):
+        """記錄玩家已閱讀十四歲黎念的信。"""
+
+        self.game.learn_knowledge(
+            "future_age_14"
+        )
+
+        self.game.complete_event(
+            "t7_letter_read"
+        )
+
+        self.start_dialogue(
+            "scene_11_letter",
+            after_action="return_to_space"
+        )
+
+    def complete_t7(self):
+        """完成T+7並解鎖過去時間。"""
+
+        self.game.complete_event(
+            "t7_completed"
+        )
+
+        self.game.complete_event(
+            "t3_unlocked"
+        )
+
+        self.start_dialogue(
+            "scene_11_fragment",
+            after_action="return_to_space"
+        )
+
+    def request_enter_t3(self):
+        """進入T-3前先播放終端警告。"""
+
+        if not self.is_time_door_unlocked(
+            "T3"
+        ):
+            return False
+
+        self.start_dialogue(
+            "scene_12_warning",
+            after_action="enter_t3"
+        )
+
+        return True
+
+    def enter_t3(self):
+        """正式進入過去並移除不可帶回的未來物品。"""
+
+        self.game.current_scene = (
+            "scene_12_t3"
+        )
+
+        self.game.enter_space(
+            "T3"
+        )
+
+        items_to_remove = [
+            "rubbing_paper",
+            "pencil",
+            "t7_letter"
+        ]
+
+        for item_id in items_to_remove:
+
+            self.game.remove_item(
+                item_id
+            )
+
+        self.game.complete_event(
+            "t3_items_turned_to_ash"
+        )
+
+        self.start_dialogue(
+            "scene_12_entry",
+            after_action="return_to_space"
+        )
+
+    def start_t3_search(self, object_id):
+        """錯誤位置先播放提示，不修改密碼嘗試次數。"""
+
+        if object_id not in ("t3_bed", "t3_desk", "t3_wardrobe"):
+            return False
+        self.pending_t3_search = object_id
+        self.start_dialogue("scene_12_wrong_search", after_action="finish_t3_search")
+        return True
+
+
+    def complete_t3_capsule(self):
+        """時間膠囊打開後播放字條劇情。"""
+
+        self.game.complete_event(
+            "t3_capsule_opened"
+        )
+
+        self.start_dialogue(
+            "scene_12_note",
+            after_action="return_to_space"
+        )
+
+    def complete_t3_carving(self):
+        """完成時間迴圈中的床板刻字事件。"""
+
+        if not self.game.has_knowledge(
+            "number_0347"
+        ):
+            return False
+
+        if not self.game.has_item(
+            "t3_knife"
+        ):
+            return False
+
+        self.game.complete_event(
+            "t3_0347_carved"
+        )
+
+        self.game.complete_event(
+            "t3_completed"
+        )
+
+        self.start_dialogue(
+            "scene_12_carving",
+            after_action="return_to_space"
+        )
+
+        return True
+
+    def return_to_chapter2_corridor(self):
+        """由T0/T7/T3返回第二章白色通道。"""
+
+        previous_space = (
+            self.game.current_space
+        )
+
+        # 記錄返回白色走廊時對應的房門
+        return_door_map = {
+            "T0": "door_t0",
+            "T7": "door_t7",
+            "T3": "door_t3"
+        }
+
+        return_door_id = (
+            return_door_map.get(
+                previous_space
+            )
+        )
+
+        # InteractionController若由外部注入/保存入口狀態，
+        # 不要在StoryManager直接操作pixel座標。
+        # 若目前StoryManager無法存取InteractionController，
+        # 請只回傳return_door_id，並由呼叫端保存。
+        #
+        # 本函式最後可：
+        # return return_door_id
+
+        self.game.enter_space(
+            "CH2_CORRIDOR"
+        )
+
+        if (
+            previous_space == "T3"
+            and self.game.has_event(
+                "t3_completed"
+            )
+        ):
+            self.game.current_scene = (
+                "scene_13_anchor_terminal"
+            )
+
+            if not self.game.has_event("scene_13_started"):
+                self.game.complete_event("scene_13_started")
+                self.start_dialogue("scene_13_entry", after_action="return_to_space")  # 返回走廊後才播放終章開場
+
+        elif self.game.has_event("scene_13_started"):
+            self.game.current_scene = "scene_13_anchor_terminal"
+        else:
+            self.game.current_scene = (
+                "scene_09_corridor"
+            )
+
+        return return_door_id
+
+
+    def complete_anchor_fragments(self):
+        """三枚碎片全部放入正確凹槽。"""
+
+        self.game.complete_event(
+            "anchor_fragments_placed"
+        )
+
+        self.start_dialogue(
+            "scene_13_terminal",
+            after_action="open_anchor_age_verification"
+        )
+
+    def complete_anchor_verification(
+        self
+    ):
+        """完成三個時間年齡驗證並解鎖D。"""
+
+        self.game.complete_event(
+            "anchor_verified"
+        )
+
+        self.game.complete_event(
+            "space_d_unlocked"
+        )
+
+        self.start_dialogue(
+            "scene_13_success",
+            after_action="return_to_space"
+        )
+
+
+    def inspect_time_door(
+        self,
+        target_space
+    ):
+        """顯示時間門名稱與目前狀態。"""
+
+        door_names = {
+            "T0": "T+0",
+            "T7": "T+7",
+            "T3": "T-3"
+        }
+
+        door_name = door_names.get(
+            target_space,
+            target_space
+        )
+
+        unlocked = (
+            self.is_time_door_unlocked(
+                target_space
+            )
+        )
+
+        if unlocked:
+
+            lines = [
+                {
+                    "speaker": "",
+                    "text": door_name
+                }
+            ]
+
+            after_actions = {
+                "T0": "enter_t0_from_door",
+                "T7": "enter_t7_from_door",
+                "T3": "request_t3_from_door"
+            }
+
+            after_action = (
+                after_actions.get(
+                    target_space
+                )
+            )
+
+        else:
+
+            lines = [
+                {
+                    "speaker": "",
+                    "text": door_name
+                },
+                {
+                    "speaker": "黎琛",
+                    "text": "還沒到時候。"
+                }
+            ]
+
+            after_action = (
+                "return_to_space"
+            )
+
+        self.dialogue_controller.start(
+            f"time_door_{target_space}",
+            lines
+        )
+
+        self.game.game_state = DIALOGUE
+        self.dialogue_after_action = (
+            after_action
+        )
+
+        return unlocked
 
 
     def finish_dialogue_action(self):
@@ -266,3 +750,44 @@ class StoryManager:
         elif action == "show_chapter_end":
 
             self.game.game_state = SUCCESS
+
+        elif action == "start_chapter2":
+
+            self.start_chapter2()
+
+        elif action == "return_to_space":
+
+            self.game.game_state = SPACE
+
+        elif action == "finish_t3_search":
+
+            object_id = self.pending_t3_search
+            self.pending_t3_search = None
+            self.game.game_state = SPACE
+            if object_id is not None:
+                self.game.complete_event(object_id + "_searched")
+                return {"type": "complete_t3_search", "object_id": object_id}
+
+        elif action == "enter_t3":
+
+            self.enter_t3()
+
+        elif action == "enter_t0_from_door":
+
+            self.enter_t0()
+
+        elif action == "enter_t7_from_door":
+
+            self.enter_t7()
+
+        elif action == "request_t3_from_door":
+
+            self.request_enter_t3()
+
+        elif action == "open_anchor_age_verification":
+
+            self.game.complete_event(
+                "anchor_age_puzzle_ready"
+            )
+
+            self.game.game_state = SPACE

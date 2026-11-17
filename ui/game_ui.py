@@ -229,6 +229,39 @@ class GameUI:
         return True
 
 
+    def draw_decoration(self, screen, decoration, rect):
+        """沿用圖片快取繪製單格靜態角色或裝飾。"""
+
+        asset = decoration.get("asset")
+        grid = decoration.get("sprite_sheet")
+        if not grid:
+            return self.draw_asset(screen, asset, rect)
+        sheet = self.load_image(asset)
+        if sheet is None or rect.width <= 0 or rect.height <= 0:
+            return False
+        columns, rows = grid.get("columns", 4), grid.get("rows", 3)
+        column, row = grid.get("column", 0), grid.get("row", 0)
+        if (columns <= 0 or rows <= 0 or not 0 <= column < columns
+                or not 0 <= row < rows or sheet.get_width() % columns
+                or sheet.get_height() % rows):
+            return False
+        width, height = sheet.get_width() // columns, sheet.get_height() // rows
+        if width <= 0 or height <= 0:
+            return False
+        key = ("decoration_frame", asset, columns, rows, column, row)
+        if key not in self.image_cache:
+            # 只快取指定單格，不播放角色移動動畫
+            self.image_cache[key] = sheet.subsurface(
+                pygame.Rect(column * width, row * height, width, height)
+            ).copy()
+        frame = self.image_cache[key]
+        ratio = min(rect.width / width, rect.height / height)
+        size = (max(1, round(width * ratio)), max(1, round(height * ratio)))
+        scaled = pygame.transform.scale(frame, size)
+        screen.blit(scaled, scaled.get_rect(center=rect.center))
+        return True
+
+
     def draw_background_asset(
         self,
         screen,
@@ -968,6 +1001,11 @@ class GameUI:
             "objects",
             {}
         ).items():
+            # 尚未發現的物件不繪圖或顯示名稱
+            required_event = object_layout.get("visible_after_event")
+            if required_event and not game.has_event(required_event):
+                continue
+
             rect = self.scale_rect(
                 screen,
                 object_layout
@@ -977,48 +1015,58 @@ class GameUI:
                 mouse_pos
             )
 
-            asset_drawn = self.draw_asset(
-                screen,
-                object_layout.get(
-                    "asset"
-                ),
-                rect
+            render_mode = object_layout.get(
+                "render_mode",
+                "normal"
             )
 
-            if not asset_drawn:
-                color = (
-                    (120, 125, 145)
-                    if hovered
-                    else
-                    (78, 82, 95)
-                )
-
-                self.draw_placeholder_rect(
+            # 背景物件僅保留互動範圍不重繪
+            if render_mode != "background":
+                asset_drawn = self.draw_asset(
                     screen,
-                    rect,
                     object_layout.get(
-                        "label",
-                        object_id
+                        "asset"
                     ),
-                    color=color
-                )
-
-            overlay_asset = object_layout.get(
-                "overlay_asset"
-            )
-
-            if overlay_asset:
-                self.draw_asset(
-                    screen,
-                    overlay_asset,
                     rect
                 )
+
+                if not asset_drawn:
+                    color = (
+                        (120, 125, 145)
+                        if hovered
+                        else
+                        (78, 82, 95)
+                    )
+
+                    self.draw_placeholder_rect(
+                        screen,
+                        rect,
+                        object_layout.get(
+                            "label",
+                            object_id
+                        ),
+                        color=color
+                    )
+
+                overlay_asset = object_layout.get(
+                    "overlay_asset"
+                )
+
+                if overlay_asset:
+                    self.draw_asset(
+                        screen,
+                        overlay_asset,
+                        rect
+                    )
 
             object_rects[
                 object_id
             ] = rect
 
-            if hovered:
+            if (
+                hovered
+                and render_mode != "background"
+            ):
                 object_name = self.objects.get(
                     object_id,
                     {}
@@ -1044,6 +1092,18 @@ class GameUI:
                         rect.y - 22
                     )
                 )
+
+        # 純視覺角色僅繪圖不建立互動範圍
+        for decoration in space_layout.get(
+            "decorations",
+            {}
+        ).values():
+            rect = self.scale_rect(
+                screen,
+                decoration
+            )
+
+            self.draw_decoration(screen, decoration, rect)
 
         return object_rects
 

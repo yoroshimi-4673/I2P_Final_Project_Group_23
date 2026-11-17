@@ -1,39 +1,197 @@
 {
     "chapter1_password": {
         "chapter": 1,
-
         "ui_mode": "password",
-
         "input_type": "digits",
         "length": 6,
-
         "answer": "100101",
-
         "max_attempts": 3,
-
         "solved_flag": "chapter1_password_solved",
-
         "success_message": "ACCESS GRANTED",
-
         "wrong_message": "密碼錯誤。",
-
         "rewards": [
             {
                 "type": "item",
                 "value": "photo_1"
             }
         ],
-
         "on_complete": {
             "type": "open_photo",
             "item_id": "photo_1",
             "mode": "story"
         },
-
         "failure": {
             "type": "game_over",
             "reason": "space_c_locked",
             "message": "錯誤次數已達上限。空間C已永久封鎖。"
+        }
+    },
+    "t0_bedside_drawer": {
+        "chapter": 2,
+        "ui_mode": "password",
+        "input_type": "digits",
+        "length": 3,
+        "answer": "121",
+        "success_message": "抽屜打開了。",
+        "wrong_message": "抽屜卡住了。",
+        "rewards": [
+            {
+                "type": "item",
+                "value": "pencil"
+            },
+            {
+                "type": "item",
+                "value": "t0_diary_page_4"
+            }
+        ]
+    },
+    "t0_diary_restore": {
+        "chapter": 2,
+        "ui_mode": "diary_drag",
+        "answer": [
+            "t0_diary_page_2",
+            "t0_diary_page_4",
+            "t0_diary_page_5"
+        ],
+        "success_message": "日記頁已經按照月份恢復。",
+        "wrong_message": "頁面的順序似乎不對。",
+        "rewards": [
+            {
+                "type": "consume_items",
+                "values": [
+                    "t0_diary_page_2",
+                    "t0_diary_page_4",
+                    "t0_diary_page_5"
+                ]
+            },
+            {
+                "type": "item",
+                "value": "t0_fixed_diary"
+            }
+        ]
+    },
+    "t0_child_safe": {
+        "chapter": 2,
+        "ui_mode": "password",
+        "input_type": "digits",
+        "length": 2,
+        "answer": "21",
+        "success_message": "保險箱打開了。",
+        "wrong_message": "保險箱發出低沉的哀鳴聲。",
+        "requirements": {
+            "puzzles": [
+                "t0_diary_restore"
+            ]
+        },
+        "rewards": [
+            {
+                "type": "item",
+                "value": "present_fragment"
+            },
+            {
+                "type": "item",
+                "value": "rubbing_paper"
+            }
+        ],
+        "on_complete": {
+            "type": "story_event",
+            "event": "t0_completed"
+        }
+    },
+    "t7_desk_drawer": {
+        "chapter": 2,
+        "ui_mode": "password",
+        "input_type": "digits",
+        "length": 3,
+        "answer": "307",
+        "success_message": "書桌抽屜打開了。",
+        "wrong_message": "抽屜彈不開。",
+        "rewards": [
+            {
+                "type": "item",
+                "value": "future_fragment"
+            }
+        ],
+        "on_complete": {
+            "type": "story_event",
+            "event": "t7_completed"
+        }
+    },
+    "t3_time_capsule": {
+        "chapter": 2,
+        "ui_mode": "password",
+        "input_type": "digits",
+        "length": 4,
+        "answer": "0347",
+        "max_attempts": 3,
+        "success_message": "鐵盒打開了。",
+        "wrong_message": "密碼錯誤。",
+        "requirements": {
+            "knowledge": [
+                "number_0347"
+            ]
+        },
+        "rewards": [
+            {
+                "type": "item",
+                "value": "past_fragment"
+            },
+            {
+                "type": "item",
+                "value": "t3_note"
+            }
+        ],
+        "on_complete": {
+            "type": "story_event",
+            "event": "t3_capsule_opened"
+        },
+        "failure": {
+            "type": "game_over",
+            "reason": "time_loop_broken",
+            "message": "鐵盒碎裂。時間迴圈被破壞了。"
+        }
+    },
+    "anchor_age_verification": {
+        "chapter": 2,
+        "ui_mode": "multi_input",
+        "input_type": "digits",
+        "fields": [
+            {
+                "id": "past",
+                "label": "過去"
+            },
+            {
+                "id": "present",
+                "label": "現在"
+            },
+            {
+                "id": "future",
+                "label": "未來"
+            }
+        ],
+        "answer": {
+            "past": "4",
+            "present": "7",
+            "future": "14"
+        },
+        "max_attempts": 3,
+        "success_message": "錨點驗證通過。",
+        "wrong_message": "錨點驗證失敗。",
+        "requirements": {
+            "items": [
+                "past_fragment",
+                "present_fragment",
+                "future_fragment"
+            ]
+        },
+        "on_complete": {
+            "type": "story_event",
+            "event": "anchor_verified"
+        },
+        "failure": {
+            "type": "game_over",
+            "reason": "white_wall_consumed_corridor",
+            "message": "白牆吞沒了整條走廊。"
         }
     }
 }

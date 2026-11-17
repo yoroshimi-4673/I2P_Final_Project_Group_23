@@ -144,7 +144,7 @@
                     "interaction_padding": 30
                 },
                 "wardrobe_rift": {
-                    "x": 560,
+                    "x": 580,
                     "y": 360,
                     "width": 90,
                     "height": 100,
@@ -180,7 +180,7 @@
                     "kind": "furniture"
                 },
                 "wardrobe_body": {
-                    "x": 560,
+                    "x": 580,
                     "y": 360,
                     "width": 90,
                     "height": 100,
@@ -465,6 +465,936 @@
                     "kind": "furniture"
                 }
             }
+        },
+        "CH2_CORRIDOR": {
+            "background": {
+                "asset": "assets/素材庫/第二章/白色通道/the_hall.png",
+                "label": "第二章／白色通道"
+            },
+            "player": {
+                "x": 360,
+                "y": 250,
+                "width": 80,
+                "height": 100,
+                "label": "黎琛"
+            },
+            "walkable_polygon": [
+                [
+                    231,
+                    0
+                ],
+                [
+                    231,
+                    79
+                ],
+                [
+                    173,
+                    79
+                ],
+                [
+                    173,
+                    136
+                ],
+                [
+                    221,
+                    136
+                ],
+                [
+                    221,
+                    232
+                ],
+                [
+                    174,
+                    232
+                ],
+                [
+                    173,
+                    327
+                ],
+                [
+                    225,
+                    327
+                ],
+                [
+                    225,
+                    431
+                ],
+                [
+                    175,
+                    431
+                ],
+                [
+                    175,
+                    526
+                ],
+                [
+                    230,
+                    526
+                ],
+                [
+                    230,
+                    600
+                ],
+                [
+                    567,
+                    600
+                ],
+                [
+                    567,
+                    526
+                ],
+                [
+                    628,
+                    526
+                ],
+                [
+                    628,
+                    430
+                ],
+                [
+                    577,
+                    430
+                ],
+                [
+                    577,
+                    326
+                ],
+                [
+                    626,
+                    326
+                ],
+                [
+                    626,
+                    232
+                ],
+                [
+                    578,
+                    232
+                ],
+                [
+                    578,
+                    132
+                ],
+                [
+                    628,
+                    132
+                ],
+                [
+                    628,
+                    78
+                ],
+                [
+                    569,
+                    78
+                ],
+                [
+                    569,
+                    0
+                ]
+            ],
+            "objects": {
+                "door_t3": {
+                    "x": 139,
+                    "y": 52,
+                    "width": 34,
+                    "height": 63,
+                    "asset": null,
+                    "label": "T-3",
+                    "render_mode": "background",
+                    "interaction_padding": 0
+                },
+                "door_t0": {
+                    "x": 139,
+                    "y": 239,
+                    "width": 36,
+                    "height": 76,
+                    "asset": null,
+                    "label": "T+0",
+                    "render_mode": "background",
+                    "interaction_padding": 0
+                },
+                "door_t7": {
+                    "x": 140,
+                    "y": 436,
+                    "width": 30,
+                    "height": 74,
+                    "asset": null,
+                    "label": "T+7",
+                    "render_mode": "background",
+                    "interaction_padding": 0
+                },
+                "ch2_terminal": {
+                    "x": 300,
+                    "y": 220,
+                    "width": 200,
+                    "height": 160,
+                    "asset": "assets/素材庫/第二章/白色通道/controler.png",
+                    "label": "時間終端機",
+                    "interaction_padding": 50,
+                    "visible_after_event": "scene_13_started"
+                }
+            },
+            "entry_spawns": {
+                "door_t0": {
+                    "x": 231,
+                    "y": 279
+                },
+                "door_t3": {
+                    "x": 231,
+                    "y": 103
+                },
+                "door_t7": {
+                    "x": 231,
+                    "y": 481
+                }
+            },
+            "collision_zones": {
+                "ch2_terminal_body": {
+                    "x": 320,
+                    "y": 236,
+                    "width": 160,
+                    "height": 128,
+                    "kind": "furniture",
+                    "visible_after_event": "scene_13_started"
+                }
+            },
+            "pending_objects": {
+                "door_d": {
+                    "label": "D",
+                    "render_mode": "background",
+                    "reason": "等待人工確認背景座標"
+                }
+            }
+        },
+        "T0": {
+            "background": {
+                "asset": "assets/素材庫/第二章/T+0/background_withblack.png",
+                "label": "T+0／307病房"
+            },
+            "player": {
+                "x": 350,
+                "y": 350,
+                "width": 80,
+                "height": 100,
+                "label": "黎琛"
+            },
+            "walkable_polygon": [
+                [
+                    242,
+                    198
+                ],
+                [
+                    556,
+                    198
+                ],
+                [
+                    653,
+                    242
+                ],
+                [
+                    703,
+                    293
+                ],
+                [
+                    703,
+                    339
+                ],
+                [
+                    701,
+                    341
+                ],
+                [
+                    701,
+                    371
+                ],
+                [
+                    627,
+                    456
+                ],
+                [
+                    575,
+                    456
+                ],
+                [
+                    549,
+                    487
+                ],
+                [
+                    480,
+                    487
+                ],
+                [
+                    480,
+                    478
+                ],
+                [
+                    455,
+                    449
+                ],
+                [
+                    345,
+                    449
+                ],
+                [
+                    319,
+                    478
+                ],
+                [
+                    319,
+                    488
+                ],
+                [
+                    252,
+                    488
+                ],
+                [
+                    223,
+                    456
+                ],
+                [
+                    173,
+                    456
+                ],
+                [
+                    97,
+                    372
+                ],
+                [
+                    97,
+                    345
+                ],
+                [
+                    95,
+                    345
+                ],
+                [
+                    95,
+                    295
+                ],
+                [
+                    140,
+                    242
+                ]
+            ],
+            "objects": {
+                "t0_bed": {
+                    "x": 60,
+                    "y": 220,
+                    "width": 195,
+                    "height": 110,
+                    "asset": "assets/素材庫/第二章/T+0/bed.png",
+                    "label": "床",
+                    "interaction_padding": 40
+                },
+                "t0_bedside_drawer": {
+                    "x": 200,
+                    "y": 180,
+                    "width": 80,
+                    "height": 80,
+                    "asset": "assets/素材庫/第二章/T+0/drawer.png",
+                    "label": "床頭抽屜",
+                    "interaction_padding": 40
+                },
+                "t0_child_safe": {
+                    "x": 500,
+                    "y": 170,
+                    "width": 100,
+                    "height": 60,
+                    "asset": "assets/素材庫/第二章/T+0/locker.png",
+                    "label": "兒童保險箱",
+                    "interaction_padding": 40
+                },
+                "t0_diary": {
+                    "x": 600,
+                    "y": 170,
+                    "width": 100,
+                    "height": 120,
+                    "asset": "assets/素材庫/第二章/T+0/diary(on_table).png",
+                    "label": "陪伴日記",
+                    "interaction_padding": 40
+                },
+                "t0_height_marks": {
+                    "x": 290,
+                    "y": 445,
+                    "width": 59,
+                    "height": 139,
+                    "asset": null,
+                    "label": "門框身高刻度",
+                    "render_mode": "background",
+                    "interaction_padding": 0,
+                    "interaction_polygon": [
+                        [
+                            290,
+                            487
+                        ],
+                        [
+                            316,
+                            487
+                        ],
+                        [
+                            349,
+                            445
+                        ],
+                        [
+                            349,
+                            584
+                        ],
+                        [
+                            322,
+                            584
+                        ],
+                        [
+                            322,
+                            546
+                        ],
+                        [
+                            294,
+                            541
+                        ]
+                    ]
+                },
+                "t0_exit_door": {
+                    "x": 352,
+                    "y": 441,
+                    "width": 96,
+                    "height": 139,
+                    "asset": null,
+                    "label": "病房門",
+                    "render_mode": "background",
+                    "interaction_padding": 0
+                },
+                "t0_curtain": {
+                    "x": 286,
+                    "y": 43,
+                    "width": 41,
+                    "height": 137,
+                    "asset": null,
+                    "label": "窗簾",
+                    "render_mode": "background",
+                    "interaction_padding": 0
+                }
+            },
+            "entry_spawns": {},
+            "collision_zones": {
+                "t0_bed_body": {
+                    "x": 121,
+                    "y": 220,
+                    "width": 73,
+                    "height": 110,
+                    "kind": "furniture"
+                },
+                "t0_bedside_drawer_body": {
+                    "x": 200,
+                    "y": 180,
+                    "width": 80,
+                    "height": 80,
+                    "kind": "furniture"
+                },
+                "t0_child_safe_body": {
+                    "x": 500,
+                    "y": 170,
+                    "width": 100,
+                    "height": 60,
+                    "kind": "furniture"
+                },
+                "t0_diary_body": {
+                    "x": 600,
+                    "y": 170,
+                    "width": 100,
+                    "height": 120,
+                    "kind": "furniture"
+                }
+            },
+            "pending_objects": {
+                "t0_pillow": {
+                    "x": 0,
+                    "y": 0,
+                    "width": 0,
+                    "height": 0,
+                    "asset": null,
+                    "label": "枕頭",
+                    "render_mode": "background",
+                    "interaction_padding": 30,
+                    "reason": "等待人工確認背景座標"
+                }
+            }
+        },
+        "T7": {
+            "background": {
+                "asset": "assets/素材庫/第二章/T+7/background_withblack.png",
+                "label": "T+7／307病房"
+            },
+            "player": {
+                "x": 350,
+                "y": 350,
+                "width": 80,
+                "height": 100,
+                "label": "黎琛"
+            },
+            "walkable_polygon": [
+                [
+                    242,
+                    198
+                ],
+                [
+                    556,
+                    198
+                ],
+                [
+                    653,
+                    242
+                ],
+                [
+                    703,
+                    293
+                ],
+                [
+                    703,
+                    339
+                ],
+                [
+                    701,
+                    341
+                ],
+                [
+                    701,
+                    371
+                ],
+                [
+                    627,
+                    456
+                ],
+                [
+                    575,
+                    456
+                ],
+                [
+                    549,
+                    487
+                ],
+                [
+                    480,
+                    487
+                ],
+                [
+                    480,
+                    478
+                ],
+                [
+                    455,
+                    449
+                ],
+                [
+                    345,
+                    449
+                ],
+                [
+                    319,
+                    478
+                ],
+                [
+                    319,
+                    488
+                ],
+                [
+                    252,
+                    488
+                ],
+                [
+                    223,
+                    456
+                ],
+                [
+                    173,
+                    456
+                ],
+                [
+                    97,
+                    372
+                ],
+                [
+                    97,
+                    345
+                ],
+                [
+                    95,
+                    345
+                ],
+                [
+                    95,
+                    295
+                ],
+                [
+                    140,
+                    242
+                ]
+            ],
+            "objects": {
+                "t7_broken_bed": {
+                    "x": 100,
+                    "y": 230,
+                    "width": 150,
+                    "height": 115,
+                    "asset": "assets/素材庫/第二章/T+7/bed.png",
+                    "label": "斷裂的床",
+                    "interaction_padding": 40
+                },
+                "t7_calendar": {
+                    "x": 570,
+                    "y": 90,
+                    "width": 60,
+                    "height": 50,
+                    "asset": "assets/素材庫/第二章/T+7/date.png",
+                    "label": "牆上的日曆",
+                    "interaction_padding": 40
+                },
+                "t7_desk_drawer": {
+                    "x": 600,
+                    "y": 170,
+                    "width": 100,
+                    "height": 120,
+                    "asset": "assets/素材庫/第二章/T+7/desk.png",
+                    "label": "書桌",
+                    "interaction_padding": 40
+                },
+                "t7_letter": {
+                    "x": 630,
+                    "y": 190,
+                    "width": 30,
+                    "height": 24,
+                    "asset": "assets/素材庫/第二章/T+7/letter.png",
+                    "label": "給爸爸的信",
+                    "interaction_padding": 35
+                },
+                "t7_height_marks": {
+                    "x": 290,
+                    "y": 445,
+                    "width": 59,
+                    "height": 139,
+                    "asset": null,
+                    "label": "門框身高刻度",
+                    "render_mode": "background",
+                    "interaction_padding": 0,
+                    "interaction_polygon": [
+                        [
+                            290,
+                            487
+                        ],
+                        [
+                            316,
+                            487
+                        ],
+                        [
+                            349,
+                            445
+                        ],
+                        [
+                            349,
+                            584
+                        ],
+                        [
+                            322,
+                            584
+                        ],
+                        [
+                            322,
+                            546
+                        ],
+                        [
+                            294,
+                            541
+                        ]
+                    ]
+                },
+                "t7_exit_door": {
+                    "x": 352,
+                    "y": 441,
+                    "width": 96,
+                    "height": 139,
+                    "asset": null,
+                    "label": "病房門",
+                    "render_mode": "background",
+                    "interaction_padding": 0
+                }
+            },
+            "entry_spawns": {},
+            "collision_zones": {
+                "t7_broken_bed_body": {
+                    "x": 100,
+                    "y": 230,
+                    "width": 150,
+                    "height": 115,
+                    "kind": "furniture"
+                },
+                "t7_desk_drawer_body": {
+                    "x": 600,
+                    "y": 170,
+                    "width": 100,
+                    "height": 120,
+                    "kind": "furniture"
+                },
+                "t7_letter_body": {
+                    "x": 630,
+                    "y": 190,
+                    "width": 30,
+                    "height": 24,
+                    "kind": "furniture"
+                }
+            },
+            "pending_objects": {}
+        },
+        "T3": {
+            "background": {
+                "asset": "assets/素材庫/第二章/T-3/background_withblack.png",
+                "label": "T-3／307病房"
+            },
+            "player": {
+                "x": 350,
+                "y": 350,
+                "width": 80,
+                "height": 100,
+                "label": "黎琛"
+            },
+            "walkable_polygon": [
+                [
+                    242,
+                    198
+                ],
+                [
+                    556,
+                    198
+                ],
+                [
+                    653,
+                    242
+                ],
+                [
+                    703,
+                    293
+                ],
+                [
+                    703,
+                    339
+                ],
+                [
+                    701,
+                    341
+                ],
+                [
+                    701,
+                    371
+                ],
+                [
+                    627,
+                    456
+                ],
+                [
+                    575,
+                    456
+                ],
+                [
+                    549,
+                    487
+                ],
+                [
+                    480,
+                    487
+                ],
+                [
+                    480,
+                    478
+                ],
+                [
+                    455,
+                    449
+                ],
+                [
+                    345,
+                    449
+                ],
+                [
+                    319,
+                    478
+                ],
+                [
+                    319,
+                    488
+                ],
+                [
+                    252,
+                    488
+                ],
+                [
+                    223,
+                    456
+                ],
+                [
+                    173,
+                    456
+                ],
+                [
+                    97,
+                    372
+                ],
+                [
+                    97,
+                    345
+                ],
+                [
+                    95,
+                    345
+                ],
+                [
+                    95,
+                    295
+                ],
+                [
+                    140,
+                    242
+                ]
+            ],
+            "objects": {
+                "t3_wardrobe": {
+                    "x": 80,
+                    "y": 110,
+                    "width": 300,
+                    "height": 120,
+                    "asset": "assets/素材庫/第二章/T-3/closet.png",
+                    "label": "衣櫃",
+                    "interaction_padding": 40
+                },
+                "t3_time_capsule": {
+                    "x": 350,
+                    "y": 130,
+                    "width": 45,
+                    "height": 35,
+                    "asset": "assets/素材庫/第二章/T-3/locker.png",
+                    "label": "時間膠囊",
+                    "interaction_padding": 35,
+                    "visible_after_event": "t3_time_capsule_found"
+                },
+                "t3_bed": {
+                    "x": 60,
+                    "y": 220,
+                    "width": 195,
+                    "height": 110,
+                    "asset": "assets/素材庫/第二章/T-3/bed.png",
+                    "label": "床",
+                    "render_mode": "normal",
+                    "interaction_padding": 40
+                },
+                "t3_desk": {
+                    "x": 600,
+                    "y": 170,
+                    "width": 100,
+                    "height": 120,
+                    "asset": "assets/素材庫/第二章/T+7/desk.png",
+                    "label": "書桌",
+                    "render_mode": "normal",
+                    "interaction_padding": 40
+                },
+                "t3_exit_door": {
+                    "x": 352,
+                    "y": 441,
+                    "width": 96,
+                    "height": 139,
+                    "asset": null,
+                    "label": "病房門",
+                    "render_mode": "background",
+                    "interaction_padding": 0
+                },
+                "t3_windowsill": {
+                    "x": 286,
+                    "y": 43,
+                    "width": 41,
+                    "height": 137,
+                    "asset": null,
+                    "label": "窗台",
+                    "render_mode": "background",
+                    "interaction_padding": 0
+                },
+                "t3_height_marks": {
+                    "x": 290,
+                    "y": 445,
+                    "width": 59,
+                    "height": 139,
+                    "asset": null,
+                    "label": "門框身高刻度",
+                    "render_mode": "background",
+                    "interaction_padding": 0,
+                    "interaction_polygon": [
+                        [
+                            290,
+                            487
+                        ],
+                        [
+                            316,
+                            487
+                        ],
+                        [
+                            349,
+                            445
+                        ],
+                        [
+                            349,
+                            584
+                        ],
+                        [
+                            322,
+                            584
+                        ],
+                        [
+                            322,
+                            546
+                        ],
+                        [
+                            294,
+                            541
+                        ]
+                    ]
+                }
+            },
+            "decorations": {
+                "young_li_nian": {
+                    "x": 110,
+                    "y": 190,
+                    "width": 55,
+                    "height": 75,
+                    "asset": "assets/素材庫/角色/daughter.png",
+                    "label": "四歲黎念",
+                    "sprite_sheet": {
+                        "columns": 4,
+                        "rows": 3,
+                        "column": 0,
+                        "row": 0
+                    }
+                }
+            },
+            "entry_spawns": {},
+            "collision_zones": {
+                "t3_bed_body": {
+                    "x": 60,
+                    "y": 220,
+                    "width": 195,
+                    "height": 110,
+                    "fit_object_asset": "t3_bed"
+                },
+                "t3_wardrobe_body": {
+                    "x": 80,
+                    "y": 110,
+                    "width": 300,
+                    "height": 120,
+                    "fit_object_asset": "t3_wardrobe"
+                },
+                "t3_desk_body": {
+                    "x": 600,
+                    "y": 170,
+                    "width": 100,
+                    "height": 120,
+                    "fit_object_asset": "t3_desk"
+                }
+            },
+            "pending_objects": {}
         }
     },
     "hud": {
@@ -492,5 +1422,82 @@
     "popup": {
         "default_width": 460,
         "default_height": 300
+    },
+    "puzzle_layouts": {
+        "anchor_fragment_slots": {
+            "title": "錨點終端",
+            "slots": {
+                "past": {
+                    "x": 100,
+                    "y": 140,
+                    "width": 160,
+                    "height": 280,
+                    "label": "過去"
+                },
+                "present": {
+                    "x": 320,
+                    "y": 140,
+                    "width": 160,
+                    "height": 280,
+                    "label": "現在"
+                },
+                "future": {
+                    "x": 540,
+                    "y": 140,
+                    "width": 160,
+                    "height": 280,
+                    "label": "未來"
+                }
+            }
+        },
+        "anchor_age_verification": {
+            "title": "錨點驗證",
+            "fields": {
+                "past": {
+                    "x": 120,
+                    "y": 230,
+                    "width": 150,
+                    "height": 70,
+                    "label": "過去"
+                },
+                "present": {
+                    "x": 325,
+                    "y": 230,
+                    "width": 150,
+                    "height": 70,
+                    "label": "現在"
+                },
+                "future": {
+                    "x": 530,
+                    "y": 230,
+                    "width": 150,
+                    "height": 70,
+                    "label": "未來"
+                }
+            },
+            "submit": {
+                "x": 300,
+                "y": 380,
+                "width": 200,
+                "height": 60,
+                "label": "驗證"
+            }
+        }
+    },
+    "chapter2_effects": {
+        "white_wall": {
+            "color": [
+                245,
+                245,
+                245
+            ],
+            "alpha": 210,
+            "stages": {
+                "far": 0.15,
+                "middle": 0.35,
+                "near": 0.6,
+                "consumed": 1.0
+            }
+        }
     }
 }

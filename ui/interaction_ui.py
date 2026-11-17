@@ -119,6 +119,109 @@ class InteractionUI:
     # Open Interaction
     # ========================================================
 
+    def open_message(
+        self,
+        message,
+        object_id=None
+    ):
+        """開啟單純訊息視窗。"""
+
+        self.current_object_id = (
+            object_id
+        )
+
+        self.result = {
+            "status": "message",
+            "description": message
+        }
+
+        self.mode = "message"
+
+
+    def open_readable(
+        self,
+        object_id
+    ):
+        """開啟可閱讀圖片。"""
+
+        self.current_object_id = (
+            object_id
+        )
+
+        current_object = (
+            self.objects[
+                object_id
+            ]
+        )
+
+        self.result = {
+            "status": "readable",
+            "object_id": object_id,
+            "name": current_object.get(
+                "name",
+                object_id
+            ),
+            "description": current_object.get(
+                "description",
+                ""
+            ),
+            "asset": current_object.get(
+                "ui_asset"
+            )
+        }
+
+        self.mode = "readable"
+
+
+    def draw_readable(
+        self,
+        screen,
+        mouse_pos
+    ):
+        """繪製置中的可閱讀文件。"""
+
+        modal = self.draw_modal_base(
+            screen,
+            width=600,
+            height=500
+        )
+
+        image_rect = pygame.Rect(
+            modal.x + 60,
+            modal.y + 40,
+            modal.width - 120,
+            modal.height - 120
+        )
+
+        self.game_ui.draw_asset(
+            screen,
+            self.result.get(
+                "asset"
+            ),
+            image_rect
+        )
+
+        close_rect = pygame.Rect(
+            modal.centerx - 55,
+            modal.bottom - 60,
+            110,
+            36
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "關閉",
+            close_rect,
+            close_rect.collidepoint(
+                mouse_pos
+            )
+        )
+
+        return {
+            "close": close_rect
+        }
+
+
     def open_object(
         self,
         object_id
@@ -148,6 +251,11 @@ class InteractionUI:
             ]
         )
 
+        if current_object.get("reader_type") == "diary":
+            self.puzzle_controller.diary_reader_page = 0
+            self.open_diary_reader(object_id)
+            return
+
         if object_type == "container":
 
             self.mode = "container"
@@ -159,6 +267,28 @@ class InteractionUI:
                     self.objects
                 )
             )
+
+        elif object_type == "searchable":
+
+            self.mode = "searchable"
+
+            self.result = {
+                "status": "searchable",
+                "object_id": object_id,
+                "name": current_object["name"],
+                "description": current_object.get(
+                    "description",
+                    ""
+                ),
+                "search_prompt": current_object.get(
+                    "search_prompt",
+                    "要繼續搜索嗎？"
+                )
+            }
+
+        elif object_type == "readable":
+
+            self.open_readable(object_id)
 
         elif object_type == "inspectable":
 
@@ -575,10 +705,18 @@ class InteractionUI:
             "inspectable": self.draw_inspectable,
             "rift": self.draw_rift,
             "password": self.draw_password,
+            "sequence": self.draw_sequence,
+            "exit_confirmation": self.draw_exit_confirmation,
+            "diary_drag": self.draw_diary_drag,
+            "diary_exit_confirmation": self.draw_diary_exit_confirmation,
+            "diary_reader": self.draw_diary_reader,
+            "anchor_fragments": self.draw_anchor_fragments,
+            "multi_input": self.draw_multi_input,
             "photo": self.draw_photo,
             "door": self.draw_door,
             "item": self.draw_item,
             "item_notification": self.draw_item_notification,
+            "readable": self.draw_readable,
             "message": self.draw_message
         }
 
@@ -936,6 +1074,200 @@ class InteractionUI:
     # ========================================================
     # Password
     # ========================================================
+
+    def draw_sequence(self, screen, mouse_pos):
+        """依控制器目前順序繪製日記頁卡片。"""
+
+        modal = self.draw_modal_base(screen, width=700, height=500)
+        title = self.game_ui.font_large.render("陪伴日記", True, (255, 220, 140))
+        screen.blit(title, title.get_rect(center=(modal.centerx, modal.y + 35)))
+        page_ids = self.puzzle_controller.puzzle.get("answer", [])
+        selected = self.puzzle_controller.sequence_input
+        buttons = {}
+        card_width = (modal.width - 80) // max(1, len(page_ids))
+
+        for index, item_id in enumerate(page_ids):
+            rect = pygame.Rect(modal.x + 40 + index * card_width, modal.y + 85,
+                               card_width - 15, 145)
+            label = self.objects.get(item_id, {}).get("name", item_id)
+            self.game_ui.draw_button(screen, label, rect, rect.collidepoint(mouse_pos))
+            image_rect = rect.inflate(-12, -36)
+            if self.objects.get(item_id, {}).get("ui_asset"):
+                pygame.draw.rect(screen, (55, 58, 72), rect, border_radius=6)
+                self.game_ui.draw_item_asset(screen, item_id, image_rect)
+                text = self.game_ui.font_small.render(label, True, (240, 240, 245))
+                screen.blit(text, text.get_rect(center=(rect.centerx, rect.bottom - 14)))
+            if item_id in selected:
+                pygame.draw.rect(screen, (255, 220, 140), rect, 3, border_radius=6)
+            buttons["page:" + item_id] = rect
+
+        order = [self.objects.get(item, {}).get("name", item) for item in selected]
+        order_text = "目前順序：" + " → ".join(
+            f"{index + 1}. {name}" for index, name in enumerate(order)
+        )
+        self.draw_multiline_text(screen, order_text, modal.x + 35, modal.y + 250,
+                                 modal.width - 70)
+        message = (self.result or {}).get("message", "")
+        self.draw_multiline_text(screen, message, modal.x + 35, modal.y + 320,
+                                 modal.width - 70, font=self.game_ui.font_small)
+        for index, (key, label) in enumerate((("clear", "清除"), ("submit", "確認"),
+                                               ("back", "返回"))):
+            rect = pygame.Rect(modal.x + 35 + index * (modal.width - 70) // 3,
+                               modal.bottom - 60, (modal.width - 100) // 3, 36)
+            self.game_ui.draw_button(screen, label, rect, rect.collidepoint(mouse_pos))
+            buttons[key] = rect
+        return buttons
+
+
+    def draw_u_groove(self, screen, rect, label, filled=False):
+        """沿用原型上方開口與三面槽牆造型。"""
+
+        wall_x = max(1, self.game_ui.scale_x(screen, 25))
+        wall_y = max(1, self.game_ui.scale_y(screen, 25))
+        fill = (100, 105, 115) if filled else (78, 81, 94)
+        border = (180, 185, 198)
+        # 三面牆直接畫成凹形，保留透明的上方開口
+        points = [(rect.left, rect.top), (rect.left + wall_x, rect.top),
+                  (rect.left + wall_x, rect.bottom - wall_y),
+                  (rect.right - wall_x, rect.bottom - wall_y),
+                  (rect.right - wall_x, rect.top), (rect.right, rect.top),
+                  (rect.right, rect.bottom), (rect.left, rect.bottom)]
+        pygame.draw.polygon(screen, fill, points)
+        pygame.draw.polygon(screen, border, points, width=2)
+        text = self.game_ui.font_ui.render(label, True, (205, 210, 220))
+        screen.blit(text, text.get_rect(center=(rect.centerx,
+                    rect.bottom + self.game_ui.scale_y(screen, 25))))
+
+
+    def draw_anchor_fragments(self, screen, mouse_pos):
+        """繪製持續保存狀態的三枚錨點凹槽。"""
+
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((20, 20, 25, 210))
+        screen.blit(overlay, (0, 0))
+        layout = self.game_ui.ui_layout["puzzle_layouts"]["anchor_fragment_slots"]
+        title = self.game_ui.font_large.render(layout["title"], True, (255, 220, 140))
+        screen.blit(title, title.get_rect(center=(screen.get_width() // 2,
+                    self.game_ui.scale_y(screen, 55))))
+        buttons = {}
+        slots = self.puzzle_controller.anchor_slots
+        for slot_id, data in layout["slots"].items():
+            rect = self.game_ui.scale_rect(screen, data)
+            item_id = slots.get(slot_id)
+            self.draw_u_groove(screen, rect, data["label"], filled=item_id is not None)
+            if item_id:
+                icon = rect.inflate(-self.game_ui.scale_x(screen, 60),
+                                    -self.game_ui.scale_y(screen, 70))
+                if not self.game_ui.draw_item_asset(screen, item_id, icon):
+                    self.draw_multiline_text(screen, self.objects[item_id]["name"],
+                                             icon.x, icon.centery, icon.width,
+                                             font=self.game_ui.font_small)
+            buttons["slot:" + slot_id] = rect
+
+        for index, item_id in enumerate(("past_fragment", "present_fragment", "future_fragment")):
+            if not self.game.has_item(item_id) or item_id in slots.values():
+                continue
+            rect = self.game_ui.scale_rect(screen, {
+                "x": 90 + index * 220, "y": 500, "width": 180, "height": 48
+            })
+            position = self.puzzle_controller.anchor_fragment_positions.get(item_id)
+            if position is not None:
+                rect.topleft = position  # 拖曳碎片依滑鼠位置即時繪製
+            pygame.draw.rect(screen, (65, 68, 85), rect, border_radius=5)
+            if not self.game_ui.draw_item_asset(screen, item_id, rect):
+                self.game_ui.draw_button(screen, self.objects[item_id]["name"], rect,
+                                         rect.collidepoint(mouse_pos))
+            buttons["fragment:" + item_id] = rect
+
+        close = self.game_ui.scale_rect(screen, {
+            "x": 700, "y": 20, "width": 80, "height": 36
+        })
+        self.game_ui.draw_button(screen, "關閉", close, close.collidepoint(mouse_pos))
+        buttons["close"] = close
+        self.draw_multiline_text(screen, (self.result or {}).get("message", ""),
+                                 self.game_ui.scale_x(screen, 100),
+                                 self.game_ui.scale_y(screen, 565),
+                                 self.game_ui.scale_x(screen, 600),
+                                 font=self.game_ui.font_small)
+        return buttons
+
+
+    def draw_white_wall(self, screen):
+        """由剩餘次數與版面設定推導白牆範圍。"""
+
+        if self.puzzle_controller.current_puzzle_id != "anchor_age_verification":
+            return
+        config = self.game_ui.ui_layout["chapter2_effects"]["white_wall"]
+        stage = self.puzzle_controller.puzzle_manager.get_failure_stage(
+            "anchor_age_verification"
+        )
+        ratio = config["stages"].get(stage, 0)
+        width = int(screen.get_width() * ratio)
+        if width > 0:
+            wall = pygame.Surface((width, screen.get_height()), pygame.SRCALPHA)
+            wall.fill((*config["color"], config["alpha"]))
+            screen.blit(wall, (screen.get_width() - width, 0))
+
+
+    def draw_multi_input(self, screen, mouse_pos):
+        """分別顯示三個時間年齡及共用數字輸入。"""
+
+        self.draw_white_wall(screen)
+        if (self.puzzle_controller.last_result or {}).get("status") == "final_failure_pending":
+            # 白牆吞沒後先保留畫面等待玩家確認
+            overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+            overlay.fill((20, 20, 25, 80))
+            screen.blit(overlay, (0, 0))
+            message = self.puzzle_controller.last_result.get("message", "白牆吞沒了整條走廊。")
+            self.draw_multiline_text(screen, message, self.game_ui.scale_x(screen, 100),
+                                     self.game_ui.scale_y(screen, 240),
+                                     self.game_ui.scale_x(screen, 600), color=(45, 45, 50))
+            rect = self.game_ui.scale_rect(screen, {"x": 320, "y": 380, "width": 160, "height": 60})
+            self.game_ui.draw_button(screen, "確定", rect, rect.collidepoint(mouse_pos))
+            return {"ack_failure": rect}
+        overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+        overlay.fill((20, 20, 25, 150))
+        screen.blit(overlay, (0, 0))
+        layout = self.game_ui.ui_layout["puzzle_layouts"]["anchor_age_verification"]
+        title = self.game_ui.font_large.render(layout["title"], True, (255, 220, 140))
+        screen.blit(title, title.get_rect(center=(screen.get_width() // 2,
+                    self.game_ui.scale_y(screen, 100))))
+        buttons = {}
+        for field_id, data in layout["fields"].items():
+            rect = self.game_ui.scale_rect(screen, data)
+            label = self.game_ui.font_ui.render(data["label"], True, (235, 235, 240))
+            screen.blit(label, label.get_rect(midbottom=(rect.centerx, rect.top - 8)))
+            pygame.draw.rect(screen, (42, 44, 56), rect, border_radius=6)
+            active = self.puzzle_controller.active_field_id == field_id
+            pygame.draw.rect(screen, (255, 220, 140) if active else (160, 165, 180),
+                             rect, 3 if active else 2, border_radius=6)
+            text = self.game_ui.font_large.render(
+                self.puzzle_controller.multi_input.get(field_id, ""), True, (245, 245, 245)
+            )
+            screen.blit(text, text.get_rect(center=rect.center))
+            buttons["field:" + field_id] = rect
+
+        for index in range(10):
+            rect = self.game_ui.scale_rect(screen, {
+                "x": 140 + index * 52, "y": 325, "width": 44, "height": 36
+            })
+            self.game_ui.draw_button(screen, str(index), rect, rect.collidepoint(mouse_pos))
+            buttons[str(index)] = rect
+        for key, label, data in (
+            ("clear", "清除此欄", {"x": 80, "y": 380, "width": 160, "height": 60}),
+            ("submit", layout["submit"]["label"], layout["submit"]),
+            ("back", "返回", {"x": 560, "y": 380, "width": 160, "height": 60})
+        ):
+            rect = self.game_ui.scale_rect(screen, data)
+            self.game_ui.draw_button(screen, label, rect, rect.collidepoint(mouse_pos))
+            buttons[key] = rect
+        self.draw_multiline_text(screen, (self.result or {}).get("message", ""),
+                                 self.game_ui.scale_x(screen, 100),
+                                 self.game_ui.scale_y(screen, 465),
+                                 self.game_ui.scale_x(screen, 600),
+                                 font=self.game_ui.font_small)
+        return buttons
+
 
     def draw_password(
         self,
@@ -1703,4 +2035,893 @@ class InteractionUI:
 
         return {
             "ok": ok_rect
+        }
+
+
+    def open_exit_confirmation(
+        self,
+        object_id
+    ):
+        """開啟時間房出口確認視窗。"""
+
+        self.current_object_id = (
+            object_id
+        )
+
+        self.result = {
+            "status": "exit_confirmation",
+            "message": "確定要離開這個房間嗎？"
+        }
+
+        self.mode = (
+            "exit_confirmation"
+        )
+
+
+    def draw_exit_confirmation(
+        self,
+        screen,
+        mouse_pos
+    ):
+        """繪製時間房出口確認視窗。"""
+
+        modal = self.draw_modal_base(
+            screen,
+            width=460,
+            height=230
+        )
+
+        message = (
+            "確定要離開這個房間嗎？"
+        )
+
+        self.draw_multiline_text(
+            screen,
+            message,
+            modal.x + 35,
+            modal.y + 55,
+            modal.width - 70,
+            font=self.game_ui.font_ui
+        )
+
+        leave_rect = pygame.Rect(
+            modal.x + 55,
+            modal.bottom - 70,
+            140,
+            40
+        )
+
+        cancel_rect = pygame.Rect(
+            modal.right - 195,
+            modal.bottom - 70,
+            140,
+            40
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "離開",
+            leave_rect,
+            leave_rect.collidepoint(
+                mouse_pos
+            )
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "取消",
+            cancel_rect,
+            cancel_rect.collidepoint(
+                mouse_pos
+            )
+        )
+
+        return {
+            "leave": leave_rect,
+            "cancel": cancel_rect
+        }
+
+
+    def draw_diary_drag(
+        self,
+        screen,
+        mouse_pos
+    ):
+        """繪製陪伴日記拖放謎題。"""
+
+        overlay = pygame.Surface(
+            screen.get_size(),
+            pygame.SRCALPHA
+        )
+
+        overlay.fill(
+            (20, 20, 25, 235)
+        )
+
+        screen.blit(
+            overlay,
+            (0, 0)
+        )
+
+        width, height = (
+            screen.get_size()
+        )
+
+        title = (
+            self.game_ui.font_large.render(
+                "《陪伴日記》",
+                True,
+                (245, 245, 245)
+            )
+        )
+
+        screen.blit(
+            title,
+            title.get_rect(
+                center=(
+                    width // 2,
+                    self.game_ui.scale_y(
+                        screen,
+                        75
+                    )
+                )
+            )
+        )
+
+        # Base座標沿用diary_drag.py prototype
+        fixed_layout = {
+            "page_1": {
+                "x": 155,
+                "y": 140,
+                "width": 130,
+                "height": 70,
+                "label": "Page 1"
+            },
+            "page_3": {
+                "x": 515,
+                "y": 140,
+                "width": 130,
+                "height": 70,
+                "label": "Page 3"
+            },
+            "page_6": {
+                "x": 515,
+                "y": 245,
+                "width": 130,
+                "height": 70,
+                "label": "Page 6"
+            }
+        }
+
+        slot_layout = {
+            "page_2": {
+                "x": 335,
+                "y": 140,
+                "width": 130,
+                "height": 70
+            },
+            "page_4": {
+                "x": 155,
+                "y": 245,
+                "width": 130,
+                "height": 70
+            },
+            "page_5": {
+                "x": 335,
+                "y": 245,
+                "width": 130,
+                "height": 70
+            }
+        }
+
+        home_layout = {
+            "t0_diary_page_2": {
+                "x": 155,
+                "y": 410,
+                "width": 130,
+                "height": 70
+            },
+            "t0_diary_page_4": {
+                "x": 335,
+                "y": 410,
+                "width": 130,
+                "height": 70
+            },
+            "t0_diary_page_5": {
+                "x": 515,
+                "y": 410,
+                "width": 130,
+                "height": 70
+            }
+        }
+
+        buttons = {}
+        drag_rects = {}
+
+        # 固定頁1/3/6
+        for data in fixed_layout.values():
+
+            rect = (
+                self.game_ui.scale_rect(
+                    screen,
+                    data
+                )
+            )
+
+            pygame.draw.rect(
+                screen,
+                (55, 60, 70),
+                rect,
+                border_radius=6
+            )
+
+            pygame.draw.rect(
+                screen,
+                (200, 200, 200),
+                rect,
+                width=2,
+                border_radius=6
+            )
+
+            text = (
+                self.game_ui.font_ui.render(
+                    data["label"],
+                    True,
+                    (240, 240, 240)
+                )
+            )
+
+            screen.blit(
+                text,
+                text.get_rect(
+                    center=rect.center
+                )
+            )
+
+        # 空槽
+        for slot_id, data in (
+            slot_layout.items()
+        ):
+
+            rect = (
+                self.game_ui.scale_rect(
+                    screen,
+                    data
+                )
+            )
+
+            pygame.draw.rect(
+                screen,
+                (40, 42, 48),
+                rect,
+                border_radius=6
+            )
+
+            pygame.draw.rect(
+                screen,
+                (140, 140, 150),
+                rect,
+                width=2,
+                border_radius=6
+            )
+
+            occupant = (
+                self.puzzle_controller
+                .diary_slots[
+                    slot_id
+                ]
+            )
+
+            if occupant is None:
+
+                text = (
+                    self.game_ui.font_small
+                    .render(
+                        "[空槽]",
+                        True,
+                        (150, 150, 160)
+                    )
+                )
+
+                screen.blit(
+                    text,
+                    text.get_rect(
+                        center=rect.center
+                    )
+                )
+
+            buttons[
+                "diary_slot:"
+                + slot_id
+            ] = rect
+
+        available_pages = (
+            self.puzzle_controller
+            .get_available_diary_pages()
+        )
+
+        # 先建立每一頁目前應該顯示的位置
+        for page_id in available_pages:
+
+            current_slot = None
+
+            for slot_id, occupant in (
+                self.puzzle_controller
+                .diary_slots.items()
+            ):
+
+                if occupant == page_id:
+
+                    current_slot = (
+                        slot_id
+                    )
+
+                    break
+
+            if current_slot is not None:
+
+                rect = (
+                    buttons[
+                        "diary_slot:"
+                        + current_slot
+                    ].copy()
+                )
+
+            else:
+
+                rect = (
+                    self.game_ui.scale_rect(
+                        screen,
+                        home_layout[
+                            page_id
+                        ]
+                    )
+                )
+
+            # 正在拖曳時使用controller保存的位置
+            drag_position = (
+                self.puzzle_controller
+                .diary_page_positions
+                .get(
+                    page_id
+                )
+            )
+
+            if (
+                self.puzzle_controller
+                .diary_dragging_page
+                == page_id
+                and drag_position
+                is not None
+            ):
+
+                rect.topleft = (
+                    drag_position
+                )
+
+            drag_rects[
+                page_id
+            ] = rect
+
+        # 分隔線
+        pygame.draw.line(
+            screen,
+            (200, 200, 200),
+            (
+                self.game_ui.scale_x(
+                    screen,
+                    100
+                ),
+                self.game_ui.scale_y(
+                    screen,
+                    355
+                )
+            ),
+            (
+                self.game_ui.scale_x(
+                    screen,
+                    700
+                ),
+                self.game_ui.scale_y(
+                    screen,
+                    355
+                )
+            ),
+            width=2
+        )
+
+        # 非拖曳頁先畫
+        for page_id, rect in (
+            drag_rects.items()
+        ):
+
+            if (
+                page_id
+                == self.puzzle_controller
+                .diary_dragging_page
+            ):
+                continue
+
+            pygame.draw.rect(
+                screen,
+                (75, 115, 165),
+                rect,
+                border_radius=6
+            )
+
+            pygame.draw.rect(
+                screen,
+                (240, 240, 240),
+                rect,
+                width=2,
+                border_radius=6
+            )
+
+            label = (
+                self.objects.get(
+                    page_id,
+                    {}
+                ).get(
+                    "name",
+                    page_id
+                )
+            )
+
+            text = (
+                self.game_ui.font_small
+                .render(
+                    label,
+                    True,
+                    (240, 240, 240)
+                )
+            )
+
+            screen.blit(
+                text,
+                text.get_rect(
+                    center=rect.center
+                )
+            )
+
+            buttons[
+                "diary_page:"
+                + page_id
+            ] = rect
+
+        # 拖曳頁最後畫
+        dragging_page = (
+            self.puzzle_controller
+            .diary_dragging_page
+        )
+
+        if (
+            dragging_page is not None
+            and dragging_page in drag_rects
+        ):
+
+            rect = (
+                drag_rects[
+                    dragging_page
+                ]
+            )
+
+            pygame.draw.rect(
+                screen,
+                (105, 155, 215),
+                rect,
+                border_radius=6
+            )
+
+            pygame.draw.rect(
+                screen,
+                (240, 240, 240),
+                rect,
+                width=2,
+                border_radius=6
+            )
+
+            label = (
+                self.objects.get(
+                    dragging_page,
+                    {}
+                ).get(
+                    "name",
+                    dragging_page
+                )
+            )
+
+            text = (
+                self.game_ui.font_small
+                .render(
+                    label,
+                    True,
+                    (240, 240, 240)
+                )
+            )
+
+            screen.blit(
+                text,
+                text.get_rect(
+                    center=rect.center
+                )
+            )
+
+            buttons[
+                "diary_page:"
+                + dragging_page
+            ] = rect
+
+        confirm_rect = (
+            self.game_ui.scale_rect(
+                screen,
+                {
+                    "x": 430,
+                    "y": 515,
+                    "width": 100,
+                    "height": 42
+                }
+            )
+        )
+
+        reset_rect = (
+            self.game_ui.scale_rect(
+                screen,
+                {
+                    "x": 545,
+                    "y": 515,
+                    "width": 100,
+                    "height": 42
+                }
+            )
+        )
+
+        exit_rect = (
+            self.game_ui.scale_rect(
+                screen,
+                {
+                    "x": 660,
+                    "y": 515,
+                    "width": 100,
+                    "height": 42
+                }
+            )
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "確認",
+            confirm_rect,
+            confirm_rect.collidepoint(
+                mouse_pos
+            )
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "重設",
+            reset_rect,
+            reset_rect.collidepoint(
+                mouse_pos
+            )
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "退出",
+            exit_rect,
+            exit_rect.collidepoint(
+                mouse_pos
+            )
+        )
+
+        buttons["confirm"] = (
+            confirm_rect
+        )
+
+        buttons["reset"] = (
+            reset_rect
+        )
+
+        buttons["exit"] = (
+            exit_rect
+        )
+
+        buttons["_drag_rects"] = (
+            drag_rects
+        )
+
+        message = (
+            self.result or {}
+        ).get(
+            "message",
+            ""
+        )
+
+        if message:
+
+            self.draw_multiline_text(
+                screen,
+                message,
+                self.game_ui.scale_x(
+                    screen,
+                    80
+                ),
+                self.game_ui.scale_y(
+                    screen,
+                    565
+                ),
+                self.game_ui.scale_x(
+                    screen,
+                    620
+                ),
+                font=self.game_ui.font_small
+            )
+
+        return buttons
+
+
+    def open_diary_exit_confirmation(
+        self
+    ):
+        """詢問是否清空目前日記排列並離開。"""
+
+        self.puzzle_controller.diary_exit_confirmation = True
+
+        self.mode = (
+            "diary_exit_confirmation"
+        )
+
+
+    def draw_diary_exit_confirmation(
+        self,
+        screen,
+        mouse_pos
+    ):
+        """繪製日記整理退出確認。"""
+
+        modal = self.draw_modal_base(
+            screen,
+            width=560,
+            height=260
+        )
+
+        message = (
+            "要退出日記整理嗎？\n"
+            "若退出將會清空排列，"
+            "並將全部的日記紙返回道具欄"
+        )
+
+        self.draw_multiline_text(
+            screen,
+            message,
+            modal.x + 40,
+            modal.y + 55,
+            modal.width - 80,
+            font=self.game_ui.font_ui
+        )
+
+        confirm_rect = pygame.Rect(
+            modal.x + 70,
+            modal.bottom - 70,
+            160,
+            40
+        )
+
+        cancel_rect = pygame.Rect(
+            modal.right - 230,
+            modal.bottom - 70,
+            160,
+            40
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "確定退出",
+            confirm_rect,
+            confirm_rect.collidepoint(
+                mouse_pos
+            )
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "取消",
+            cancel_rect,
+            cancel_rect.collidepoint(
+                mouse_pos
+            )
+        )
+
+        return {
+            "confirm": confirm_rect,
+            "cancel": cancel_rect
+        }
+
+
+    def open_diary_reader(
+        self,
+        object_id
+    ):
+        """開啟完整日記閱讀器。"""
+
+        self.current_object_id = (
+            object_id
+        )
+
+        self.mode = (
+            "diary_reader"
+        )
+
+        self.result = {
+            "status": "diary_reader"
+        }
+
+
+    def draw_diary_reader(
+        self,
+        screen,
+        mouse_pos
+    ):
+        """顯示完整陪伴日記目前頁面。"""
+
+        diary = self.objects.get(
+            self.current_object_id,
+            {}
+        )
+
+        pages = diary.get(
+            "pages",
+            []
+        )
+
+        if not pages:
+
+            return {}
+
+        index = max(
+            0,
+            min(
+                self.puzzle_controller
+                .diary_reader_page,
+                len(pages) - 1
+            )
+        )
+
+        self.puzzle_controller.diary_reader_page = (
+            index
+        )
+
+        page = pages[
+            index
+        ]
+
+        modal = self.draw_modal_base(
+            screen,
+            width=650,
+            height=470
+        )
+
+        title = (
+            self.game_ui.font_large.render(
+                "《陪伴日記》",
+                True,
+                (255, 220, 140)
+            )
+        )
+
+        screen.blit(
+            title,
+            title.get_rect(
+                center=(
+                    modal.centerx,
+                    modal.y + 40
+                )
+            )
+        )
+
+        page_number = (
+            self.game_ui.font_small.render(
+                f"{index + 1} / {len(pages)}",
+                True,
+                (185, 185, 195)
+            )
+        )
+
+        screen.blit(
+            page_number,
+            page_number.get_rect(
+                center=(
+                    modal.centerx,
+                    modal.y + 75
+                )
+            )
+        )
+
+        month = (
+            self.game_ui.font_ui.render(
+                page.get(
+                    "month",
+                    ""
+                ),
+                True,
+                (245, 245, 245)
+            )
+        )
+
+        screen.blit(
+            month,
+            (
+                modal.x + 55,
+                modal.y + 115
+            )
+        )
+
+        self.draw_multiline_text(
+            screen,
+            page.get(
+                "text",
+                ""
+            ),
+            modal.x + 55,
+            modal.y + 165,
+            modal.width - 110,
+            font=self.game_ui.font_ui
+        )
+
+        previous_rect = pygame.Rect(
+            modal.x + 55,
+            modal.bottom - 65,
+            120,
+            38
+        )
+
+        next_rect = pygame.Rect(
+            modal.right - 175,
+            modal.bottom - 65,
+            120,
+            38
+        )
+
+        close_rect = pygame.Rect(
+            modal.centerx - 60,
+            modal.bottom - 65,
+            120,
+            38
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "上一頁",
+            previous_rect,
+            previous_rect.collidepoint(
+                mouse_pos
+            ),
+            enabled=index > 0
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "關閉",
+            close_rect,
+            close_rect.collidepoint(
+                mouse_pos
+            )
+        )
+
+        self.game_ui.draw_button(
+            screen,
+            "下一頁",
+            next_rect,
+            next_rect.collidepoint(
+                mouse_pos
+            ),
+            enabled=index < len(pages) - 1
+        )
+
+        return {
+            "previous": previous_rect,
+            "close": close_rect,
+            "next": next_rect,
+            "can_previous": index > 0,
+            "can_next": index < len(pages) - 1
         }

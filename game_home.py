@@ -178,7 +178,8 @@ game_ui = GameUI(
 # 集中管理Space版面、碰撞、互動範圍與出生點
 map_manager = MapManager(
     ui_layout,
-    game_ui
+    game_ui,
+    game
 )
 
 dialogue_controller = DialogueController(
@@ -360,6 +361,34 @@ def draw_player_navigation_guide(
     )
 
 
+def is_in_interaction_region(object_id, interaction_rect):
+    """先檢查矩形，再精確判斷非矩形互動區域。"""
+
+    if not player.rect.colliderect(interaction_rect):
+        return False
+
+    layout = ui_layout.get("spaces", {}).get(
+        game.current_space, {}
+    ).get("objects", {}).get(object_id, {})
+    points = layout.get("interaction_polygon", [])
+    if len(points) < 3:
+        return True
+
+    polygon = [
+        (game_ui.scale_x(screen, x), game_ui.scale_y(screen, y))
+        for x, y in points
+    ]
+    corners = (player.rect.topleft, player.rect.topright,
+               player.rect.bottomleft, player.rect.bottomright)
+    if any(player.point_in_polygon(point, polygon) for point in corners):
+        return True
+    return any(
+        player.rect.collidepoint(point)
+        or player.rect.clipline(point, polygon[(index + 1) % len(polygon)])
+        for index, point in enumerate(polygon)
+    )
+
+
 def get_nearest_interaction_target(
     object_rects,
     interaction_rects
@@ -377,8 +406,15 @@ def get_nearest_interaction_target(
         interaction_rects.items()
     ):
 
+        # 未發現物件不列入鄰近互動目標
+        object_layout = ui_layout["spaces"][game.current_space].get("objects", {}).get(object_id, {})
+        required_event = object_layout.get("visible_after_event")
+        if required_event and not game.has_event(required_event):
+            continue
+
         # 玩家未進入範圍時不能使用E互動
-        if not player.rect.colliderect(
+        if not is_in_interaction_region(
+            object_id,
             interaction_rect
         ):
             continue
@@ -417,11 +453,70 @@ def get_nearest_interaction_target(
     return nearest_target
 
 
+def draw_dialogue_background(
+    surface,
+    mouse_pos
+):
+    """依目前場景繪製背景，Dialogue Box再獨立疊上。"""
+
+    dialogue_id = (
+        dialogue_controller.dialogue_id
+    )
+
+    # 第一章開場仍保留原本特殊背景
+    if dialogue_id == "intro":
+
+        game_ui.draw_intro_background(
+            surface,
+            dialogue_controller
+        )
+
+        return
+
+    # 第一章選擇結果仍使用307病房
+    if dialogue_id == "scene_04_choice_result":
+
+        game_ui.draw_room_307(
+            surface
+        )
+
+        return
+
+    # 第一章結尾尚未正式切入第二章
+    if dialogue_id == "chapter_1_end":
+
+        surface.fill(
+            (255, 255, 255)
+        )
+
+        return
+
+    # 只要目前存在正式Space，就直接畫真正場景
+    if game.current_space is not None:
+
+        game_ui.draw_space(
+            surface,
+            game,
+            mouse_pos
+        )
+
+        player.draw(
+            surface
+        )
+
+        return
+
+    # 沒有Space資料時才使用第一章307備援
+    game_ui.draw_room_307(
+        surface
+    )
+
+
 def draw_interaction_prompt(
     surface,
     target
 ):
-    """在可互動物件旁顯示E鍵提示。"""
+    """依提示位置背景亮度自動產生高反差E鍵文字。"""
 
     if target is None:
         return
@@ -438,23 +533,81 @@ def draw_interaction_prompt(
         object_id
     )
 
-    prompt_surface = (
+    object_layout = (
+        ui_layout
+        .get(
+            "spaces",
+            {}
+        )
+        .get(
+            game.current_space,
+            {}
+        )
+        .get(
+            "objects",
+            {}
+        )
+        .get(
+            object_id,
+            {}
+        )
+    )
+
+    # 第二章時間門直接顯示門名
+    if (
+        game.current_space
+        == "CH2_CORRIDOR"
+        and objects.get(
+            object_id,
+            {}
+        ).get(
+            "type"
+        ) == "time_door"
+    ):
+
+        prompt_text = (
+            f"[E] {object_name}"
+        )
+
+    # 背景內建物件不顯示物件名稱
+    elif object_id in ("t0_height_marks", "t7_height_marks", "t3_height_marks"):
+        prompt_text = "[E]互動: 門框"
+
+    elif (
+        object_layout.get(
+            "render_mode"
+        )
+        == "background"
+    ):
+
+        prompt_text = (
+            "[E] 互動"
+        )
+
+    else:
+
+        prompt_text = (
+            f"[E] 互動：{object_name}"
+        )
+
+    # 先用暫時文字取得真正尺寸
+    measurement_surface = (
         game_ui.font_small.render(
-            f"[E] 互動：{object_name}",
+            prompt_text,
             True,
-            (255, 245, 180)
+            (255, 255, 255)
         )
     )
 
     prompt_x = (
         player.rect.centerx
-        - prompt_surface.get_width()
+        - measurement_surface.get_width()
         // 2
     )
 
     prompt_y = (
         player.rect.top
-        - prompt_surface.get_height()
+        - measurement_surface.get_height()
         - 10
     )
 
@@ -463,7 +616,7 @@ def draw_interaction_prompt(
         min(
             prompt_x,
             surface.get_width()
-            - prompt_surface.get_width()
+            - measurement_surface.get_width()
             - 8
         )
     )
@@ -471,6 +624,133 @@ def draw_interaction_prompt(
     prompt_y = max(
         8,
         prompt_y
+    )
+
+    sample_rect = pygame.Rect(
+        prompt_x - 5,
+        prompt_y - 4,
+        measurement_surface.get_width() + 10,
+        measurement_surface.get_height() + 8
+    )
+
+    # 避免取樣範圍超出螢幕
+    sample_rect = sample_rect.clip(surface.get_rect())
+    if sample_rect.width <= 0 or sample_rect.height <= 0:
+        return
+
+    # 讀取提示文字後方的平均背景顏色
+    average_color = (
+        pygame.transform.average_color(
+            surface.subsurface(
+                sample_rect
+            )
+        )
+    )
+
+    red = average_color[0]
+    green = average_color[1]
+    blue = average_color[2]
+
+    # 使用感知亮度，而不是單純RGB平均
+    luminance = (
+        0.2126 * red
+        + 0.7152 * green
+        + 0.0722 * blue
+    )
+
+    # 亮背景→黑字；暗背景→白字
+    if luminance >= 145:
+
+        text_color = (
+            20,
+            20,
+            25
+        )
+
+        outline_color = (
+            245,
+            245,
+            245
+        )
+
+        backing_color = (
+            255,
+            255,
+            255,
+            80
+        )
+
+    else:
+
+        text_color = (
+            245,
+            245,
+            245
+        )
+
+        outline_color = (
+            15,
+            15,
+            20
+        )
+
+        backing_color = (
+            0,
+            0,
+            0,
+            90
+        )
+
+    # 加一層半透明底框，處理花紋複雜背景
+    backing = pygame.Surface(
+        sample_rect.size,
+        pygame.SRCALPHA
+    )
+
+    backing.fill(
+        backing_color
+    )
+
+    surface.blit(
+        backing,
+        sample_rect.topleft
+    )
+
+    # 先畫反色外框
+    outline_surface = (
+        game_ui.font_small.render(
+            prompt_text,
+            True,
+            outline_color
+        )
+    )
+
+    for offset_x, offset_y in (
+        (-1, 0),
+        (1, 0),
+        (0, -1),
+        (0, 1),
+        (-1, -1),
+        (1, -1),
+        (-1, 1),
+        (1, 1)
+    ):
+
+        surface.blit(
+            outline_surface,
+            (
+                prompt_x + offset_x,
+                prompt_y + offset_y
+            )
+        )
+
+    # 最後畫真正文字
+    prompt_surface = (
+        game_ui.font_small.render(
+            prompt_text,
+            True,
+            text_color
+        )
     )
 
     surface.blit(
@@ -695,6 +975,25 @@ ui_overlay = None  # 記錄Settings等覆蓋式介面
 # Game Flow
 # ============================================================
 
+def finish_dialogue_and_open_ready_puzzle():
+    """對話結束後依準備事件開啟年齡介面。"""
+
+    continuation = story_manager.finish_dialogue_action()
+    # 搜尋提示結束後交回原有互動控制器繼續處理
+    if continuation and continuation.get("type") == "complete_t3_search":
+        interaction_controller.complete_t3_search(continuation["object_id"])
+    if (
+        game.game_state == SPACE
+        and game.current_space == "CH2_CORRIDOR"
+        and game.has_event("anchor_age_puzzle_ready")
+        and not game.is_puzzle_solved("anchor_age_verification")
+        and not game.has_event("anchor_age_ui_opened")
+    ):
+        result = interaction_controller.open_anchor_age_verification()
+        if result.get("status") == "input_required":
+            game.complete_event("anchor_age_ui_opened")
+
+
 def start_new_game():
     """重設UI暫存狀態並交由StoryManager開始新遊戲。"""
 
@@ -704,6 +1003,7 @@ def start_new_game():
     global last_player_space
 
     interaction_ui.close()
+    puzzle_controller.reset_anchor_slots()  # 新遊戲清除上局碎片暫存狀態
     codex_ui.close_item()
 
     # 新遊戲開始時清除殘留移動按鍵
@@ -714,6 +1014,7 @@ def start_new_game():
 
     # 新遊戲不保留上一局的裂隙入口資料
     interaction_controller.pending_entry_rift = None
+    interaction_controller.pending_entry_object = None
 
     hotbar_controller.reset()
 
@@ -1185,6 +1486,32 @@ while running:
         # Mouse
         # ====================================================
 
+        # 日記拖放直接使用上幀的頁面與槽位
+        elif (
+            interaction_ui.mode in ("diary_drag", "anchor_fragments")
+            and ui_overlay is None
+            and ui_screen == UI_GAME
+            and event.type in (pygame.MOUSEMOTION, pygame.MOUSEBUTTONDOWN, pygame.MOUSEBUTTONUP)
+        ):
+            if interaction_ui.mode == "anchor_fragments":
+                if event.type == pygame.MOUSEMOTION:
+                    interaction_controller.update_anchor_drag(event.pos)
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    interaction_controller.start_anchor_drag(interaction_controller.last_buttons, event.pos)
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    interaction_controller.finish_anchor_drag(interaction_controller.last_buttons, event.pos)
+            else:
+                if event.type == pygame.MOUSEMOTION:
+                    interaction_controller.update_diary_drag(event.pos)
+                elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                    interaction_controller.handle_click(
+                        interaction_controller.last_buttons, event.pos
+                    )
+                elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                    interaction_controller.update_diary_drag(event.pos)
+                    interaction_controller.finish_diary_drag(
+                        interaction_controller.last_buttons, event.pos
+                    )
         elif (
             event.type == pygame.MOUSEMOTION
             and polygon_editor_active
@@ -1507,7 +1834,7 @@ while running:
                         == "dialogue_finished"
                     ):
 
-                        story_manager.finish_dialogue_action()
+                        finish_dialogue_and_open_ready_puzzle()
 
                 continue
 
@@ -1744,71 +2071,8 @@ while running:
 
         if game.game_state == DIALOGUE:
 
-            dialogue_id = (
-                dialogue_controller
-                .dialogue_id
-            )
-
-            if dialogue_id == "intro":
-
-                game_ui.draw_intro_background(
-                    screen,
-                    dialogue_controller
-                )
-
-            elif dialogue_id in (
-                "scene_04_choice_result",
-            ):
-
-                game_ui.draw_room_307(
-                    screen
-                )
-
-            elif dialogue_id == "photo_back_story":
-
-                # 照片劇情仍發生於Space C
-                game_ui.draw_space(
-                    screen,
-                    game,
-                    mouse_pos
-                )
-                player.draw(screen)
-
-            elif dialogue_id == "chapter_1_end":
-
-                screen.fill(
-                    (235, 235, 235)
-                )
-
-                corridor_text = (
-                    game_ui.font_large
-                    .render(
-                        (
-                            "無限白色走廊 "
-                            "/ Background Placeholder"
-                        ),
-                        True,
-                        (45, 45, 50)
-                    )
-                )
-
-                screen.blit(
-                    corridor_text,
-                    corridor_text.get_rect(
-                        center=(
-                            screen.get_width()
-                            // 2,
-
-                            80
-                        )
-                    )
-                )
-
-            else:
-
-                game_ui.draw_room_307(
-                    screen
-                )
+            # 場景背景與對話框分開依序繪製
+            draw_dialogue_background(screen, mouse_pos)
 
             draw_dialogue_box(
                 screen,
@@ -1868,7 +2132,8 @@ while running:
                     player,
                     game.current_space,
                     screen,
-                    interaction_controller.pending_entry_rift
+                    interaction_controller.pending_entry_rift,
+                    interaction_controller.pending_entry_object
                 )
 
                 last_player_space = (
@@ -1877,6 +2142,7 @@ while running:
 
                 # 出生點套用完成後清除一次性入口資訊
                 interaction_controller.pending_entry_rift = None
+                interaction_controller.pending_entry_object = None
 
                 pressed_keys.clear()
 
@@ -2323,7 +2589,7 @@ while running:
                     == "dialogue_finished"
                 ):
 
-                    story_manager.finish_dialogue_action()
+                    finish_dialogue_and_open_ready_puzzle()
 
 
             # =================================================

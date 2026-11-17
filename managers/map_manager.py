@@ -4,9 +4,10 @@
 class MapManager:
     """將ui_layout中的Space資料轉成遊戲執行時資料。"""
 
-    def __init__(self, ui_layout, game_ui):
+    def __init__(self, ui_layout, game_ui, game):
         self.ui_layout = ui_layout
         self.game_ui = game_ui
+        self.game = game  # 依劇情事件啟用場景物件與碰撞
 
         # 保存Player原始版面供出生點系統使用
         self.player_layouts = {
@@ -49,6 +50,9 @@ class MapManager:
                 {}
             ).items()
         ):
+            required_event = object_layout.get("visible_after_event")
+            if required_event and not self.game.has_event(required_event):
+                continue  # 未解鎖物件不建立地圖互動範圍
             object_rects[object_id] = (
                 self.game_ui.scale_rect(
                     screen,
@@ -73,12 +77,25 @@ class MapManager:
                 {}
             ).items()
         ):
+            required_event = zone_layout.get("visible_after_event")
+            if required_event and not self.game.has_event(required_event):
+                continue  # 物件尚未出現時不建立隱形碰撞
             collision_rects[zone_id] = (
                 self.game_ui.scale_rect(
                     screen,
                     zone_layout
                 )
             )
+
+            # 家具碰撞跟隨圖片等比例縮放範圍
+            object_id = zone_layout.get("fit_object_asset")
+            if object_id:
+                object_layout = space_layout.get("objects", {}).get(object_id, {})
+                image = self.game_ui.load_image(object_layout.get("asset"))
+                if image is not None:
+                    target = self.game_ui.scale_rect(screen, object_layout)
+                    fitted = self.game_ui.scale_image_to_fit(image, target)
+                    collision_rects[zone_id] = fitted.get_rect(center=target.center)
 
         return collision_rects
 
@@ -237,12 +254,64 @@ class MapManager:
 
         return player_layout
 
+    def get_object_entry_spawn(
+        self,
+        space_id,
+        object_id
+    ):
+        """依指定物件Base Rect計算右側出生位置。"""
+
+        if object_id is None:
+            return None
+
+        space_layout = (
+            self.get_space_layout(
+                space_id
+            )
+        )
+
+        # 人工指定入口優先於門右側的預設計算
+        entry_spawn = space_layout.get("entry_spawns", {}).get(object_id)
+        if entry_spawn is not None:
+            return dict(entry_spawn)
+
+        object_layout = (
+            space_layout
+            .get(
+                "objects",
+                {}
+            )
+            .get(
+                object_id
+            )
+        )
+
+        if object_layout is None:
+            return None
+
+        x = (
+            object_layout["x"]
+            + object_layout["width"]
+            + 20
+        )
+
+        y = (
+            object_layout["y"]
+            + object_layout["height"] / 2
+        )
+
+        return {
+            "x": x,
+            "y": y
+        }
+
     def place_player(
         self,
         player,
         space_id,
         screen,
-        entry_rift_id=None
+        entry_rift_id=None,
+        entry_object_id=None
     ):
         """將Player放到指定Space的正確出生位置。"""
 
@@ -253,6 +322,25 @@ class MapManager:
 
         if player_layout is None:
             return False
+
+        if entry_object_id is not None:
+
+            object_spawn = (
+                self.get_object_entry_spawn(
+                    space_id,
+                    entry_object_id
+                )
+            )
+
+            if object_spawn is not None:
+
+                player_layout = dict(
+                    player_layout
+                )
+
+                player_layout.update(
+                    object_spawn
+                )
 
         spawn_rect = self.game_ui.scale_rect(
             screen,
