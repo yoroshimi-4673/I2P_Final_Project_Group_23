@@ -38,7 +38,6 @@ class StoryManager:
         # 記錄目前Dialogue結束後要執行的流程
         self.dialogue_after_action = None
 
-        self.pending_t3_search = None  # 只暫存對話後要繼續搜尋的物件
 
         # 保存第一章結尾最後顯示的文字內容
         self.chapter_end_text = (
@@ -52,7 +51,6 @@ class StoryManager:
 
         self.pending_target_space = None
         self.dialogue_after_action = None
-        self.pending_t3_search = None
 
         self.chapter_end_text = (
             "你只解開了一把鎖。"
@@ -504,12 +502,12 @@ class StoryManager:
         )
 
     def start_t3_search(self, object_id):
-        """錯誤位置先播放提示，不修改密碼嘗試次數。"""
+        """記錄已完成的搜尋並播放事後反應。"""
 
         if object_id not in ("t3_bed", "t3_desk", "t3_wardrobe"):
             return False
-        self.pending_t3_search = object_id
-        self.start_dialogue("scene_12_wrong_search", after_action="finish_t3_search")
+        self.game.complete_event(object_id + "_searched")
+        self.start_dialogue("scene_12_wrong_search", after_action="return_to_space")
         return True
 
 
@@ -640,6 +638,12 @@ class StoryManager:
         )
 
 
+    def start_scene_14(self):
+        """從 D 門進入純對話場景。"""
+        self.game.current_scene = "scene_14"
+        self.game.current_space = None
+        self.start_dialogue("scene_14", after_action="finish_chapter2")
+
     def inspect_time_door(
         self,
         target_space
@@ -747,8 +751,11 @@ class StoryManager:
                 self.game
             )
 
-        elif action == "show_chapter_end":
-
+        elif action == "finish_chapter2":
+            self.game.complete_chapter(2)
+            self.game.complete_event("chapter_2_completed")
+            self.game.current_scene = "chapter_2_end"
+            self.game.current_space = None
             self.game.game_state = SUCCESS
 
         elif action == "start_chapter2":
@@ -758,15 +765,6 @@ class StoryManager:
         elif action == "return_to_space":
 
             self.game.game_state = SPACE
-
-        elif action == "finish_t3_search":
-
-            object_id = self.pending_t3_search
-            self.pending_t3_search = None
-            self.game.game_state = SPACE
-            if object_id is not None:
-                self.game.complete_event(object_id + "_searched")
-                return {"type": "complete_t3_search", "object_id": object_id}
 
         elif action == "enter_t3":
 

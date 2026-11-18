@@ -227,6 +227,120 @@
 - 可靠近物件並互動。
 - 劇情、關卡設計(二、三章)、結局、美術
 
+### 2026-11-18
+
+## Commit `54c8b14f` — 足部碰撞、Path Finding、UI 流程與第二章整合
+
+### 更新摘要
+
+本次為大型整合更新，主要包含：
+
+- 玩家足部碰撞系統
+- A* Path Finding
+- Space 切換時隱藏 Player 一幀
+- Puzzle 成功後 UI 顯示順序重構
+- C 空間照片／收斂率劇情恢復
+- T-3 事後反應 Dialogue 流程調整
+- 第二章部分素材、座標與物件名稱更新
+- Scene 13 終端機去白底
+- 對應測試更新
+
+本次共修改 17 個檔案，其中 2 個為新增檔案。
+
+### 修改檔案
+
+- `controllers/interaction_controller.py`  
+  重構 Puzzle 成功後的 Message、Story、Item Notification 與事後 Dialogue 順序，並支援 T-3 互動完成後才播放反應對話。
+
+- `data/objects.json`  
+  將 T+0 `t0_curtain` 改為 `t0_windowsill`，更新窗台文字，並為 `pencil`、`present_fragment` 加入正式素材。
+
+- `data/puzzles.json`  
+  恢復 `chapter1_password` 的強制照片 Story 流程，並加入 `reward_notification_order` 控制特殊提示順序。
+
+- `data/ui_layout.json`  
+  更新第二章走廊返回出生點、T-3 黎念位置、T+0/T-3 窗台提示設定，以及 Scene 13 終端機去白底參數。
+
+- `game_home.py`  
+  串接 PathfindingManager、繪製 waypoint 導航線，並調整 Space 切換時的 Player placement／隱藏機制與互動提示顯示。
+
+- `managers/pathfinding_manager.py` **（新增）**  
+  實作 5 px Grid 的 A* Path Finding、8 方向移動、禁止斜角穿牆、最近合法目標搜尋與路徑簡化。
+
+- `managers/puzzle_manager.py`  
+  Puzzle 成功結果新增 `reward_notification_order`，供 Controller 決定獎勵 UI 顯示時機。
+
+- `managers/story_manager.py`  
+  移除舊的 T-3「先 Dialogue 再開互動」流程，改為互動完成後播放事後反應。
+
+- `player.py`  
+  新增底部中央足部碰撞盒，家具碰撞改以腳部判斷；同時加入 waypoint path state 與自動沿路徑移動功能。
+
+- `test/test_chapter2_flow.py`  
+  更新第二章整體流程測試，涵蓋新的 Puzzle success、reward queue、窗台命名與照片強制 Story。
+
+- `test/test_diary_drag.py`  
+  配合新的 Puzzle 完成與 reward notification 流程調整測試。
+
+- `test/test_pathfinding.py` **（新增）**  
+  測試 A* 尋路、避障、Polygon 邊界、最近合法目標、corner cutting 與 path simplification。
+
+- `test/test_player.py`  
+  新增足部碰撞與 path movement 測試；目前仍同時保留手動 Player demo，之後可再拆分。
+
+- `test/test_puzzles.py`  
+  更新 `chapter1_password`、`reward_notification_order` 與 Puzzle completion contract 的測試。
+
+- `test/test_scene13.py`  
+  更新 Scene 13 終端機顯示與碰撞測試，並加入去白底處理與 image cache 驗證。
+
+- `test/test_t3_room.py`  
+  更新 T-3 床、衣櫃、書桌互動順序，確認 Item Notification 完成後才播放 `scene_12_wrong_search`。
+
+- `ui/game_ui.py`  
+  新增可選的近白色背景透明化處理與 processed image cache，供 Scene 13 終端機使用。
+
+### 架構結果
+
+本次修改後仍維持：
+
+```text id="0jwzsr"
+game_home.py
+→ 主迴圈與系統串接
+
+controllers/
+→ 輸入與 UI 流程控制
+
+managers/
+→ Path Finding、Puzzle、Story 規則
+
+player.py
+→ 移動、碰撞、路徑執行
+
+ui/
+→ 畫面與素材處理
+
+data/
+→ 內容、座標與行為設定
+
+test/
+→ 回歸與子系統測試
+```
+
+整體架構方向仍合理，但本次 commit 同時包含多個獨立功能，後續應盡量拆成較小的功能性 commit。
+
+### 後續注意
+
+- 確認 `DEBUG_COLLISION` 正式遊玩時應設為 `False`。
+- Scene 13 終端機白底 threshold 應確認是否維持預期值。
+- `InteractionController` 的流程狀態逐漸增加，若未來再新增更多 continuation，應考慮抽出獨立 sequence manager。
+- `test/test_player.py` 可考慮將 manual demo 拆到 `tools/` 或 `debug/`。
+- 完成後執行：
+
+```powershell id="kkv0ew"
+python -m unittest discover -s test
+```
+
     <!-- ### 2026-11-20
     目標：
     - 完成第一個可以從 New Game 玩到 Ending 的完整 MVP。

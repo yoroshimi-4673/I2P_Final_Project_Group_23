@@ -17,6 +17,7 @@ from managers.game_manager import GameManager
 from managers.puzzle_manager import PuzzleManager
 from controllers.puzzle_controller import PuzzleController
 from managers.map_manager import MapManager
+from managers.pathfinding_manager import PathfindingManager
 from managers.story_manager import StoryManager
 
 from player import Player #匯入角色移動模組
@@ -47,7 +48,7 @@ from ui.interaction_ui import InteractionUI
 pygame.init()
 pygame.key.stop_text_input()
 
-DEBUG_COLLISION = True  # 顯示Polygon與家具碰撞供校正
+DEBUG_COLLISION = True  # 正式遊玩預設隱藏碰撞校正圖層
 POLYGON_EDITOR_ENABLED = True  # Enable mouse and keyboard polygon editing
 polygon_editor_active = False  # 記錄目前是否正在繪製Polygon
 polygon_editor_points = []  # 暫存本次繪製的Base座標頂點
@@ -181,6 +182,7 @@ map_manager = MapManager(
     game_ui,
     game
 )
+pathfinding_manager = PathfindingManager(game_ui)
 
 dialogue_controller = DialogueController(
     typing_speed=35
@@ -319,7 +321,8 @@ def draw_player_navigation_guide(
 ):
     """顯示滑鼠自動移動的虛線與終點標記。"""
 
-    if player.mouse_target is None:
+    remaining_points = player.path_points[player.path_index:]
+    if not remaining_points:
         return
 
     target_color = (
@@ -328,37 +331,34 @@ def draw_player_navigation_guide(
         0
     )
 
-    player_center = (
-        player.rect.center
-    )
-
-    target_center = (
-        round(
-            player.mouse_target.x
-        ),
-        round(
-            player.mouse_target.y
-        )
-    )
-
-    draw_dashed_line(
-        surface,
-        target_color,
-        player_center,
-        target_center,
-        width=2,
-        dash_length=12,
-        space_length=14
-    )
+    start = player.rect.center
+    for point in remaining_points:
+        draw_dashed_line(surface, target_color, start, point, width=2, dash_length=12, space_length=14)
+        start = point
 
     # 使用空心圓標示角色真正導航終點
     pygame.draw.circle(
         surface,
         target_color,
-        target_center,
+        (round(start.x), round(start.y)),
         15,
         width=2
     )
+
+
+def navigate_to_click(position, obstacles, walkable_polygon, interaction_target=None):
+    """依照本幀空間資料規劃地面或物件點擊路線。"""
+    interaction_rect = None
+    if interaction_target is not None:
+        if player.can_interact(interaction_target):
+            player.cancel_mouse_movement()
+            return
+        position = player.get_interaction_stop_point(interaction_target)
+        interaction_rect = interaction_target["interaction_rect"]
+    path = pathfinding_manager.find_path(
+        game.current_space, screen, player, position, obstacles, walkable_polygon, interaction_rect
+    )
+    player.set_path(path, interaction_target)  # 即使無路線也要清除上一條路
 
 
 def is_in_interaction_region(object_id, interaction_rect):
@@ -453,15 +453,40 @@ def get_nearest_interaction_target(
     return nearest_target
 
 
+def place_player_on_space_change(
+    current_space, last_space, map_manager, player, screen, interaction_controller, pressed_keys
+):
+    """完成本幀的出生點配置，回傳是否應隱藏角色。"""
+    if current_space is None or current_space == last_space:
+        return False
+
+    map_manager.place_player(
+        player,
+        current_space,
+        screen,
+        interaction_controller.pending_entry_rift,
+        interaction_controller.pending_entry_object,
+    )
+    interaction_controller.pending_entry_rift = None  # 套用後清除一次性的裂隙入口
+    interaction_controller.pending_entry_object = None  # 套用後清除一次性的房門入口
+    pressed_keys.clear()  # 清除切換前殘留的方向鍵狀態
+    return True
+
+
 def draw_dialogue_background(
     surface,
-    mouse_pos
+    mouse_pos,
+    draw_player=True
 ):
     """依目前場景繪製背景，Dialogue Box再獨立疊上。"""
 
     dialogue_id = (
         dialogue_controller.dialogue_id
     )
+
+    if dialogue_id == "scene_14":
+        surface.fill((12, 22, 48))
+        return
 
     # 第一章開場仍保留原本特殊背景
     if dialogue_id == "intro":
@@ -500,9 +525,8 @@ def draw_dialogue_background(
             mouse_pos
         )
 
-        player.draw(
-            surface
-        )
+        if draw_player:
+            player.draw(surface)
 
         return
 
@@ -569,10 +593,13 @@ def draw_interaction_prompt(
             f"[E] {object_name}"
         )
 
-    # 背景內建物件不顯示物件名稱
+    elif (interaction_label := object_layout.get("interaction_label")):
+        prompt_text = f"[E] 互動：{interaction_label}"  # 版面可指定背景物件的互動名稱
+
     elif object_id in ("t0_height_marks", "t7_height_marks", "t3_height_marks"):
         prompt_text = "[E]互動: 門框"
 
+    # 背景內建物件預設不顯示物件名稱
     elif (
         object_layout.get(
             "render_mode"
@@ -978,10 +1005,7 @@ ui_overlay = None  # 記錄Settings等覆蓋式介面
 def finish_dialogue_and_open_ready_puzzle():
     """對話結束後依準備事件開啟年齡介面。"""
 
-    continuation = story_manager.finish_dialogue_action()
-    # 搜尋提示結束後交回原有互動控制器繼續處理
-    if continuation and continuation.get("type") == "complete_t3_search":
-        interaction_controller.complete_t3_search(continuation["object_id"])
+    story_manager.finish_dialogue_action()
     if (
         game.game_state == SPACE
         and game.current_space == "CH2_CORRIDOR"
@@ -992,6 +1016,7 @@ def finish_dialogue_and_open_ready_puzzle():
         result = interaction_controller.open_anchor_age_verification()
         if result.get("status") == "input_required":
             game.complete_event("anchor_age_ui_opened")
+    interaction_controller.finish_interaction_sequence()  # 強制互動先於獎勵與事後反應
 
 
 def start_new_game():
@@ -1003,6 +1028,8 @@ def start_new_game():
     global last_player_space
 
     interaction_ui.close()
+    interaction_controller.reset_puzzle_completion()
+    interaction_controller.pending_post_interaction_dialogue = None
     puzzle_controller.reset_anchor_slots()  # 新遊戲清除上局碎片暫存狀態
     codex_ui.close_item()
 
@@ -1261,124 +1288,6 @@ def draw_game_over(
 
     return buttons
 
-
-# ============================================================
-# Chapter Ending UI
-# ============================================================
-
-def draw_chapter_end(
-    mouse_pos
-):
-    """繪製第一章結束畫面。"""
-
-    screen.fill(
-        (25, 25, 32)
-    )
-
-    width, height = (
-        screen.get_size()
-    )
-
-    title = game_ui.font_title.render(
-        "Chapter 1",
-        True,
-        (245, 245, 245)
-    )
-
-    screen.blit(
-        title,
-        title.get_rect(
-            center=(
-                width // 2,
-                height // 2 - 120
-            )
-        )
-    )
-
-    end_surface = (
-        game_ui.font_large.render(
-            "— END —",
-            True,
-            (220, 220, 225)
-        )
-    )
-
-    screen.blit(
-        end_surface,
-        end_surface.get_rect(
-            center=(
-                width // 2,
-                height // 2 - 70
-            )
-        )
-    )
-
-    quote_lines = [
-        "「你只解開了一把鎖。",
-        "但你還沒解開自己。」"
-    ]
-
-    y = (
-        height // 2
-    )
-
-    for line in quote_lines:
-
-        surface = (
-            game_ui.font_ui.render(
-                line,
-                True,
-                (230, 230, 235)
-            )
-        )
-
-        screen.blit(
-            surface,
-            surface.get_rect(
-                center=(
-                    width // 2,
-                    y
-                )
-            )
-        )
-
-        y += 32
-
-    buttons = {
-        "settings": pygame.Rect(
-            width // 2 - 175,
-            height // 2 + 100,
-            150,
-            42
-        ),
-
-        "menu": pygame.Rect(
-            width // 2 + 25,
-            height // 2 + 100,
-            150,
-            42
-        )
-    }
-
-    game_ui.draw_button(
-        screen,
-        "設定",
-        buttons["settings"],
-        buttons["settings"].collidepoint(
-            mouse_pos
-        )
-    )
-
-    game_ui.draw_button(
-        screen,
-        "回到主選單",
-        buttons["menu"],
-        buttons["menu"].collidepoint(
-            mouse_pos
-        )
-    )
-
-    return buttons
 
 # ============================================================
 # Interaction Keyboard
@@ -1975,6 +1884,9 @@ while running:
             dt
         )
 
+    if ui_screen == UI_GAME and ui_overlay is None:
+        interaction_controller.finish_interaction_sequence()
+
     # 非正常探索狀態時清除殘留移動按鍵
     if not (
         ui_screen == UI_GAME
@@ -2034,6 +1946,15 @@ while running:
     # Render Main Menu
     # ========================================================
 
+    hide_player_this_frame = False  # 每幀預設允許顯示玩家角色
+    if ui_screen == UI_GAME:
+        hide_player_this_frame = place_player_on_space_change(
+            game.current_space, last_player_space, map_manager, player,
+            screen, interaction_controller, pressed_keys,
+        )
+        if hide_player_this_frame:
+            last_player_space = game.current_space  # 記錄已放置角色的目前空間
+
     if ui_screen == UI_MENU:
 
         menu_buttons = (
@@ -2072,7 +1993,7 @@ while running:
         if game.game_state == DIALOGUE:
 
             # 場景背景與對話框分開依序繪製
-            draw_dialogue_background(screen, mouse_pos)
+            draw_dialogue_background(screen, mouse_pos, draw_player=not hide_player_this_frame)
 
             draw_dialogue_box(
                 screen,
@@ -2081,13 +2002,8 @@ while running:
                 game_ui.font_ui
             )
 
-            settings_button_rect = (
-                game_ui
-                .draw_settings_button(
-                    screen,
-                    mouse_pos
-                )
-            )
+            if dialogue_controller.dialogue_id != "scene_14":
+                settings_button_rect = game_ui.draw_settings_button(screen, mouse_pos)
 
 
         # ----------------------------------------------------
@@ -2124,27 +2040,6 @@ while running:
         # ----------------------------------------------------
 
         elif game.game_state == SPACE:
-
-            # 第一次進入新Space時套用該空間出生點
-            if game.current_space != last_player_space:
-
-                map_manager.place_player(
-                    player,
-                    game.current_space,
-                    screen,
-                    interaction_controller.pending_entry_rift,
-                    interaction_controller.pending_entry_object
-                )
-
-                last_player_space = (
-                    game.current_space
-                )
-
-                # 出生點套用完成後清除一次性入口資訊
-                interaction_controller.pending_entry_rift = None
-                interaction_controller.pending_entry_object = None
-
-                pressed_keys.clear()
 
             # GameUI只負責繪製，目前不再提供物理資料
             game_ui.draw_space(
@@ -2186,6 +2081,7 @@ while running:
                 ui_overlay is None
                 and not interaction_ui.is_open()
                 and not polygon_editor_active
+                and not hide_player_this_frame  # 放置角色當幀暫停移動與互動
             ):
 
                 # E鍵只和目前範圍內最近的物件互動
@@ -2232,9 +2128,8 @@ while running:
                 player.cancel_mouse_movement()
 
             # 滑鼠自動移動時顯示虛線與終點標記
-            draw_player_navigation_guide(
-                screen
-            )
+            if not hide_player_this_frame:
+                draw_player_navigation_guide(screen)
 
             if DEBUG_COLLISION:
                 game_ui.draw_debug_collision(
@@ -2254,28 +2149,15 @@ while running:
                     polygon_editor_space
                 )
 
-            # 繪製正式Player取代舊有Placeholder
-            player.draw(
-                screen
-            )
+            if not hide_player_this_frame:
+                player.draw(screen)
+                if DEBUG_COLLISION:
+                    pygame.draw.rect(screen, (0, 220, 255), player.get_collision_rect(), 2)  # 顯示實際與家具碰撞的腳部
 
-            # 找出目前E鍵會作用的最近互動物件
-            nearby_target = (
-                get_nearest_interaction_target(
-                    object_rects,
-                    interaction_rects
-                )
-            )
-
-            if (
-                ui_overlay is None
-                and not interaction_ui.is_open()
-            ):
-
-                draw_interaction_prompt(
-                    screen,
-                    nearby_target
-                )
+                # 找出目前E鍵會作用的最近互動物件
+                if ui_overlay is None and not interaction_ui.is_open():
+                    nearby_target = get_nearest_interaction_target(object_rects, interaction_rects)
+                    draw_interaction_prompt(screen, nearby_target)
 
             settings_button_rect = (
                 game_ui
@@ -2313,7 +2195,8 @@ while running:
                 )
             )
 
-            player.draw(screen)  # 謎題開啟時保留角色所在位置
+            if not hide_player_this_frame:
+                player.draw(screen)  # 謎題開啟時保留角色所在位置
 
             hotbar_data = (
                 game_ui.draw_hotbar(
@@ -2345,11 +2228,7 @@ while running:
 
         elif game.game_state == SUCCESS:
 
-            ending_buttons = (
-                draw_chapter_end(
-                    mouse_pos
-                )
-            )
+            ending_buttons = game_ui.draw_success_end(screen, mouse_pos)
 
 
         # ====================================================
@@ -2466,6 +2345,7 @@ while running:
             elif result == "go_menu":
 
                 interaction_ui.close()
+                interaction_controller.pending_post_interaction_dialogue = None
                 ui_screen = UI_MENU
                 ui_overlay = None
 
@@ -2621,12 +2501,8 @@ while running:
             # Space
             # =================================================
 
-            elif game.game_state == SPACE:
+            elif game.game_state == SPACE and not hide_player_this_frame:
 
-                click_is_walkable = (
-                    len(walkable_polygon) >= 3
-                    and player.point_in_polygon(mouse_pos, walkable_polygon)
-                )
                 click_handled = False
 
                 # ---------------------------------------------
@@ -2638,7 +2514,7 @@ while running:
                     rect
                 ) in object_rects.items():
 
-                    if click_is_walkable and rect.collidepoint(
+                    if rect.collidepoint(
                         mouse_pos
                     ):
 
@@ -2654,9 +2530,7 @@ while running:
                         }
 
                         # 點物件只負責靠近，不再自動開啟UI
-                        player.set_interaction_target(
-                            target
-                        )
+                        navigate_to_click(mouse_pos, obstacles, walkable_polygon, target)
 
                         click_handled = True
 
@@ -2765,12 +2639,10 @@ while running:
                 # Empty Ground
                 # ---------------------------------------------
 
-                if not click_handled and click_is_walkable:
+                if not click_handled:
 
                     # 點空地時設定一般滑鼠移動目標
-                    player.set_mouse_target(
-                        mouse_pos
-                    )
+                    navigate_to_click(mouse_pos, obstacles, walkable_polygon)
 
 
             # =================================================

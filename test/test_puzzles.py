@@ -46,7 +46,8 @@ class PuzzleTests(unittest.TestCase):
     def setUp(self):
         self.objects = load_data("objects.json")
         self.puzzles = load_data("puzzles.json")
-        self.puzzle_id = self.objects["password_panel"]["puzzle_id"]
+        self.layout = load_data("ui_layout.json")
+        self.puzzle_id = self.objects["exit_door"]["puzzle_id"]
         self.answer = self.puzzles[self.puzzle_id]["answer"]
         self.wrong = "9" * self.puzzles[self.puzzle_id]["length"]
         self.game = GameManager()
@@ -56,7 +57,7 @@ class PuzzleTests(unittest.TestCase):
 
     def make_ui(self):
         levels = load_data("levels.json")
-        game_ui = GameUI(load_data("ui_layout.json"), levels, self.objects)
+        game_ui = GameUI(self.layout, levels, self.objects)
         ui = InteractionUI(game_ui, self.game, self.objects, levels, self.controller)
         story = StoryManager(self.game, DialogueController(), ChoiceController(), load_data("dialogue.json"))
         interaction = InteractionController(ui, story, self.game, self.controller)
@@ -157,6 +158,8 @@ class PuzzleTests(unittest.TestCase):
         self.assertEqual(self.game.puzzle_attempts, {self.puzzle_id: 2})
         self.assertTrue(self.manager.is_solved(self.puzzle_id))
         self.assertFalse(self.manager.is_solved("password_panel"))
+        self.assertTrue(self.game.has_event("chapter1_password_solved"))
+        self.assertEqual(get_door_info(self.game, "exit_door", self.objects)["status"], "door_available")
         serialized = self.round_trip_save()
         self.assertNotIn("password_panel", serialized["solved_puzzles"])
         self.assertNotIn("password_panel", serialized["puzzle_attempts"])
@@ -214,21 +217,108 @@ class PuzzleTests(unittest.TestCase):
     def test_photo_reward_without_completion_stays_message(self):
         self.puzzles[self.puzzle_id].pop("on_complete")
         ui, interaction, _ = self.make_ui()
-        interaction.open_object("password_panel")
+        interaction.open_object("exit_door")
         self.controller.append_input(self.answer)
         interaction.submit_puzzle()
         self.assertTrue(self.game.has_item("photo_1"))
+        self.click(ui, interaction, "ok")
         self.assertEqual(ui.mode, "message")
         self.assertIsNone(ui.photo_id)
         self.assertEqual(ui.result["message"], "ACCESS GRANTED")
 
-    def test_completion_opens_photo_without_using_back_text(self):
-        self.objects["photo_1"].pop("back_text")
-        ui, interaction, _ = self.make_ui()
-        interaction.open_object("password_panel")
+    def click(self, ui, interaction, control):
+        buttons = ui.draw(self.screen, (0, 0))
+        interaction.handle_click(buttons, buttons[control].center)
+
+    def test_space_c_only_contains_exit_and_rifts(self):
+        space = self.layout["spaces"]["C"]
+        expected_objects = {"rift_C_A", "rift_C_B", "exit_door"}
+        self.assertNotIn("password_panel", self.objects)
+        self.assertEqual(set(space["objects"]), expected_objects)
+        self.assertEqual(set(load_data("levels.json")["C"]["objects"]), expected_objects)
+        self.assertNotIn("password_panel_body", space["collision_zones"])
+
+    def test_chapter1_reward_notifies_then_plays_photo_story(self):
+        ui, interaction, story = self.make_ui()
+        interaction.open_object("exit_door")
         self.controller.append_input(self.answer)
         interaction.submit_puzzle()
-        self.assertEqual((ui.mode, ui.photo_id, ui.photo_mode), ("photo", "photo_1", "story"))
+        self.assertTrue(self.game.is_puzzle_solved("chapter1_password"))
+        self.assertTrue(self.game.has_event("chapter1_password_solved"))
+        self.assertTrue(self.game.has_item("photo_1"))
+        self.assertEqual((ui.mode, ui.notification["item_id"]), ("item_notification", "photo_1"))
+        interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.assertEqual(ui.mode, "item_notification")
+        self.click(ui, interaction, "ok")
+        self.assertEqual(
+            (ui.mode, ui.photo_id, ui.photo_mode, ui.photo_side),
+            ("photo", "photo_1", "story", "front"),
+        )
+        interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.assertEqual(ui.mode, "photo")
+        self.assertFalse(ui.draw(self.screen, (0, 0))["allow_close"])
+        self.assertFalse(self.game.has_event("photo_back_seen"))
+        self.click(ui, interaction, "back")
+        self.assertFalse(ui.is_open())
+        self.assertTrue(self.game.has_event("photo_back_seen"))
+        self.assertEqual(self.game.game_state, DIALOGUE)
+        self.assertEqual(story.dialogue_controller.dialogue_id, "photo_back_story")
+        script = "\n".join(line["text"] for line in story.dialogue_controller.lines)
+        for line in (
+            "空間D……還有？", "牆上顯示器突然亮起。", "收斂率更新",
+            "空間A：81%", "空間B：55%", "空間C：37%",
+            "收斂率在漲……", "這個房間在消失。", "我得走。",
+        ):
+            self.assertIn(line, script)
+        story.finish_dialogue_action()
+        self.assertEqual((self.game.current_space, self.game.game_state), ("C", SPACE))
+
+        hotbar = HotbarController(self.game, ui.game_ui, ui, interaction)
+        hotbar.open_item("photo_1")
+        self.assertEqual((ui.mode, ui.photo_id, ui.photo_mode), ("photo", "photo_1", "inventory"))
+        self.click(ui, interaction, "back")
+        self.assertEqual((ui.mode, ui.photo_side, self.game.game_state), ("photo", "back", SPACE))
+        ui.close()
+
+        interaction.open_object("exit_door")
+        self.assertEqual(ui.mode, "door")
+        with patch.object(story, "start_chapter_end", wraps=story.start_chapter_end) as chapter_end:
+            self.click(ui, interaction, "enter")
+            chapter_end.assert_called_once()
+            self.assertEqual(chapter_end.call_args.args[0]["target_scene"], "chapter_1_end")
+        self.assertEqual(self.game.game_state, DIALOGUE)
+
+    def test_drawer_notifies_only_new_items_in_reward_order(self):
+        for owned in ((), ("pencil",), ("pencil", "t0_diary_page_4")):
+            with self.subTest(owned=owned):
+                self.game.reset_game()
+                self.game.enter_space("T0")
+                for item in owned:
+                    self.game.add_item(item)
+                ui, interaction, _ = self.make_ui()
+                interaction.open_object("t0_bedside_drawer")
+                self.controller.append_input("121")
+                interaction.submit_puzzle()
+                self.assertEqual(ui.mode, "message")
+                self.assertEqual(ui.result["message"], "抽屜打開了。")
+                self.click(ui, interaction, "ok")
+
+                for item in ("pencil", "t0_diary_page_4"):
+                    self.assertTrue(self.game.has_item(item))
+                    if item not in owned:
+                        self.assertEqual((ui.mode, ui.notification["item_id"]), ("item_notification", item))
+                        self.click(ui, interaction, "ok")
+                self.assertFalse(ui.is_open())
+                self.assertIsNone(interaction.item_notification_result)
+
+    def test_t0_item_assets_load_through_shared_renderer(self):
+        ui, _, _ = self.make_ui()
+        for item, asset in (("pencil", "pencil.png"), ("present_fragment", "piece.png")):
+            with self.subTest(item=item):
+                path = self.objects[item]["ui_asset"]
+                self.assertEqual(Path(path).name, asset)
+                self.assertTrue((ROOT / path).is_file())
+                self.assertTrue(ui.game_ui.draw_item_asset(self.screen, item, pygame.Rect(0, 0, 50, 50)))
 
     def test_completion_fallback_and_optional_story_event(self):
         ui, interaction, _ = self.make_ui()
@@ -244,7 +334,7 @@ class PuzzleTests(unittest.TestCase):
     def test_ui_mode_comes_from_data(self):
         self.puzzles[self.puzzle_id]["ui_mode"] = "custom_mode"
         ui, interaction, _ = self.make_ui()
-        interaction.open_object("password_panel")
+        interaction.open_object("exit_door")
         self.assertEqual(ui.mode, "custom_mode")
         self.assertEqual(self.controller.ui_mode, "custom_mode")
 
@@ -252,7 +342,7 @@ class PuzzleTests(unittest.TestCase):
         self.puzzles[self.puzzle_id].pop("max_attempts")
         self.puzzles[self.puzzle_id]["length"] = 4
         ui, interaction, _ = self.make_ui()
-        interaction.open_object("password_panel")
+        interaction.open_object("exit_door")
         original_font = ui.game_ui.font_small
         font = Mock(wraps=original_font)
         ui.game_ui.font_small = font
@@ -266,10 +356,12 @@ class PuzzleTests(unittest.TestCase):
         self.puzzles[self.puzzle_id].pop("length")
         ui.draw(self.screen, (0, 0))  # 缺少長度設定仍可安全繪製既有介面
 
-    def test_ui_photo_story_and_exit_unlock(self):
-        ui, interaction, story = self.make_ui()
-        interaction.open_object("password_panel")
+    def test_unsolved_door_opens_password_and_preserves_attempts(self):
+        ui, interaction, _ = self.make_ui()
+        self.game.complete_event("photo_back_seen")
+        interaction.open_object("exit_door")
         self.assertEqual(ui.mode, "password")
+        self.assertEqual(self.controller.current_puzzle_id, "chapter1_password")
         self.assertEqual(self.game.game_state, PASSWORD)
         buttons = ui.draw(self.screen, (0, 0))
         self.assertTrue(all(key in buttons for key in ("0", "9", "clear", "submit", "back")))
@@ -277,42 +369,31 @@ class PuzzleTests(unittest.TestCase):
         interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE))
         self.assertEqual(self.controller.input_text, "")
         self.controller.append_input(self.wrong)
-        interaction.handle_click(buttons, buttons["submit"].center)
+        self.click(ui, interaction, "submit")
         self.assertEqual(self.controller.remaining_attempts, 2)
-        self.controller.append_input(self.answer)
-        interaction.handle_click(buttons, buttons["submit"].center)
-        self.assertEqual((ui.mode, ui.photo_id, ui.photo_mode, ui.photo_side), ("photo", "photo_1", "story", "front"))
-        self.assertEqual(get_door_info(self.game, "exit_door", self.objects)["status"], "door_locked")
-        buttons = ui.draw(self.screen, (0, 0))
-        self.assertFalse(buttons["allow_close"])
-        interaction.handle_click(buttons, buttons["back"].center)
-        self.assertTrue(self.game.has_event("photo_back_seen"))
-        self.assertEqual(self.game.game_state, DIALOGUE)
-        self.assertEqual(story.dialogue_after_action, "finish_photo_story")
-        story.finish_dialogue_action()
-        self.assertEqual(self.game.game_state, SPACE)
-        self.assertEqual(get_door_info(self.game, "exit_door", self.objects)["status"], "door_available")
-        interaction.open_object("password_panel")
-        self.assertEqual(ui.mode, "message")
+        self.click(ui, interaction, "back")
+        interaction.open_object("exit_door")
+        self.assertEqual(self.controller.remaining_attempts, 2)
 
     def test_ui_escape_and_game_over_close(self):
         ui, interaction, _ = self.make_ui()
-        interaction.open_object("password_panel")
+        interaction.open_object("exit_door")
         interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
         self.assertFalse(ui.is_open())
         self.assertIsNone(self.controller.current_puzzle_id)
         self.assertEqual(self.game.game_state, SPACE)
-        interaction.open_object("password_panel")
+        interaction.open_object("exit_door")
         for _ in range(3):
             self.controller.append_input(self.wrong)
             interaction.submit_puzzle()
         self.assertFalse(ui.is_open())
         self.assertEqual(self.game.game_state, GAME_OVER)
+        self.assertEqual(self.game.game_over_reason, "space_c_locked")
 
     def test_text_entry_uses_same_rules(self):
         with patch("builtins.input", return_value=self.answer), patch("sys.stdout", new_callable=io.StringIO):
             with patch("managers.interaction_manager.interact_with_photo") as photo:
-                interact_with_puzzle(self.game, "password_panel", self.objects, self.manager)
+                interact_with_puzzle(self.game, "exit_door", self.objects, self.manager)
                 photo.assert_called_once_with(self.game, "photo_1", self.objects, mode="story")
         self.assertTrue(self.manager.is_solved(self.puzzle_id))
 

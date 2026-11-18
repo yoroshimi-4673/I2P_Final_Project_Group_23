@@ -360,7 +360,7 @@ def get_door_info(game, object_id, objects):
 # ======== 正式進入出口門 ======== #
 
 def enter_door(game, object_id, objects):
-    """玩家確認進入出口門後執行章節結尾。"""
+    """確認出口門狀態並回傳門後的場景。"""
 
     door_result = get_door_info(
         game,
@@ -413,7 +413,7 @@ def enter_door(game, object_id, objects):
         }
 
     return {
-        "status": "door_entered",
+        "status": "scene_transition" if target_scene else "door_entered",
         "object_id": object_id,
         "target_scene": target_scene
     }

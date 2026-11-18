@@ -8,6 +8,7 @@
         "max_attempts": 3,
         "solved_flag": "chapter1_password_solved",
         "success_message": "ACCESS GRANTED",
+        "reward_notification_order": "before_completion",
         "wrong_message": "密碼錯誤。",
         "rewards": [
             {

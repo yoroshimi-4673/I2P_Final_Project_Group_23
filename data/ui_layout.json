@@ -410,14 +410,6 @@
                 ]
             ],
             "objects": {
-                "password_panel": {
-                    "x": 315,
-                    "y": 170,
-                    "width": 170,
-                    "height": 100,
-                    "label": "六位數密碼鎖 Placeholder",
-                    "interaction_padding": 40
-                },
                 "rift_C_A": {
                     "x": 80,
                     "y": 250,
@@ -456,15 +448,7 @@
                     "y": 280
                 }
             },
-            "collision_zones": {
-                "password_panel_body": {
-                    "x": 315,
-                    "y": 170,
-                    "width": 170,
-                    "height": 100,
-                    "kind": "furniture"
-                }
-            }
+            "collision_zones": {}
         },
         "CH2_CORRIDOR": {
             "background": {
@@ -631,21 +615,35 @@
                     "asset": "assets/素材庫/第二章/白色通道/controler.png",
                     "label": "時間終端機",
                     "interaction_padding": 50,
-                    "visible_after_event": "scene_13_started"
+                    "visible_after_event": "scene_13_started",
+                    "remove_white_background": true,
+                    "white_background_threshold": 235
+                },
+                "door_d": {
+                    "x": 627,
+                    "y": 231,
+                    "width": 30,
+                    "height": 93,
+                    "label": "D",
+                    "render_mode": "background",
+                    "interaction_padding": 0,
+                    "interaction_polygon": [[627, 234], [627, 324], [657, 324], [657, 231]],
+                    "interaction_label": "前往D空間",
+                    "visible_after_event": "space_d_unlocked"
                 }
             },
             "entry_spawns": {
                 "door_t0": {
-                    "x": 231,
-                    "y": 279
+                    "x": 201,
+                    "y": 229
                 },
                 "door_t3": {
-                    "x": 231,
-                    "y": 103
+                    "x": 201,
+                    "y": 53
                 },
                 "door_t7": {
-                    "x": 231,
-                    "y": 481
+                    "x": 201,
+                    "y": 431
                 }
             },
             "collision_zones": {
@@ -656,13 +654,6 @@
                     "height": 128,
                     "kind": "furniture",
                     "visible_after_event": "scene_13_started"
-                }
-            },
-            "pending_objects": {
-                "door_d": {
-                    "label": "D",
-                    "render_mode": "background",
-                    "reason": "等待人工確認背景座標"
                 }
             }
         },
@@ -863,13 +854,14 @@
                     "render_mode": "background",
                     "interaction_padding": 0
                 },
-                "t0_curtain": {
+                "t0_windowsill": {
                     "x": 286,
                     "y": 43,
                     "width": 41,
                     "height": 137,
                     "asset": null,
-                    "label": "窗簾",
+                    "label": "窗台",
+                    "interaction_label": "窗台",
                     "render_mode": "background",
                     "interaction_padding": 0
                 }
@@ -1310,6 +1302,7 @@
                     "height": 137,
                     "asset": null,
                     "label": "窗台",
+                    "interaction_label": "窗台",
                     "render_mode": "background",
                     "interaction_padding": 0
                 },
@@ -1356,8 +1349,8 @@
             },
             "decorations": {
                 "young_li_nian": {
-                    "x": 110,
-                    "y": 190,
+                    "x": 120,
+                    "y": 215,
                     "width": 55,
                     "height": 75,
                     "asset": "assets/素材庫/角色/daughter.png",

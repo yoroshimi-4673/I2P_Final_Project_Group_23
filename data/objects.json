@@ -87,13 +87,6 @@
         "description": "廢棄的通風管持續吹出異常冰冷的風，其中形成了一道扭曲的裂隙。",
         "target_space": "C"
     },
-    "password_panel": {
-        "name": "六位數密碼鎖",
-        "type": "puzzle",
-        "space": "C",
-        "description": "純白房間中央懸浮著一個六位數密碼鎖。",
-        "puzzle_id": "chapter1_password"
-    },
     "photo_1": {
         "name": "照片",
         "type": "item",
@@ -107,14 +100,14 @@
         "name": "裂隙α",
         "type": "rift",
         "space": "C",
-        "description": "密碼鎖左側的空氣扭曲成一道裂隙，另一側似乎連接著空間A。",
+        "description": "純白房間左側的空氣扭曲成一道裂隙，另一側似乎連接著空間A。",
         "target_space": "A"
     },
     "rift_C_B": {
         "name": "裂隙β",
         "type": "rift",
         "space": "C",
-        "description": "密碼鎖右側的空氣扭曲成一道裂隙，另一側似乎連接著空間B。",
+        "description": "純白房間右側的空氣扭曲成一道裂隙，另一側似乎連接著空間B。",
         "target_space": "B"
     },
     "exit_door": {
@@ -122,8 +115,9 @@
         "type": "door",
         "space": "C",
         "description": "你伸手握住門把。這一次，門沒有鎖。",
-        "locked_description": "出口門就在那裡，但現在還無法打開。",
-        "required_event": "photo_back_seen",
+        "locked_description": "門上的六位數密碼鎖仍然亮著。",
+        "puzzle_id": "chapter1_password",
+        "required_event": "chapter1_password_solved",
         "target_scene": "chapter_1_end"
     },
     "ch2_terminal": {
@@ -160,6 +154,8 @@
         "name": "D",
         "type": "door",
         "space": "CH2_CORRIDOR",
+        "description": "D 門已解鎖。",
+        "locked_description": "D 門尚未解鎖。",
         "required_event": "space_d_unlocked",
         "target_scene": "scene_14"
     },
@@ -186,14 +182,14 @@
         "item": "t0_diary_page_2",
         "empty_text": "枕頭下面已經沒有其他東西。"
     },
-    "t0_curtain": {
-        "name": "窗簾",
+    "t0_windowsill": {
+        "name": "窗台",
         "type": "searchable",
         "space": "T0",
-        "description": "窗簾的夾層裡似乎塞著一張紙。",
-        "search_prompt": "要檢查窗簾夾層嗎？",
+        "description": "窗台上似乎放著一張紙。",
+        "search_prompt": "要檢查窗台嗎？",
         "item": "t0_diary_page_5",
-        "empty_text": "窗簾夾層已經空了。"
+        "empty_text": "窗台上已經沒有其他東西。"
     },
     "t0_bedside_drawer": {
         "name": "床頭抽屜",
@@ -238,6 +234,7 @@
         "name": "鉛筆",
         "type": "item",
         "description": "一支普通的鉛筆，可以用來進行拓印。",
+        "ui_asset": "assets/素材庫/第二章/T+0/pencil.png",
         "collectable": true
     },
     "rubbing_paper": {
@@ -250,6 +247,7 @@
         "name": "碎片（現在）",
         "type": "item",
         "description": "金屬碎片上刻著：「……現在，只能被選擇……」",
+        "ui_asset": "assets/素材庫/第二章/T+0/piece.png",
         "collectable": true
     },
     "t0_exit_door": {
