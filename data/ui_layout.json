@@ -410,14 +410,6 @@
                 ]
             ],
             "objects": {
-                "password_panel": {
-                    "x": 315,
-                    "y": 170,
-                    "width": 170,
-                    "height": 100,
-                    "label": "六位數密碼鎖 Placeholder",
-                    "interaction_padding": 40
-                },
                 "rift_C_A": {
                     "x": 80,
                     "y": 250,
@@ -456,15 +448,7 @@
                     "y": 280
                 }
             },
-            "collision_zones": {
-                "password_panel_body": {
-                    "x": 315,
-                    "y": 170,
-                    "width": 170,
-                    "height": 100,
-                    "kind": "furniture"
-                }
-            }
+            "collision_zones": {}
         },
         "CH2_CORRIDOR": {
             "background": {

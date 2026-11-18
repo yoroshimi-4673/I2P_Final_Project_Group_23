@@ -25,7 +25,6 @@
     "C": {
         "name": "空間C",
         "objects": [
-            "password_panel",
             "rift_C_A",
             "rift_C_B",
             "exit_door"

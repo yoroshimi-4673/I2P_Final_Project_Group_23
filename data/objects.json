@@ -87,13 +87,6 @@
         "description": "廢棄的通風管持續吹出異常冰冷的風，其中形成了一道扭曲的裂隙。",
         "target_space": "C"
     },
-    "password_panel": {
-        "name": "六位數密碼鎖",
-        "type": "puzzle",
-        "space": "C",
-        "description": "純白房間中央懸浮著一個六位數密碼鎖。",
-        "puzzle_id": "chapter1_password"
-    },
     "photo_1": {
         "name": "照片",
         "type": "item",
@@ -107,14 +100,14 @@
         "name": "裂隙α",
         "type": "rift",
         "space": "C",
-        "description": "密碼鎖左側的空氣扭曲成一道裂隙，另一側似乎連接著空間A。",
+        "description": "純白房間左側的空氣扭曲成一道裂隙，另一側似乎連接著空間A。",
         "target_space": "A"
     },
     "rift_C_B": {
         "name": "裂隙β",
         "type": "rift",
         "space": "C",
-        "description": "密碼鎖右側的空氣扭曲成一道裂隙，另一側似乎連接著空間B。",
+        "description": "純白房間右側的空氣扭曲成一道裂隙，另一側似乎連接著空間B。",
         "target_space": "B"
     },
     "exit_door": {
@@ -122,8 +115,9 @@
         "type": "door",
         "space": "C",
         "description": "你伸手握住門把。這一次，門沒有鎖。",
-        "locked_description": "出口門就在那裡，但現在還無法打開。",
-        "required_event": "photo_back_seen",
+        "locked_description": "門上的六位數密碼鎖仍然亮著。",
+        "puzzle_id": "chapter1_password",
+        "required_event": "chapter1_password_solved",
         "target_scene": "chapter_1_end"
     },
     "ch2_terminal": {
