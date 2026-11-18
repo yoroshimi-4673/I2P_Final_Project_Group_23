@@ -615,21 +615,23 @@
                     "asset": "assets/素材庫/第二章/白色通道/controler.png",
                     "label": "時間終端機",
                     "interaction_padding": 50,
-                    "visible_after_event": "scene_13_started"
+                    "visible_after_event": "scene_13_started",
+                    "remove_white_background": true,
+                    "white_background_threshold": 235
                 }
             },
             "entry_spawns": {
                 "door_t0": {
-                    "x": 231,
-                    "y": 279
+                    "x": 201,
+                    "y": 229
                 },
                 "door_t3": {
-                    "x": 231,
-                    "y": 103
+                    "x": 201,
+                    "y": 53
                 },
                 "door_t7": {
-                    "x": 231,
-                    "y": 481
+                    "x": 201,
+                    "y": 431
                 }
             },
             "collision_zones": {
@@ -847,13 +849,14 @@
                     "render_mode": "background",
                     "interaction_padding": 0
                 },
-                "t0_curtain": {
+                "t0_windowsill": {
                     "x": 286,
                     "y": 43,
                     "width": 41,
                     "height": 137,
                     "asset": null,
-                    "label": "窗簾",
+                    "label": "窗台",
+                    "interaction_label": "窗台",
                     "render_mode": "background",
                     "interaction_padding": 0
                 }
@@ -1294,6 +1297,7 @@
                     "height": 137,
                     "asset": null,
                     "label": "窗台",
+                    "interaction_label": "窗台",
                     "render_mode": "background",
                     "interaction_padding": 0
                 },
@@ -1340,8 +1344,8 @@
             },
             "decorations": {
                 "young_li_nian": {
-                    "x": 110,
-                    "y": 190,
+                    "x": 120,
+                    "y": 215,
                     "width": 55,
                     "height": 75,
                     "asset": "assets/素材庫/角色/daughter.png",

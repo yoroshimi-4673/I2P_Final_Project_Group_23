@@ -126,6 +126,8 @@ class DiaryDragTests(unittest.TestCase):
 
     def test_table_and_hotbar_use_same_six_page_reader(self):
         self.restore_diary()
+        self.f.acknowledge_success("日記頁已經按照月份恢復。")
+        self.f.acknowledge_rewards("t0_fixed_diary")
         self.f.open("t0_diary")
         self.assertEqual(self.f.ui.mode, "diary_reader")
         expected = [

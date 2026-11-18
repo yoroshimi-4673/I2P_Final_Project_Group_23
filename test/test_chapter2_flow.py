@@ -19,6 +19,7 @@ from managers.game_manager import GameManager
 from managers.map_manager import MapManager
 from managers.puzzle_manager import PuzzleManager
 from managers.story_manager import StoryManager
+from player import Player
 from ui.game_ui import GameUI
 from ui.interaction_ui import InteractionUI
 
@@ -88,12 +89,26 @@ class Chapter2FlowTests(unittest.TestCase):
             self.click(digit)
         self.click("submit")
 
+    def acknowledge_success(self, message):
+        self.assertEqual(self.ui.mode, "message")
+        self.assertEqual(self.ui.result["message"], message)
+        self.click("ok")
+
+    def acknowledge_rewards(self, *items):
+        for item in items:
+            self.assertEqual(self.ui.mode, "item_notification")
+            self.assertEqual(self.ui.notification["item_id"], item)
+            self.click("ok")
+        self.assertFalse(self.ui.is_open())
 
     def enter_chapter2_from_chapter1_exit(self):
         self.game.enter_space("C")
         if not self.game.is_puzzle_solved("chapter1_password"):
             self.password("exit_door", "100101")
             self.click("ok")
+            self.click("back")
+            self.expect_dialogue("photo_back_story")
+            self.finish()
         self.open("exit_door")
         self.assertEqual(self.ui.mode, "door")
         self.click("enter")
@@ -133,6 +148,23 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(self.story.chapter_end_text,
                          "你只解開了一把鎖。但你還沒解開自己。")
 
+    def test_forced_anchor_puzzle_takes_priority_over_pending_reward(self):
+        self.game.enter_space("T0")
+        self.game.solve_puzzle("t0_diary_restore")
+        for item in ("past_fragment", "future_fragment"):
+            self.game.add_item(item)
+        self.password("t0_child_safe", "21")
+        self.acknowledge_success("保險箱打開了。")
+        self.expect_dialogue("scene_10_fragment")
+        self.game.current_space = "CH2_CORRIDOR"
+        self.game.complete_event("anchor_age_puzzle_ready")
+        self.finish()
+        self.assertEqual(self.ui.mode, "multi_input")
+        self.assertEqual(self.puzzle.current_puzzle_id, "anchor_age_verification")
+        self.ui.close()
+        self.interaction.resume_pending_item_notifications()
+        self.acknowledge_rewards("present_fragment", "rubbing_paper")
+
     def test_chapter1_end_to_scene13(self):
         g = self.game
         for name in ("current_scene", "current_space", "inventory", "knowledge",
@@ -164,9 +196,8 @@ class Chapter2FlowTests(unittest.TestCase):
         self.password("t0_bedside_drawer", "121")
         self.assertTrue(g.has_item("pencil"))
         self.assertTrue(g.has_item("t0_diary_page_4"))
-        self.click("ok")
-        self.click("ok")
-        self.click("ok")
+        self.acknowledge_success("抽屜打開了。")
+        self.acknowledge_rewards("pencil", "t0_diary_page_4")
         self.open("t0_bed")
         self.click("t0_pillow")
         self.click("yes")
@@ -176,9 +207,11 @@ class Chapter2FlowTests(unittest.TestCase):
         self.ui.close()
         self.assertTrue(g.has_item("t0_diary_page_2"))
         g = self.game
-        self.open("t0_curtain")
+        self.open("t0_windowsill")
+        self.assertEqual(self.ui.mode, "searchable")
         self.click("yes")
-        self.click("ok")
+        self.acknowledge_rewards("t0_diary_page_5")
+        self.assertTrue(g.has_item("t0_diary_page_5"))
         self.open("t0_diary")
         for page in (2, 4, 5):
             buttons = self.ui.draw(self.screen, (0, 0))
@@ -190,15 +223,17 @@ class Chapter2FlowTests(unittest.TestCase):
             self.interaction.finish_diary_drag(buttons, target)
         self.click("confirm")
         self.assertTrue(g.is_puzzle_solved("t0_diary_restore"))
-        self.click("ok")
-        self.click("ok")
+        self.acknowledge_success("日記頁已經按照月份恢復。")
+        self.acknowledge_rewards("t0_fixed_diary")
         self.password("t0_child_safe", "21")
-        self.click("ok")
-        self.click("ok")
-        self.expect_dialogue("scene_10_fragment")
         self.assertTrue(g.has_item("present_fragment"))
         self.assertTrue(g.has_item("rubbing_paper"))
+        self.acknowledge_success("保險箱打開了。")
+        self.expect_dialogue("scene_10_fragment")
+        self.interaction.resume_pending_item_notifications()
+        self.assertFalse(self.ui.is_open())
         self.finish()
+        self.acknowledge_rewards("present_fragment", "rubbing_paper")
         self.assertEqual(g.current_space, "T0")
         self.assertTrue(g.has_event("t0_completed"))
         self.open("t0_exit_door")
@@ -229,9 +264,10 @@ class Chapter2FlowTests(unittest.TestCase):
         self.click("close")
         self.assertEqual(self.dialogue.start.call_count, letter_dialogue_count)
         self.password("t7_desk_drawer", "307")
-        self.click("ok")
+        self.acknowledge_success("書桌抽屜打開了。")
         self.expect_dialogue("scene_11_fragment")
         self.finish()
+        self.acknowledge_rewards("future_fragment")
         self.assertEqual(g.current_space, "T7")
         self.open("t7_exit_door")
         self.click("leave")
@@ -251,35 +287,38 @@ class Chapter2FlowTests(unittest.TestCase):
         self.finish()
         for object_id in ("t3_bed", "t3_wardrobe"):
             self.open(object_id)
+            self.assertEqual(self.ui.mode, "container" if object_id == "t3_bed" else "inspectable")
+            self.click("close" if object_id == "t3_bed" else "back")
             self.expect_dialogue("scene_12_wrong_search")
             self.finish()
-            self.assertEqual(self.ui.mode, "container" if object_id == "t3_bed" else "inspectable")
-            self.ui.close()
         self.open("t3_time_capsule")
         self.assertEqual(self.ui.mode, "message")
         self.assertIsNone(self.puzzle.current_puzzle_id)
         self.open("t3_windowsill")
         self.assertTrue(g.has_event("t3_time_capsule_found"))
         self.password("t3_time_capsule", "0347")
-        self.click("ok")
-        self.click("ok")
-        self.expect_dialogue("scene_12_note")
         self.assertTrue(g.has_item("past_fragment"))
         self.assertTrue(g.has_item("t3_note"))
+        self.acknowledge_success("鐵盒打開了。")
+        self.expect_dialogue("scene_12_note")
         self.finish()
+        self.acknowledge_rewards("past_fragment", "t3_note")
         self.open("t3_bed_board")
         self.assertEqual(self.ui.mode, "message")
+        self.click("ok")
         self.open("t3_desk")
-        self.expect_dialogue("scene_12_wrong_search")
-        self.assertFalse(g.has_item("t3_knife"))
-        self.finish()
+        self.assertEqual((self.ui.mode, self.ui.notification["item_id"]), ("item_notification", "t3_knife"))
         self.assertTrue(g.has_item("t3_knife"))
         self.click("ok")
+        self.click("close")
+        self.expect_dialogue("scene_12_wrong_search")
+        self.finish()
         g = self.game
         self.open("t3_bed")
-        self.finish()
         self.click("t3_bed_board")
         self.expect_dialogue("scene_12_carving")
+        self.finish()
+        self.expect_dialogue("scene_12_wrong_search")
         self.finish()
         self.assertTrue(g.has_event("t3_completed"))
         self.open("t3_exit_door")
@@ -392,6 +431,91 @@ class Chapter2FlowTests(unittest.TestCase):
         target = {"id": "t3_wardrobe"}
         prompt(self.screen, target)
         self.assertIn(self.objects["t3_wardrobe"]["name"], spy.render.call_args.args[0])
+        for space, object_id in (("T0", "t0_windowsill"), ("T3", "t3_windowsill")):
+            with self.subTest(space=space):
+                self.game.enter_space(space)
+                prompt(self.screen, {"id": object_id})
+                self.assertEqual(spy.render.call_args.args[0], "[E] 互動：窗台")
+
+    def test_t0_windowsill_data_keeps_search_reward_and_location(self):
+        layout_objects = self.layout["spaces"]["T0"]["objects"]
+        self.assertNotIn("t0_curtain", self.objects)
+        self.assertNotIn("t0_curtain", layout_objects)
+        windowsill = self.objects["t0_windowsill"]
+        self.assertEqual(
+            (windowsill["name"], windowsill["type"], windowsill["item"]),
+            ("窗台", "searchable", "t0_diary_page_5"),
+        )
+        self.assertEqual(
+            self.game_ui.scale_rect(self.screen, layout_objects["t0_windowsill"]),
+            pygame.Rect(286, 43, 41, 137),
+        )
+
+    def test_corridor_return_spawns_are_independent_of_door_positions(self):
+        corridor = self.layout["spaces"]["CH2_CORRIDOR"]
+        expected = {
+            "door_t0": ((201, 229), (139, 239)),
+            "door_t3": ((201, 53), (139, 52)),
+            "door_t7": ((201, 431), (140, 436)),
+        }
+        for door, (spawn, position) in expected.items():
+            with self.subTest(door=door):
+                self.assertEqual(corridor["entry_spawns"][door], dict(zip(("x", "y"), spawn)))
+                layout = corridor["objects"][door]
+                self.assertEqual((layout["x"], layout["y"]), position)
+
+    def test_space_change_places_player_and_hides_only_first_frame(self):
+        place = home_function("place_player_on_space_change", {})
+        manager = MapManager(self.layout, self.game_ui, self.game)
+        player = Player(0, 0)
+        cases = (
+            ("A", "B", "wardrobe_rift", None),
+            ("A", "C", "floor_rift_A", None),
+            ("B", "A", "floor_rift_B", None),
+            ("B", "C", "ceiling_rift", None),
+            ("C", "A", "rift_C_A", None),
+            ("C", "B", "rift_C_B", None),
+            ("CH2_CORRIDOR", "T0", None, None),
+            ("T0", "CH2_CORRIDOR", None, "door_t0"),
+            ("CH2_CORRIDOR", "T7", None, None),
+            ("T7", "CH2_CORRIDOR", None, "door_t7"),
+            ("CH2_CORRIDOR", "T3", None, None),
+            ("T3", "CH2_CORRIDOR", None, "door_t3"),
+        )
+        for source, target, rift, door in cases:
+            with self.subTest(source=source, target=target):
+                spawn = manager.get_spawn_layout(target, rift)
+                if door:
+                    spawn.update(manager.get_object_entry_spawn(target, door))
+                expected = self.game_ui.scale_rect(self.screen, spawn).center
+                manager.place_player(player, source, self.screen)
+                player.set_mouse_target((10, 10))
+                keys = {pygame.K_w}
+                self.interaction.pending_entry_rift = rift
+                self.interaction.pending_entry_object = door
+                with patch.object(manager, "place_player", wraps=manager.place_player) as placement:
+                    self.assertTrue(place(target, source, manager, player, self.screen, self.interaction, keys))
+                    self.assertEqual(player.rect.center, expected)
+                    self.assertFalse(keys)
+                    self.assertIsNone(player.mouse_target)
+                    self.assertIsNone(self.interaction.pending_entry_rift)
+                    self.assertIsNone(self.interaction.pending_entry_object)
+                    self.assertFalse(place(target, target, manager, player, self.screen, self.interaction, keys))
+                    placement.assert_called_once_with(player, target, self.screen, rift, door)
+
+    def test_dialogue_background_can_hide_player_without_hiding_space(self):
+        player = Mock()
+        game_ui = Mock()
+        self.game.enter_space("T0")
+        draw = home_function("draw_dialogue_background", {
+            "game": self.game, "game_ui": game_ui, "player": player,
+            "dialogue_controller": types.SimpleNamespace(dialogue_id="scene_10_entry"),
+        })
+        draw(self.screen, (0, 0), draw_player=False)
+        game_ui.draw_space.assert_called_once_with(self.screen, self.game, (0, 0))
+        player.draw.assert_not_called()
+        draw(self.screen, (0, 0))
+        player.draw.assert_called_once_with(self.screen)
 
     def test_data_references_and_pending_runtime_exclusion(self):
         represented = set()

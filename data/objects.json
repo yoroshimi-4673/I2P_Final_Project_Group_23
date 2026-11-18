@@ -180,14 +180,14 @@
         "item": "t0_diary_page_2",
         "empty_text": "枕頭下面已經沒有其他東西。"
     },
-    "t0_curtain": {
-        "name": "窗簾",
+    "t0_windowsill": {
+        "name": "窗台",
         "type": "searchable",
         "space": "T0",
-        "description": "窗簾的夾層裡似乎塞著一張紙。",
-        "search_prompt": "要檢查窗簾夾層嗎？",
+        "description": "窗台上似乎放著一張紙。",
+        "search_prompt": "要檢查窗台嗎？",
         "item": "t0_diary_page_5",
-        "empty_text": "窗簾夾層已經空了。"
+        "empty_text": "窗台上已經沒有其他東西。"
     },
     "t0_bedside_drawer": {
         "name": "床頭抽屜",
@@ -232,6 +232,7 @@
         "name": "鉛筆",
         "type": "item",
         "description": "一支普通的鉛筆，可以用來進行拓印。",
+        "ui_asset": "assets/素材庫/第二章/T+0/pencil.png",
         "collectable": true
     },
     "rubbing_paper": {
@@ -244,6 +245,7 @@
         "name": "碎片（現在）",
         "type": "item",
         "description": "金屬碎片上刻著：「……現在，只能被選擇……」",
+        "ui_asset": "assets/素材庫/第二章/T+0/piece.png",
         "collectable": true
     },
     "t0_exit_door": {
