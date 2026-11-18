@@ -358,6 +358,10 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertTrue(g.has_event("space_d_unlocked"))
         self.assertEqual(g.current_space, "CH2_CORRIDOR")
         self.assertEqual(g.current_scene, "scene_13_anchor_terminal")
+        self.assertEqual(g.game_state, SPACE)
+        self.assertFalse(self.ui.is_open())
+        manager = MapManager(self.layout, self.game_ui, g)
+        self.assertIn("door_d", manager.get_interaction_rects("CH2_CORRIDOR", self.screen))
 
     def test_capsule_and_age_failure_paths(self):
         self.game.enter_space("T3")

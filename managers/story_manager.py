@@ -638,6 +638,12 @@ class StoryManager:
         )
 
 
+    def start_scene_14(self):
+        """從 D 門進入純對話場景。"""
+        self.game.current_scene = "scene_14"
+        self.game.current_space = None
+        self.start_dialogue("scene_14", after_action="finish_chapter2")
+
     def inspect_time_door(
         self,
         target_space
@@ -745,8 +751,11 @@ class StoryManager:
                 self.game
             )
 
-        elif action == "show_chapter_end":
-
+        elif action == "finish_chapter2":
+            self.game.complete_chapter(2)
+            self.game.complete_event("chapter_2_completed")
+            self.game.current_scene = "chapter_2_end"
+            self.game.current_space = None
             self.game.game_state = SUCCESS
 
         elif action == "start_chapter2":

@@ -484,6 +484,10 @@ def draw_dialogue_background(
         dialogue_controller.dialogue_id
     )
 
+    if dialogue_id == "scene_14":
+        surface.fill((12, 22, 48))
+        return
+
     # 第一章開場仍保留原本特殊背景
     if dialogue_id == "intro":
 
@@ -1286,124 +1290,6 @@ def draw_game_over(
 
 
 # ============================================================
-# Chapter Ending UI
-# ============================================================
-
-def draw_chapter_end(
-    mouse_pos
-):
-    """繪製第一章結束畫面。"""
-
-    screen.fill(
-        (25, 25, 32)
-    )
-
-    width, height = (
-        screen.get_size()
-    )
-
-    title = game_ui.font_title.render(
-        "Chapter 1",
-        True,
-        (245, 245, 245)
-    )
-
-    screen.blit(
-        title,
-        title.get_rect(
-            center=(
-                width // 2,
-                height // 2 - 120
-            )
-        )
-    )
-
-    end_surface = (
-        game_ui.font_large.render(
-            "— END —",
-            True,
-            (220, 220, 225)
-        )
-    )
-
-    screen.blit(
-        end_surface,
-        end_surface.get_rect(
-            center=(
-                width // 2,
-                height // 2 - 70
-            )
-        )
-    )
-
-    quote_lines = [
-        "「你只解開了一把鎖。",
-        "但你還沒解開自己。」"
-    ]
-
-    y = (
-        height // 2
-    )
-
-    for line in quote_lines:
-
-        surface = (
-            game_ui.font_ui.render(
-                line,
-                True,
-                (230, 230, 235)
-            )
-        )
-
-        screen.blit(
-            surface,
-            surface.get_rect(
-                center=(
-                    width // 2,
-                    y
-                )
-            )
-        )
-
-        y += 32
-
-    buttons = {
-        "settings": pygame.Rect(
-            width // 2 - 175,
-            height // 2 + 100,
-            150,
-            42
-        ),
-
-        "menu": pygame.Rect(
-            width // 2 + 25,
-            height // 2 + 100,
-            150,
-            42
-        )
-    }
-
-    game_ui.draw_button(
-        screen,
-        "設定",
-        buttons["settings"],
-        buttons["settings"].collidepoint(
-            mouse_pos
-        )
-    )
-
-    game_ui.draw_button(
-        screen,
-        "回到主選單",
-        buttons["menu"],
-        buttons["menu"].collidepoint(
-            mouse_pos
-        )
-    )
-
-    return buttons
-
-# ============================================================
 # Interaction Keyboard
 # ============================================================
 
@@ -2116,13 +2002,8 @@ while running:
                 game_ui.font_ui
             )
 
-            settings_button_rect = (
-                game_ui
-                .draw_settings_button(
-                    screen,
-                    mouse_pos
-                )
-            )
+            if dialogue_controller.dialogue_id != "scene_14":
+                settings_button_rect = game_ui.draw_settings_button(screen, mouse_pos)
 
 
         # ----------------------------------------------------
@@ -2347,11 +2228,7 @@ while running:
 
         elif game.game_state == SUCCESS:
 
-            ending_buttons = (
-                draw_chapter_end(
-                    mouse_pos
-                )
-            )
+            ending_buttons = game_ui.draw_success_end(screen, mouse_pos)
 
 
         # ====================================================

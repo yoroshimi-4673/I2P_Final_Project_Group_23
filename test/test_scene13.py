@@ -57,8 +57,9 @@ class Scene13Tests(unittest.TestCase):
         self.assertEqual(after["interaction_rects"]["ch2_terminal"], pygame.Rect(250, 170, 300, 260))
         asset = f.layout["spaces"]["CH2_CORRIDOR"]["objects"]["ch2_terminal"]["asset"]
         self.assertIsNotNone(f.game_ui.load_image(asset))
-        self.assertIn("door_d", f.layout["spaces"]["CH2_CORRIDOR"]["pending_objects"])
+        self.assertIn("door_d", f.layout["spaces"]["CH2_CORRIDOR"]["objects"])
         self.assertNotIn("door_d", after["object_rects"])
+        self.assertNotIn("door_d", after["interaction_rects"])
         f.game.enter_space("T3")
         f.story.return_to_chapter2_corridor()
         self.assertNotEqual(f.game.game_state, DIALOGUE)

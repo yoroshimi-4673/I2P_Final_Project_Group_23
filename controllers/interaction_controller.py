@@ -1328,6 +1328,11 @@ class InteractionController:
                         result
                     )
 
+                elif result.get("status") == "scene_transition" and result.get("target_scene") == "scene_14":
+                    self.interaction_ui.close()
+                    self.reset_interaction_focus()
+                    self.story_manager.start_scene_14()
+
             elif (
                 "cancel" in buttons
                 and buttons[
