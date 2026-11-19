@@ -31,7 +31,7 @@ def draw_dashed_line(surface, color, start_pos, end_pos, width=2, dash_length=12
     dx = x2 - x1
     dy = y2 - y1
     distance = math.hypot(dx, dy)
-    
+
     if distance == 0:
         return
 
@@ -43,7 +43,7 @@ def draw_dashed_line(surface, color, start_pos, end_pos, width=2, dash_length=12
         start_dash = (x1 + ux * current_dist, y1 + uy * current_dist)
         end_dash_dist = min(current_dist + dash_length, distance)
         end_dash = (x1 + ux * end_dash_dist, y1 + uy * end_dash_dist)
-        
+
         pygame.draw.line(surface, color, start_dash, end_dash, width)
         current_dist += dash_length + space_length
 
@@ -54,7 +54,7 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
-        
+
         # 偵測滑鼠左鍵點擊
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             target_pos[0] = event.pos[0] - square_size / 2
