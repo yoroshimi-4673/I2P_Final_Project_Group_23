@@ -3,13 +3,13 @@ import copy
 import os
 from pathlib import Path
 import unittest
-from unittest.mock import Mock
+from unittest.mock import patch
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
-import test_chapter2_flow as flow
+from test import test_chapter2_flow as flow
 from controllers.hotbar_controller import HotbarController
 from managers.map_manager import MapManager
 from player import Player
@@ -41,6 +41,16 @@ class DiaryDragTests(unittest.TestCase):
         return self.f.ui.draw(self.screen, (0, 0))
 
     def drag(self, item, slot=None):
+        if slot is not None:
+            puzzle = self.f.puzzle
+            target_index = next(
+                index for index, spread in enumerate(puzzle.diary_spreads)
+                if spread["slot_id"] == slot
+            )
+            while puzzle.diary_spread_index < target_index:
+                self.f.click("diary_next_page")
+            while puzzle.diary_spread_index > target_index:
+                self.f.click("diary_prev_page")
         buttons = self.f.ui.draw(self.screen, (0, 0))
         rect = buttons["_drag_rects"][item]
         self.f.interaction.handle_click(buttons, rect.center)
@@ -71,7 +81,7 @@ class DiaryDragTests(unittest.TestCase):
         self.drag(self.pages[1], "page_4")
         self.assertEqual(self.f.puzzle.diary_slots["page_4"], self.pages[1])
         buttons = self.f.ui.draw(self.screen, (0, 0))
-        self.assertEqual(buttons["_drag_rects"][self.pages[0]].topleft, (155, 410))
+        self.assertEqual(buttons["_drag_rects"][self.pages[0]].topleft, (180, 405))
         self.drag(self.pages[1])
         self.assertTrue(all(value is None for value in self.f.puzzle.diary_slots.values()))
         self.drag(self.pages[0], "page_2")
@@ -87,6 +97,55 @@ class DiaryDragTests(unittest.TestCase):
             self.f.interaction.finish_diary_drag(buttons, target)
             self.assertEqual(self.f.puzzle.diary_slots["page_2"], self.pages[0])
             self.f.puzzle.reset_diary_drag_state()
+
+    def test_spread_config_and_navigation_bounds(self):
+        puzzle = self.f.puzzle
+        self.assertEqual(
+            [(Path(s["background_asset"]).name, s["slot_id"], s["side"])
+             for s in puzzle.diary_spreads],
+            [("1.png", "page_2", "right"), ("3.png", "page_4", "right"),
+             ("empty_diary.png", "page_5", "left")],
+        )
+        self.assertEqual(puzzle.diary_spread_index, 0)
+        for expected in (1, 2, 2):
+            puzzle.next_diary_spread()
+            self.assertEqual(puzzle.diary_spread_index, expected)
+        for expected in (1, 0, 0):
+            puzzle.previous_diary_spread()
+            self.assertEqual(puzzle.diary_spread_index, expected)
+
+    def test_keyboard_navigation_and_reset_clear_all_drag_state(self):
+        self.open_diary()
+        self.drag(self.pages[0], "page_2")
+        puzzle = self.f.puzzle
+        for key, expected in ((pygame.K_RIGHT, 1), (pygame.K_LEFT, 0), (pygame.K_RIGHT, 1)):
+            self.f.interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=key))
+            self.assertEqual(puzzle.diary_spread_index, expected)
+
+        buttons = self.f.ui.draw(self.screen, (0, 0))
+        rect = buttons["_drag_rects"][self.pages[1]]
+        self.f.interaction.start_diary_drag(self.pages[1], rect, rect.center)
+        self.assertTrue(puzzle.diary_page_positions)
+        self.assertNotEqual(puzzle.diary_drag_offset, (0, 0))
+        self.f.click("reset")
+        self.assertEqual(puzzle.diary_spread_index, 0)
+        self.assertIsNone(puzzle.diary_dragging_page)
+        self.assertEqual(puzzle.diary_drag_offset, (0, 0))
+        self.assertEqual(puzzle.diary_page_positions, {})
+        self.assertTrue(all(value is None for value in puzzle.diary_slots.values()))
+
+    def test_inventory_draws_the_shared_diary_assets(self):
+        game_ui = self.f.game_ui
+        for number in (2, 4, 5):
+            item = f"t0_diary_page_{number}"
+            with self.subTest(item=item):
+                asset = self.f.objects[item]["ui_asset"]
+                self.assertTrue(asset.endswith(f"/日記内容/{number}.png"))
+                with patch.object(game_ui, "load_image", wraps=game_ui.load_image) as load:
+                    self.assertTrue(game_ui.draw_item_asset(
+                        self.screen, item, pygame.Rect(0, 0, 80, 80)
+                    ))
+                    load.assert_called_once_with(asset)
 
     def test_escape_cancel_preserves_confirm_exit_clears_and_reopen_clean(self):
         self.open_diary()

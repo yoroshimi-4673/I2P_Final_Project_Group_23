@@ -8,6 +8,13 @@ ANCHOR_FRAGMENT_TARGETS = {
 }
 
 
+DIARY_PAGE_IDS = (
+    "t0_diary_page_2",
+    "t0_diary_page_4",
+    "t0_diary_page_5",
+)
+
+
 class PuzzleController:
     """管理目前Puzzle的輸入與暫時UI狀態。"""
 
@@ -531,9 +538,59 @@ class PuzzleController:
         }
 
 
+    @property
+    def diary_spreads(self):
+        config = self.puzzle_manager.get_puzzle("t0_diary_restore") or {}
+        return config.get("spreads", [])
+
+    def previous_diary_spread(self):
+        self.diary_spread_index = max(0, self.diary_spread_index - 1)
+
+    def next_diary_spread(self):
+        last_index = max(0, len(self.diary_spreads) - 1)
+        self.diary_spread_index = min(last_index, self.diary_spread_index + 1)
+
+    def start_diary_drag(self, page_id, page_position, mouse_pos):
+        if page_id not in self.get_available_diary_pages():
+            return
+
+        self.remove_diary_page_from_slot(page_id)
+        self.diary_dragging_page = page_id
+        self.diary_drag_offset = (
+            page_position[0] - mouse_pos[0],
+            page_position[1] - mouse_pos[1]
+        )
+        self.diary_page_positions[page_id] = page_position
+
+    def update_diary_drag(self, mouse_pos):
+        page_id = self.diary_dragging_page
+        if page_id is None:
+            return
+
+        offset_x, offset_y = self.diary_drag_offset
+        self.diary_page_positions[page_id] = (
+            mouse_pos[0] + offset_x,
+            mouse_pos[1] + offset_y
+        )
+
+    def finish_diary_drag(self, slot_id):
+        page_id = self.diary_dragging_page
+        if page_id is None:
+            return
+
+        if slot_id is not None:
+            old_page = self.set_diary_slot(slot_id, page_id)
+            if old_page is not None:
+                self.diary_page_positions.pop(old_page, None)
+
+        self.diary_page_positions.pop(page_id, None)
+        self.diary_dragging_page = None
+        self.diary_drag_offset = (0, 0)
+
     def reset_diary_drag_state(self):
         """清除本次尚未完成的日記排列。"""
 
+        self.diary_spread_index = 0
         self.diary_slots = {
             "page_2": None,
             "page_4": None,
@@ -548,27 +605,17 @@ class PuzzleController:
 
         self.diary_page_positions = {}
 
-        self.diary_exit_confirmation = (
-            False
-        )
-
+    def discard_diary_drag(self):
+        game = self.puzzle_manager.game
+        if not game.is_puzzle_solved("t0_diary_restore"):
+            for page_id in DIARY_PAGE_IDS:
+                if game.has_discovered_item(page_id) and not game.has_item(page_id):
+                    game.add_item(page_id)
+        self.reset_diary_drag_state()
 
     def get_available_diary_pages(self):
-        """取得目前背包中可以拖曳的日記散頁。"""
-
-        page_ids = (
-            "t0_diary_page_2",
-            "t0_diary_page_4",
-            "t0_diary_page_5"
-        )
-
-        return [
-            page_id
-            for page_id in page_ids
-            if self.puzzle_manager.game.has_item(
-                page_id
-            )
-        ]
+        game = self.puzzle_manager.game
+        return [page_id for page_id in DIARY_PAGE_IDS if game.has_item(page_id)]
 
 
     def get_diary_submission(self):
