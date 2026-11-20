@@ -50,6 +50,18 @@ class CodexController:
         return result
 
 
+    def _complete_codex_step(self, event_name):
+        """進入第 4 步教學後，依序推進圖鑑內各階段提示。"""
+
+        game = getattr(self.codex_ui, "game", None)
+        if (
+            game is not None
+            and game.has_event("tutorial_hotbar_done")
+            and not game.has_event(event_name)
+        ):
+            game.complete_event(event_name)
+
+
     def handle_key(self, event):
         """處理Codex鍵盤輸入。"""
 
@@ -57,6 +69,10 @@ class CodexController:
 
         if event.key != pygame.K_ESCAPE:
             return None
+
+        game = getattr(self.codex_ui, "game", None)
+        if game is not None and game.has_event("tutorial_codex_inspect_done"):
+            self._complete_codex_step("tutorial_codex_done")
 
         # Item Modal開啟時Esc只關閉Item
         if self.codex_ui.selected_item is not None:
@@ -99,6 +115,7 @@ class CodexController:
                 )
             ):
                 self.codex_ui.close_item()
+                self._complete_codex_step("tutorial_codex_done")
 
             return None
 
@@ -136,6 +153,9 @@ class CodexController:
                 mouse_pos
             )
         ):
+            game = getattr(self.codex_ui, "game", None)
+            if game is not None and game.has_event("tutorial_codex_inspect_done"):
+                self._complete_codex_step("tutorial_codex_done")
             return "close_codex"
 
         for (
@@ -154,6 +174,7 @@ class CodexController:
                 self.codex_ui.select_item(
                     item_id
                 )
+                self._complete_codex_step("tutorial_codex_inspect_done")
 
                 break
 

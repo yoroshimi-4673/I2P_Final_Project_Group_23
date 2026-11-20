@@ -998,6 +998,9 @@ ui_screen = UI_MENU  # 記錄目前主要顯示的UI頁面
 
 ui_overlay = None  # 記錄Settings等覆蓋式介面
 
+tutorial_guide_open = False  # 記錄是否開啟新手教學總覽視窗
+tutorial_guide_buttons = {}
+
 # ============================================================
 # Game Flow
 # ============================================================
@@ -1672,6 +1675,11 @@ while running:
 
             if ui_overlay == "settings":
 
+                if tutorial_guide_open:
+                    if event.key == pygame.K_ESCAPE:
+                        tutorial_guide_open = False
+                    continue
+
                 result = (
                     settings_controller.handle_key(
                         event
@@ -2118,7 +2126,17 @@ while running:
                         screen_height,
                         walkable_polygon
                     )
-
+                    # 偵測玩家移動（鍵盤 WASD 或滑鼠點擊移動），完成階段 1 教學
+                    keys = pygame.key.get_pressed()
+                    is_moving = (
+                        keys[pygame.K_w]
+                        or keys[pygame.K_a]
+                        or keys[pygame.K_s]
+                        or keys[pygame.K_d]
+                        or getattr(player, "mouse_target", None) is not None
+                    )
+                    if not game.has_event("tutorial_move_done") and is_moving:
+                        game.complete_event("tutorial_move_done")
             # 其他介面開啟時立即停止持續移動
             else:
 
@@ -2282,6 +2300,14 @@ while running:
             )
         )
 
+        if tutorial_guide_open:
+            tutorial_guide_buttons = (
+                game_ui.draw_tutorial_guide_overlay(
+                    screen,
+                    mouse_pos
+                )
+            )
+
 
     # ========================================================
     # Mouse Click
@@ -2294,6 +2320,19 @@ while running:
         # ----------------------------------------------------
 
         if ui_overlay == "settings":
+
+            if tutorial_guide_open:
+                close_rect = tutorial_guide_buttons.get("close")
+                if close_rect and close_rect.collidepoint(mouse_pos):
+                    tutorial_guide_open = False
+                continue
+
+            if (
+                settings_buttons.get("tutorial")
+                and settings_buttons["tutorial"].collidepoint(mouse_pos)
+            ):
+                tutorial_guide_open = True
+                continue
 
             result = (
                 settings_controller.handle_click(
