@@ -9,7 +9,7 @@ import pygame
 from player import Player
 
 ROOT = Path(__file__).resolve().parent.parent
-SPRITE = ROOT / "assets" / "素材庫" / "角色" / "main_player.png"
+SPRITE = ROOT / "assets" / "素材庫" / "角色" / "main_character.png"
 
 
 class PlayerAnimationTests(unittest.TestCase):

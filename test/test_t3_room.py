@@ -197,7 +197,10 @@ class T3RoomTests(unittest.TestCase):
                 image = gui.load_image(layout["asset"])
                 expected = gui.scale_image_to_fit(image, target).get_rect(center=target.center)
                 self.assertEqual(runtime["collision_rects"][object_id + "_body"], expected)
-            self.assertEqual(room["objects"]["t3_windowsill"]["x"], 286)
+            self.assertEqual(
+                runtime["interaction_rects"]["t3_windowsill"],
+                gui.scale_rect(surface, room["objects"]["t3_windowsill"]),
+            )
             gui.draw_space(surface, self.f.game, (0, 0))
         npc = room["decorations"]["young_li_nian"]
         self.assertEqual((npc["x"], npc["y"], npc["width"], npc["height"]), (120, 215, 55, 75))
