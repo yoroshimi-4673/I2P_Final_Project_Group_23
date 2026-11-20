@@ -28,6 +28,7 @@ class CodexUI:
 
         self.dragging_scrollbar = False
 
+        self.game = None
 
     # ========================================================
     # Data
@@ -907,6 +908,8 @@ class CodexUI:
         )
 
 
+        self.game = game
+
         # ====================================================
         # Item Modal
         # ====================================================
@@ -922,6 +925,17 @@ class CodexUI:
                     mouse_pos
                 )
             )
+
+        # ====================================================
+        # 圖鑑內三階段操作提示
+        # ====================================================
+
+        self.draw_tutorial_hint(
+            screen,
+            game,
+            content_x,
+            height
+        )
 
 
         return {
@@ -943,6 +957,75 @@ class CodexUI:
                 modal_buttons
             )
         }
+
+
+    def draw_tutorial_hint(
+        self,
+        screen,
+        game,
+        content_x,
+        height
+    ):
+        """完成道具欄教學後，在圖鑑內顯示三階段連貫操作提示。"""
+
+        if (
+            game is None
+            or not game.has_event("tutorial_hotbar_done")
+            or game.has_event("tutorial_codex_done")
+        ):
+            return
+
+        if not game.has_event("tutorial_codex_inspect_done"):
+            lines = [
+                "【圖鑑操作 1/2】",
+                "點擊任一張物品卡片查看詳細資訊"
+            ]
+        else:
+            lines = [
+                "【圖鑑操作 2/2】",
+                "按 ESC 鍵（或點擊關閉／返回）結束導覽"
+            ]
+
+        box_rect = pygame.Rect(
+            content_x,
+            height - 62,
+            365,
+            52
+        )
+
+        panel = pygame.Surface(
+            box_rect.size,
+            pygame.SRCALPHA
+        )
+        panel.fill((18, 22, 30, 225))
+        screen.blit(panel, box_rect.topleft)
+
+        pygame.draw.rect(
+            screen,
+            (140, 175, 220),
+            box_rect,
+            width=2,
+            border_radius=8
+        )
+
+        for idx, line in enumerate(lines):
+            color = (
+                (255, 225, 130)
+                if idx == 0
+                else (240, 244, 250)
+            )
+            text_surf = self.game_ui.font_small.render(
+                line,
+                True,
+                color
+            )
+            screen.blit(
+                text_surf,
+                (
+                    box_rect.x + 12,
+                    box_rect.y + 7 + idx * 21
+                )
+            )
 
 
     # ========================================================

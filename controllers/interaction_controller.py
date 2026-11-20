@@ -33,6 +33,8 @@ class InteractionController:
         self,
         object_id
     ):
+        if not self.game.has_event("tutorial_interact_done"):
+            self.game.complete_event("tutorial_interact_done")
         """開啟世界中的指定互動物件。"""
 
         current_object = (

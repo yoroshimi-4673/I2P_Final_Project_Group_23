@@ -1404,6 +1404,12 @@
             "y": 75,
             "width": 220,
             "height": 90
+        },
+        "tutorial_box": {
+            "x": 530,
+            "y": 58,
+            "width": 250,
+            "height": 76
         }
     },
     "hotbar": {
