@@ -712,6 +712,8 @@ class InteractionUI:
             "exit_confirmation": self.draw_exit_confirmation,
             "diary_drag": self.draw_diary_drag,
             "diary_exit_confirmation": self.draw_diary_exit_confirmation,
+            "circuit": self.draw_circuit,
+            "circuit_exit_confirmation": self.draw_circuit_exit_confirmation,
             "diary_reader": self.draw_diary_reader,
             "anchor_fragments": self.draw_anchor_fragments,
             "multi_input": self.draw_multi_input,
@@ -2349,6 +2351,93 @@ class InteractionUI:
 
         return buttons
 
+
+    def get_circuit_asset_spec(self, tile_type, rotation, powered):
+        """回傳素材名稱與素材應旋轉的角度。"""
+        if tile_type == "corner":
+            name, angle = (("left", 180), ("right", 0), ("left", 0), ("right", 180))[rotation]
+        elif tile_type == "T":
+            name, angle = "T", (180, 90, 0, -90)[rotation]
+        elif tile_type == "straight":
+            name, angle = "straight", -90 * (rotation % 2)
+        else:
+            name, angle = ("+" if tile_type == "cross" else tile_type), 0
+        prefix = "activated" if powered or tile_type == "start" else "unactivated"
+        return f"{prefix}_{name}.png", angle
+
+    def draw_circuit(self, screen, mouse_pos):
+        layout = self.game_ui.ui_layout["puzzle_layouts"]["t7_circuit"]
+        background = layout["background_asset"]
+        source = layout["source_size"]
+        grid = layout["grid"]
+        controls = {
+            key: self.game_ui.scale_rect(screen, rect)
+            for key, rect in layout["controls"].items()
+        }
+        margin = self.game_ui.scale_x(screen, layout["screen_margin"])
+        available_width = max(1, screen.get_width() - 2 * margin)
+        available_height = max(1, min(rect.top for rect in controls.values()) - 2 * margin)
+        image = self.game_ui.load_image(background)
+        target = pygame.Rect(0, 0, available_width, available_height)
+        back_rect = self.game_ui.get_fitted_image_rect(image, target) if image is not None else target
+        back_rect.midtop = (screen.get_width() // 2, margin)
+        if image is not None:
+            screen.blit(pygame.transform.smoothscale(image, back_rect.size), back_rect)
+
+        scale_x = back_rect.width / source["width"]
+        scale_y = back_rect.height / source["height"]
+        folder = background.rsplit("/", 1)[0]
+        tile_rects = {}
+        for position, tile in self.puzzle_controller.circuit_tiles.items():
+            row, col = position
+            x = grid["x"] + col * grid["tile_width"]
+            y = grid["y"] + row * grid["tile_height"]
+            left, top = round(x * scale_x), round(y * scale_y)
+            right = round((x + grid["tile_width"]) * scale_x)
+            bottom = round((y + grid["tile_height"]) * scale_y)
+            rect = pygame.Rect(back_rect.x + left, back_rect.y + top, right - left, bottom - top)
+            tile_rects[position] = rect
+            filename, angle = self.get_circuit_asset_spec(
+                tile["type"], tile["rotation"], position in self.puzzle_controller.circuit_powered_tiles
+            )
+            image = self.game_ui.load_image(f"{folder}/{filename}")
+            if image is not None and rect.width > 0 and rect.height > 0:
+                if angle:
+                    image = pygame.transform.rotate(image, angle)
+                screen.blit(pygame.transform.smoothscale(image, rect.size), rect)
+
+        for key, label in (("reset", "重設"), ("leave", "離開")):
+            rect = controls[key]
+            self.game_ui.draw_button(screen, label, rect, rect.collidepoint(mouse_pos))
+        hint = layout["hint"]
+        self.draw_multiline_text(
+            screen, "滑鼠左鍵：旋轉電線　R：重設　Esc：離開",
+            self.game_ui.scale_x(screen, hint["x"]),
+            self.game_ui.scale_y(screen, hint["y"]),
+            self.game_ui.scale_x(screen, hint["width"]),
+            font=self.game_ui.font_small,
+        )
+        return {"_tiles": tile_rects, **controls}
+
+    def open_circuit_exit_confirmation(self):
+        self.mode = "circuit_exit_confirmation"
+
+    def draw_circuit_exit_confirmation(self, screen, mouse_pos):
+        self.draw_circuit(screen, mouse_pos)
+        modal = self.draw_modal_base(screen, width=560, height=240)
+        self.draw_multiline_text(
+            screen, "要放棄修理並離開 T+7 空間嗎？\n目前的電路進度將不會保留。",
+            modal.x + 40, modal.y + 45, modal.width - 80, font=self.game_ui.font_ui,
+        )
+        width = min(160, (modal.width - 60) // 2)
+        buttons = {
+            "continue": pygame.Rect(modal.centerx - width - 10, modal.bottom - 65, width, 40),
+            "leave": pygame.Rect(modal.centerx + 10, modal.bottom - 65, width, 40),
+        }
+        for key, label in (("continue", "繼續修理"), ("leave", "離開 T+7")):
+            rect = buttons[key]
+            self.game_ui.draw_button(screen, label, rect, rect.collidepoint(mouse_pos))
+        return buttons
 
     def open_diary_exit_confirmation(
         self

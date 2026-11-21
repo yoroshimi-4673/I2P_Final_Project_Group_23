@@ -305,6 +305,20 @@ class InteractionController:
 
         self.reset_interaction_focus()
 
+    def open_t7_circuit(self):
+        """開啟 T+7 修電謎題並初始化盤面。"""
+        result = self.puzzle_controller.open_puzzle("t7_circuit")
+        self.interaction_ui.current_object_id = None
+        self.interaction_ui.result = result
+        self.interaction_ui.mode = "circuit" if result["status"] == "input_required" else "message"
+        self.reset_interaction_focus()
+        return result
+
+    def leave_t7_circuit(self):
+        self.interaction_ui.close()
+        self.pending_entry_object = self.story_manager.return_to_chapter2_corridor()
+        self.reset_interaction_focus()
+
     def open_anchor_age_verification(self):
         """共用自動開啟與重新查看年齡謎題入口。"""
 
@@ -770,6 +784,19 @@ class InteractionController:
         if not self.interaction_ui.is_open():
             return
 
+        if self.interaction_ui.mode == "circuit":
+            if event.key == pygame.K_r:
+                self.puzzle_controller.reset_circuit_state()
+                return
+            if event.key == pygame.K_ESCAPE:
+                self.interaction_ui.open_circuit_exit_confirmation()
+                self.reset_interaction_focus()
+                return
+        elif self.interaction_ui.mode == "circuit_exit_confirmation" and event.key == pygame.K_ESCAPE:
+            self.interaction_ui.mode = "circuit"
+            self.reset_interaction_focus()
+            return
+
         if self.interaction_ui.mode == "multi_input" and (self.puzzle_controller.last_result or {}).get("status") == "final_failure_pending":
             if event.key == pygame.K_RETURN:
                 self.acknowledge_anchor_final_failure()
@@ -890,6 +917,34 @@ class InteractionController:
             return
 
         mode = self.interaction_ui.mode
+
+        if mode == "circuit":
+            reset = buttons.get("reset")
+            leave = buttons.get("leave")
+            if reset is not None and reset.collidepoint(mouse_pos):
+                self.puzzle_controller.reset_circuit_state()
+            elif leave is not None and leave.collidepoint(mouse_pos):
+                self.interaction_ui.open_circuit_exit_confirmation()
+                self.reset_interaction_focus()
+            else:
+                for position, rect in buttons.get("_tiles", {}).items():
+                    if rect.collidepoint(mouse_pos):
+                        result = self.puzzle_controller.rotate_circuit_tile(*position)
+                        if result["status"] == "correct":
+                            self.interaction_ui.result = result
+                            self.handle_puzzle_completion(result["on_complete"])
+                        break
+            return
+
+        if mode == "circuit_exit_confirmation":
+            continue_button = buttons.get("continue")
+            leave = buttons.get("leave")
+            if continue_button is not None and continue_button.collidepoint(mouse_pos):
+                self.interaction_ui.mode = "circuit"
+                self.reset_interaction_focus()
+            elif leave is not None and leave.collidepoint(mouse_pos):
+                self.leave_t7_circuit()
+            return
 
         # ========================================================
         # Container

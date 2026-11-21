@@ -474,6 +474,13 @@ def place_player_on_space_change(
     return True
 
 
+def draw_t7_power_outage_overlay(surface):
+    if game.current_space == "T7" and not game.has_event("t7_circuit_completed"):
+        overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 204))
+        surface.blit(overlay, (0, 0))
+
+
 def draw_dialogue_background(
     surface,
     mouse_pos,
@@ -529,6 +536,7 @@ def draw_dialogue_background(
         if draw_player:
             player.draw(surface)
 
+        draw_t7_power_outage_overlay(surface)
         return
 
     # 沒有Space資料時才使用第一章307備援
@@ -1007,9 +1015,16 @@ tutorial_guide_buttons = {}
 # ============================================================
 
 def finish_dialogue_and_open_ready_puzzle():
-    """對話結束後依準備事件開啟年齡介面。"""
+    """對話結束後開啟已準備好的謎題介面。"""
 
-    story_manager.finish_dialogue_action()
+    action = story_manager.finish_dialogue_action()
+    if (
+        action == "open_t7_circuit"
+        and game.current_space == "T7"
+        and game.game_state == SPACE
+        and not game.has_event("t7_circuit_completed")
+    ):
+        interaction_controller.open_t7_circuit()
     if (
         game.game_state == SPACE
         and game.current_space == "CH2_CORRIDOR"
@@ -2184,10 +2199,11 @@ while running:
                 if DEBUG_COLLISION:
                     pygame.draw.rect(screen, (0, 220, 255), player.get_collision_rect(), 2)  # 顯示實際與家具碰撞的腳部
 
-                # 找出目前E鍵會作用的最近互動物件
-                if ui_overlay is None and not interaction_ui.is_open():
-                    nearby_target = get_nearest_interaction_target(object_rects, interaction_rects)
-                    draw_interaction_prompt(screen, nearby_target)
+            draw_t7_power_outage_overlay(screen)
+
+            if not hide_player_this_frame and ui_overlay is None and not interaction_ui.is_open():
+                nearby_target = get_nearest_interaction_target(object_rects, interaction_rects)
+                draw_interaction_prompt(screen, nearby_target)
 
             settings_button_rect = (
                 game_ui
@@ -2228,15 +2244,15 @@ while running:
             if not hide_player_this_frame:
                 player.draw(screen)  # 謎題開啟時保留角色所在位置
 
-            hotbar_data = (
-                game_ui.draw_hotbar(
+            draw_t7_power_outage_overlay(screen)
+            if interaction_ui.mode not in ("circuit", "circuit_exit_confirmation"):
+                hotbar_data = game_ui.draw_hotbar(
                     screen,
                     game,
                     hotbar_controller.selected_slot,
                     hotbar_controller.offset,
                     mouse_pos
                 )
-            )
 
 
         # ----------------------------------------------------
@@ -2785,6 +2801,7 @@ while running:
         ui_screen == UI_GAME
         and game.current_space is not None
         and game.game_state in (SPACE, PASSWORD, DIALOGUE)
+        and interaction_ui.mode not in ("circuit", "circuit_exit_confirmation")
     ):
         game_ui.draw_space_hud(screen, game)
 

@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import types
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, mock_open, patch
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -21,6 +21,7 @@ from managers.map_manager import MapManager
 from managers.puzzle_manager import PuzzleManager
 from managers.story_manager import StoryManager
 from player import Player
+import save_manager
 from ui.game_ui import GameUI
 from ui.interaction_ui import InteractionUI
 
@@ -83,6 +84,97 @@ class Chapter2FlowTests(unittest.TestCase):
     def expect_dialogue(self, name):
         self.assertEqual(self.game.game_state, DIALOGUE)
         self.assertEqual(self.dialogue.start.call_args.args[0], name)
+
+    def click_circuit_tile(self, position):
+        buttons = self.ui.draw(self.screen, (0, 0))
+        self.interaction.handle_click(buttons, buttons["_tiles"][position].center)
+
+    def solve_circuit(self):
+        rotations = {
+            (4, 1): 3, (3, 1): 1, (3, 3): 3, (2, 3): 2,
+            (1, 1): 1, (1, 3): 1, (1, 5): 1, (1, 6): 2,
+            (2, 6): 3, (2, 5): 1, (3, 5): 0, (4, 6): 0,
+            (4, 8): 3, (3, 8): 1, (3, 9): 3, (2, 9): 0,
+            (1, 8): 0, (0, 8): 1,
+        }
+        for position, expected in rotations.items():
+            current = self.puzzle.circuit_tiles[position]["rotation"]
+            for _ in range((expected - current) % 4):
+                self.click_circuit_tile(position)
+
+    def test_t7_circuit_draw_reset_exit_and_reentry(self):
+        self.game.complete_event("t7_unlocked")
+        self.assertTrue(self.story.enter_t7())
+        self.expect_dialogue("scene_11_circuit_intro")
+        self.finish()
+        self.assertEqual((self.puzzle.current_puzzle_id, self.ui.mode), ("t7_circuit", "circuit"))
+        buttons = self.ui.draw(self.screen, (0, 0))
+        self.assertEqual(len(buttons["_tiles"]), 28)
+        self.assertEqual(buttons["_tiles"][(4, 0)], pygame.Rect(75, 339, 66, 66))
+        self.assertEqual(buttons["_tiles"][(0, 8)].right, buttons["_tiles"][(0, 9)].left)
+        self.assertEqual(set(self.interaction.get_interaction_rect_buttons(buttons)), {"reset", "leave"})
+        tile = (4, 1)
+        self.click_circuit_tile(tile)
+        self.assertEqual(self.puzzle.circuit_tiles[tile]["rotation"], 1)
+        self.click("reset")
+        self.assertEqual(self.puzzle.circuit_tiles[tile]["rotation"], 0)
+        self.click_circuit_tile(tile)
+        self.interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_r))
+        self.assertEqual(self.puzzle.circuit_tiles[tile]["rotation"], 0)
+        self.click_circuit_tile(tile)
+        escape = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE)
+        self.interaction.handle_key(escape)
+        self.assertEqual(self.ui.mode, "circuit_exit_confirmation")
+        self.assertEqual(set(self.ui.draw(self.screen, (0, 0))), {"continue", "leave"})
+        self.interaction.handle_key(escape)
+        self.assertEqual(self.ui.mode, "circuit")
+        self.assertEqual(self.puzzle.circuit_tiles[tile]["rotation"], 1)
+        self.click("leave")
+        self.click("continue")
+        self.assertEqual(self.ui.mode, "circuit")
+        self.click("leave")
+        self.click("leave")
+        self.assertEqual(self.game.current_space, "CH2_CORRIDOR")
+        self.assertEqual(self.interaction.pending_entry_object, "door_t7")
+        self.assertFalse(self.puzzle.circuit_tiles)
+        self.assertIsNone(self.puzzle.current_puzzle_id)
+        self.story.enter_t7()
+        self.expect_dialogue("scene_11_circuit_intro")
+        self.finish()
+        self.assertEqual(self.puzzle.circuit_tiles[tile]["rotation"], 0)
+
+    def test_t7_circuit_completion_lights_room_and_survives_save_load(self):
+        self.game.complete_event("t7_unlocked")
+        self.story.enter_t7()
+        overlay = home_function("draw_t7_power_outage_overlay", {"game": self.game, "pygame": pygame})
+        surface = pygame.Surface((2, 2))
+        surface.fill("white")
+        overlay(surface)
+        self.assertEqual(surface.get_at((0, 0))[:3], (51, 51, 51))
+        self.finish()
+        self.solve_circuit()
+        self.assertTrue(self.game.has_event("t7_circuit_completed"))
+        self.assertTrue(self.game.is_puzzle_solved("t7_circuit"))
+        self.assertFalse(self.ui.is_open())
+        self.expect_dialogue("scene_11_entry")
+        surface.fill("white")
+        overlay(surface)
+        self.assertEqual(surface.get_at((0, 0))[:3], (255, 255, 255))
+        self.finish()
+
+        with patch("save_manager.open", mock_open(), create=True) as file:
+            save_manager.save_game(self.game)
+            saved = "".join(call.args[0] for call in file().write.call_args_list)
+        restored = GameManager()
+        with patch("save_manager.open", mock_open(read_data=saved), create=True):
+            self.assertTrue(save_manager.load_game(restored))
+        self.build(restored)
+        self.assertTrue(restored.has_event("t7_circuit_completed"))
+        self.assertTrue(restored.is_puzzle_solved("t7_circuit"))
+        self.assertTrue(self.story.enter_t7())
+        self.assertEqual(restored.game_state, SPACE)
+        self.dialogue.start.assert_not_called()
+        self.assertFalse(self.ui.is_open())
 
     def password(self, object_id, answer):
         self.open(object_id)
@@ -264,6 +356,9 @@ class Chapter2FlowTests(unittest.TestCase):
         self.click("leave")
         self.open("door_t7")
         self.finish()
+        self.expect_dialogue("scene_11_circuit_intro")
+        self.finish()
+        self.solve_circuit()
         self.expect_dialogue("scene_11_entry")
         self.finish()
         for missing in ("pencil", "rubbing_paper"):
@@ -575,6 +670,9 @@ class Chapter2FlowTests(unittest.TestCase):
         draw = home_function("draw_dialogue_background", {
             "game": self.game, "game_ui": game_ui, "player": player,
             "dialogue_controller": types.SimpleNamespace(dialogue_id="scene_10_entry"),
+            "draw_t7_power_outage_overlay": home_function(
+                "draw_t7_power_outage_overlay", {"game": self.game, "pygame": pygame}
+            ),
         })
         draw(self.screen, (0, 0), draw_player=False)
         game_ui.draw_space.assert_called_once_with(self.screen, self.game, (0, 0))
