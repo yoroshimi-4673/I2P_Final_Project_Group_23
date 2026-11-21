@@ -135,6 +135,51 @@
             "event": "t7_completed"
         }
     },
+    "t7_circuit": {
+        "chapter": 2,
+        "ui_mode": "circuit",
+        "rows": 5,
+        "cols": 10,
+        "success_message": "電路恢復供電。",
+        "tiles": [
+            {"row": 0, "col": 8, "type": "corner", "rotation": 2},
+            {"row": 0, "col": 9, "type": "end", "rotation": 3, "rotatable": false},
+
+            {"row": 1, "col": 1, "type": "corner", "rotation": 3},
+            {"row": 1, "col": 2, "type": "straight", "rotation": 1},
+            {"row": 1, "col": 3, "type": "straight", "rotation": 0},
+            {"row": 1, "col": 4, "type": "straight", "rotation": 1},
+            {"row": 1, "col": 5, "type": "straight", "rotation": 0},
+            {"row": 1, "col": 6, "type": "corner", "rotation": 0},
+            {"row": 1, "col": 8, "type": "T", "rotation": 2},
+            {"row": 1, "col": 9, "type": "corner", "rotation": 2},
+
+            {"row": 2, "col": 1, "type": "cross", "rotation": 0, "rotatable": false},
+            {"row": 2, "col": 2, "type": "straight", "rotation": 1},
+            {"row": 2, "col": 3, "type": "corner", "rotation": 0},
+            {"row": 2, "col": 5, "type": "T", "rotation": 0},
+            {"row": 2, "col": 6, "type": "corner", "rotation": 2},
+            {"row": 2, "col": 9, "type": "straight", "rotation": 1},
+
+            {"row": 3, "col": 1, "type": "corner", "rotation": 3},
+            {"row": 3, "col": 2, "type": "straight", "rotation": 1},
+            {"row": 3, "col": 3, "type": "corner", "rotation": 3},
+            {"row": 3, "col": 5, "type": "straight", "rotation": 1},
+            {"row": 3, "col": 8, "type": "corner", "rotation": 3},
+            {"row": 3, "col": 9, "type": "corner", "rotation": 0},
+
+            {"row": 4, "col": 0, "type": "start", "rotation": 1, "rotatable": false},
+            {"row": 4, "col": 1, "type": "corner", "rotation": 0},
+            {"row": 4, "col": 5, "type": "corner", "rotation": 0},
+            {"row": 4, "col": 6, "type": "T", "rotation": 1},
+            {"row": 4, "col": 7, "type": "straight", "rotation": 1},
+            {"row": 4, "col": 8, "type": "corner", "rotation": 1}
+        ],
+        "on_complete": {
+            "type": "story_event",
+            "event": "t7_circuit_completed"
+        }
+    },
     "t3_time_capsule": {
         "chapter": 2,
         "ui_mode": "password",

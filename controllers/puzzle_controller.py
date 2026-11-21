@@ -1,4 +1,29 @@
+from collections import deque
+
 from game_states import PASSWORD, SPACE
+
+
+CIRCUIT_DIRECTION_OFFSETS = {
+    "up": (-1, 0),
+    "right": (0, 1),
+    "down": (1, 0),
+    "left": (0, -1),
+}
+CIRCUIT_OPPOSITE_DIRECTION = {
+    "up": "down",
+    "right": "left",
+    "down": "up",
+    "left": "right",
+}
+CIRCUIT_DIRECTIONS = tuple(CIRCUIT_DIRECTION_OFFSETS)
+CIRCUIT_BASE_CONNECTIONS = {
+    "straight": (0, 2),
+    "corner": (0, 1),
+    "T": (3, 0, 1),
+    "cross": (0, 1, 2, 3),
+    "start": (0,),
+    "end": (0,),
+}
 
 
 ANCHOR_FRAGMENT_TARGETS = {
@@ -37,6 +62,9 @@ class PuzzleController:
         self.reset_anchor_drag_state()  # 控制器重建只清除拖曳暫存資料
         self.reset_diary_drag_state()
         self.diary_reader_page = 0
+        self.circuit_tiles = {}
+        self.circuit_initial_tiles = {}
+        self.circuit_powered_tiles = set()
 
         self.last_result = None
 
@@ -138,6 +166,9 @@ class PuzzleController:
             if self.ui_mode == "diary_drag":
                 self.reset_diary_drag_state()
 
+            if self.ui_mode == "circuit":
+                self.reset_circuit_state()
+
             result = {
                 "status": "input_required",
                 "remaining_attempts": (
@@ -165,6 +196,9 @@ class PuzzleController:
             game.game_state = SPACE
 
         self.reset_diary_drag_state()
+        self.circuit_tiles.clear()
+        self.circuit_initial_tiles.clear()
+        self.circuit_powered_tiles.clear()
 
         self.current_puzzle_id = None
 
@@ -176,6 +210,97 @@ class PuzzleController:
 
         self.last_result = None
 
+
+    def reset_circuit_state(self):
+        """從謎題資料重建互相獨立的初始盤面與目前盤面。"""
+        self.circuit_initial_tiles = {
+            (tile["row"], tile["col"]): {
+                "type": tile["type"],
+                "rotation": tile["rotation"] % 4,
+                "rotatable": tile.get("rotatable", True),
+            }
+            for tile in self.puzzle.get("tiles", [])
+        }
+        self.circuit_tiles = {
+            position: tile.copy() for position, tile in self.circuit_initial_tiles.items()
+        }
+        self.calculate_circuit_powered_tiles()
+
+    def get_circuit_connections(self, tile_type, rotation):
+        """取得指定方塊順時針旋轉後的導電方向。"""
+        return {
+            CIRCUIT_DIRECTIONS[(direction + rotation) % 4]
+            for direction in CIRCUIT_BASE_CONNECTIONS.get(tile_type, ())
+        }
+
+    def are_circuit_tiles_connected(self, tile, neighbor, direction):
+        """相鄰電線必須都有朝對方延伸的接點。"""
+        return (
+            direction in self.get_circuit_connections(tile["type"], tile["rotation"])
+            and CIRCUIT_OPPOSITE_DIRECTION[direction]
+            in self.get_circuit_connections(neighbor["type"], neighbor["rotation"])
+        )
+
+    def get_circuit_tile_position(self, tile_type):
+        return next(
+            (position for position, tile in self.circuit_tiles.items() if tile["type"] == tile_type),
+            None,
+        )
+
+    def calculate_circuit_powered_tiles(self):
+        """從起點廣度優先搜尋所有通電方塊。"""
+        start = self.get_circuit_tile_position("start")
+        powered = set()
+        queue = deque()
+        if start is not None:
+            powered.add(start)
+            queue.append(start)
+
+        while queue:
+            row, col = queue.popleft()
+            tile = self.circuit_tiles[(row, col)]
+            for direction in self.get_circuit_connections(tile["type"], tile["rotation"]):
+                row_offset, col_offset = CIRCUIT_DIRECTION_OFFSETS[direction]
+                position = (row + row_offset, col + col_offset)
+                neighbor = self.circuit_tiles.get(position)
+                if (
+                    position not in powered
+                    and neighbor is not None
+                    and self.are_circuit_tiles_connected(tile, neighbor, direction)
+                ):
+                    powered.add(position)
+                    queue.append(position)
+
+        self.circuit_powered_tiles = powered
+        return powered
+
+    def is_circuit_complete(self, powered_tiles=None):
+        """終點通電即完成。"""
+        if powered_tiles is None:
+            powered_tiles = self.calculate_circuit_powered_tiles()
+        return self.get_circuit_tile_position("end") in powered_tiles
+
+    def rotate_circuit_tile(self, row, col):
+        """順時針旋轉一格，並檢查是否已接通電路。"""
+        if self.ui_mode != "circuit":
+            return {"status": "not_circuit"}
+
+        position = (row, col)
+        tile = self.circuit_tiles.get(position)
+        if tile is None:
+            return {"status": "empty"}
+        if not tile["rotatable"]:
+            return {"status": "fixed"}
+        if self.puzzle_manager.is_solved(self.current_puzzle_id):
+            return {"status": "puzzle_solved"}
+
+        tile["rotation"] = (tile["rotation"] + 1) % 4
+        powered = self.calculate_circuit_powered_tiles()
+        if self.is_circuit_complete(powered):
+            self.last_result = self.puzzle_manager.apply_success(self.current_puzzle_id)
+            return self.last_result
+
+        return {"status": "rotated", "position": position, "rotation": tile["rotation"]}
 
     def append_input(
         self,
