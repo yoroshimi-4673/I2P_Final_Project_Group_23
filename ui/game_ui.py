@@ -562,16 +562,9 @@ class GameUI:
                 button_height
             ),
 
-            "save": pygame.Rect(
-                button_x,
-                start_y + gap * 3,
-                button_width,
-                button_height
-            ),
-
             "exit": pygame.Rect(
                 button_x,
-                start_y + gap * 4 + 18,
+                start_y + gap * 3,
                 button_width,
                 button_height
             )
@@ -601,29 +594,6 @@ class GameUI:
             buttons["settings"],
             buttons["settings"].collidepoint(
                 mouse_pos
-            )
-        )
-
-        self.draw_button(
-            screen,
-            "存檔",
-            buttons["save"],
-            enabled=False
-        )
-
-        locked_surface = self.font_small.render(
-            "尚未解鎖",
-            True,
-            (135, 135, 145)
-        )
-
-        screen.blit(
-            locked_surface,
-            locked_surface.get_rect(
-                center=(
-                    screen_width // 2,
-                    buttons["save"].bottom + 12
-                )
             )
         )
 

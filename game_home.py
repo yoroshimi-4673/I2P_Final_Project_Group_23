@@ -27,6 +27,8 @@ from controllers.hotbar_controller import HotbarController
 from controllers.codex_controller import CodexController
 from controllers.settings_controller import SettingsController
 from controllers.save_controller import SaveController
+from controllers.developer_controller import DeveloperController
+from ui.developer_ui import DeveloperUI
 from ui.save_ui import SaveUI
 import save_manager
 
@@ -53,6 +55,7 @@ pygame.key.stop_text_input()
 
 DEBUG_COLLISION = True  # 正式遊玩預設隱藏碰撞校正圖層
 POLYGON_EDITOR_ENABLED = True  # Enable mouse and keyboard polygon editing
+DEVELOPER_MODE_ENABLED = True
 polygon_editor_active = False  # 記錄目前是否正在繪製Polygon
 polygon_editor_points = []  # 暫存本次繪製的Base座標頂點
 polygon_editor_space = None  # 記錄目前正在編輯哪一個Space
@@ -1011,6 +1014,17 @@ ui_screen = UI_MENU  # 記錄目前主要顯示的UI頁面
 ui_overlay = None  # 記錄Settings等覆蓋式介面
 save_controller = SaveController()
 save_ui = SaveUI(game_ui)
+developer_controller = DeveloperController(
+    game, story_manager, interaction_controller, enabled=DEVELOPER_MODE_ENABLED
+)
+developer_ui = DeveloperUI(game_ui)
+developer_buttons = {}
+MENU_NAVIGATION_KEYS = {
+    pygame.K_UP: "up", pygame.K_DOWN: "down",
+    pygame.K_LEFT: "left", pygame.K_RIGHT: "right",
+    pygame.K_RETURN: "enter", pygame.K_KP_ENTER: "enter",
+    pygame.K_ESCAPE: "escape",
+}
 last_gameplay_frame = None
 
 tutorial_guide_open = False  # 記錄是否開啟新手教學總覽視窗
@@ -1056,6 +1070,44 @@ def reset_gameplay_ui():
     player.cancel_mouse_movement()
     interaction_controller.pending_entry_rift = None
     interaction_controller.pending_entry_object = None
+
+
+def toggle_developer_menu():
+    global ui_overlay, developer_buttons, tutorial_guide_open
+    global polygon_editor_active, polygon_editor_points, polygon_editor_space
+    if not developer_controller.enabled:
+        return
+    if not developer_controller.toggle():
+        ui_overlay = None
+        return
+    if ui_screen == UI_CODEX:
+        codex_controller.stop_dragging()
+        close_codex()
+    if ui_overlay == "save":
+        save_controller.close()
+    tutorial_guide_open = False
+    settings_controller.stop_volume_drag()
+    polygon_editor_active = False
+    polygon_editor_points = []
+    polygon_editor_space = None
+    polygon_editor_key_started.clear()
+    pressed_keys.clear()
+    player.cancel_mouse_movement()
+    developer_buttons = {}
+    ui_overlay = "developer"
+
+
+def apply_developer_preset(preset_id):
+    global ui_screen, ui_overlay, last_player_space, last_gameplay_frame
+    if preset_id is None or not developer_controller.enabled:
+        return
+    reset_gameplay_ui()
+    hotbar_controller.reset()
+    if developer_controller.apply_preset(preset_id):
+        last_player_space = None
+        last_gameplay_frame = None
+        ui_screen = UI_GAME
+        ui_overlay = None
 
 
 def start_new_game():
@@ -1462,6 +1514,24 @@ while running:
 
     for event in pygame.event.get():
 
+        if event.type == pygame.KEYDOWN and event.key == pygame.K_F8:
+            if DEVELOPER_MODE_ENABLED:
+                toggle_developer_menu()
+                mouse_clicked = False
+                interact_pressed = False
+            continue
+        if developer_controller.is_open and event.type not in (pygame.QUIT, pygame.VIDEORESIZE):
+            if event.type == pygame.KEYDOWN:
+                apply_developer_preset(developer_controller.handle_navigation(MENU_NAVIGATION_KEYS.get(event.key)))
+            elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                for control, rect in developer_buttons.items():
+                    if rect.collidepoint(event.pos):
+                        apply_developer_preset(developer_controller.handle_click(control))
+                        break
+            if not developer_controller.is_open:
+                ui_overlay = None
+            continue
+
         if (
             event.type == pygame.MOUSEMOTION
             and ui_screen == UI_GAME
@@ -1643,12 +1713,7 @@ while running:
         elif event.type == pygame.KEYDOWN:
 
             if ui_overlay == "save":
-                key = {
-                    pygame.K_UP: "up", pygame.K_DOWN: "down",
-                    pygame.K_LEFT: "left", pygame.K_RIGHT: "right",
-                    pygame.K_RETURN: "enter", pygame.K_KP_ENTER: "enter",
-                    pygame.K_ESCAPE: "escape",
-                }.get(event.key)
+                key = MENU_NAVIGATION_KEYS.get(event.key)
                 if key is not None:
                     apply_save_action(save_controller.handle_navigation(key))
                 continue
@@ -2385,7 +2450,7 @@ while running:
 
         if (
             interaction_ui.is_open()
-            and ui_overlay is None
+            and ui_overlay in (None, "developer")
         ):
 
             interaction_buttons = (
@@ -2401,11 +2466,12 @@ while running:
             )
 
             # 滑鼠hover同步所有Interaction鍵盤焦點
-            interaction_controller.update_interaction_hover_focus(
-                interaction_buttons,
-                mouse_pos,
-                mouse_moved=False
-            )
+            if ui_overlay is None:
+                interaction_controller.update_interaction_hover_focus(
+                    interaction_buttons,
+                    mouse_pos,
+                    mouse_moved=False
+                )
 
             # 顯示方向鍵與Enter目前作用的控制項
             interaction_controller.draw_focus(
@@ -2925,6 +2991,9 @@ while running:
             mouse_pos
         )
 
+
+    if developer_controller.is_open:
+        developer_buttons = developer_ui.draw(screen, mouse_pos, developer_controller, game, DEBUG_COLLISION)
 
     pygame.display.flip()
 
