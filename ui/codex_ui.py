@@ -140,10 +140,17 @@ class CodexUI:
     ):
         """判斷指定圖鑑物品是否已被發現。"""
 
-        return (
-            item_id
-            in game.discovered_items
-        )
+        unlock = self.objects.get(item_id, {}).get("codex_unlock")
+        if unlock is None:
+            return game.has_discovered_item(item_id)
+
+        unlock_type = unlock.get("type")
+        value = unlock.get("value")
+        if unlock_type == "discovered_item":
+            return game.has_discovered_item(value)
+        if unlock_type == "event":
+            return game.has_event(value)
+        return False
 
 
     def get_progress(

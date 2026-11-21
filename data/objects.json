@@ -198,6 +198,36 @@
         "description": "抽屜裝著三位數密碼鎖。旁邊寫著：「她長到這裡，我就把秘密還給她。」",
         "puzzle_id": "t0_bedside_drawer"
     },
+    "t0_wardrobe": {
+        "name": "衣櫃",
+        "type": "inspectable",
+        "space": "T0"
+    },
+    "t7_safe": {
+        "name": "保險箱",
+        "type": "inspectable",
+        "space": "T7"
+    },
+    "t7_bedside_table": {
+        "name": "床頭櫃",
+        "type": "inspectable",
+        "space": "T7"
+    },
+    "t7_wardrobe": {
+        "name": "衣櫃",
+        "type": "inspectable",
+        "space": "T7"
+    },
+    "t3_safe": {
+        "name": "保險箱",
+        "type": "inspectable",
+        "space": "T3"
+    },
+    "t3_bedside_table": {
+        "name": "床頭櫃",
+        "type": "inspectable",
+        "space": "T3"
+    },
     "t0_desk": {
         "name": "書桌",
         "type": "container",
@@ -252,6 +282,10 @@
         "name": "拓印紙",
         "type": "item",
         "description": "一張空白紙，可以覆在刻痕上進行拓印。",
+        "ui_asset": "assets/素材庫/第二章/T+0/empty_paper.png",
+        "completed_description": "拓印完成的紙。上面微微地刻著「0347」四個數字，下面還有一行小字：「刻給還沒出生的我們。」",
+        "completed_ui_asset": "assets/素材庫/第二章/T+0/paper_0347.png",
+        "state_event": "t7_rubbing_completed",
         "collectable": true
     },
     "present_fragment": {
@@ -272,6 +306,28 @@
         "type": "inspectable",
         "space": "T7",
         "description": "刻度只停在「7歲 121」，之後再也沒有新的痕跡。"
+    },
+    "rubbing_paper_before_codex": {
+        "name": "拓印前的紙",
+        "type": "codex_entry",
+        "description": "一張空白紙，可以覆在刻痕上進行拓印。",
+        "ui_asset": "assets/素材庫/第二章/T+0/empty_paper.png",
+        "codex_only": true,
+        "codex_unlock": {
+            "type": "discovered_item",
+            "value": "rubbing_paper"
+        }
+    },
+    "rubbing_paper_after_codex": {
+        "name": "拓印後的紙",
+        "type": "codex_entry",
+        "description": "拓印完成的紙。上面微微地刻著「0347」四個數字，下面還有一行小字：「刻給還沒出生的我們。」",
+        "ui_asset": "assets/素材庫/第二章/T+0/paper_0347.png",
+        "codex_only": true,
+        "codex_unlock": {
+            "type": "event",
+            "value": "t7_rubbing_completed"
+        }
     },
     "t7_broken_bed": {
         "name": "斷裂的床",
@@ -320,6 +376,7 @@
         "name": "碎片（未來）",
         "type": "item",
         "description": "金屬碎片上刻著：「……未來，是還沒被數完的數……」",
+        "ui_asset": "assets/素材庫/第二章/T+7/crystal_future.png",
         "collectable": true
     },
     "t7_exit_door": {
@@ -371,6 +428,7 @@
         "name": "碎片（過去）",
         "type": "item",
         "description": "金屬碎片上刻著：「……過去，不能被改寫……」",
+        "ui_asset": "assets/素材庫/第二章/T-3/crystal_past.png",
         "collectable": true
     },
     "t3_note": {

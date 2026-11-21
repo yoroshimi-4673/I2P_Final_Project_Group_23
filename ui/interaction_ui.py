@@ -344,9 +344,8 @@ class InteractionUI:
                 ),
 
                 "description": (
-                    current_object.get(
-                        "description",
-                        ""
+                    self.game_ui.get_item_display_value(
+                        object_id, "description", self.game, default=""
                     )
                 )
             }
@@ -1273,6 +1272,57 @@ class InteractionUI:
         return buttons
 
 
+    def draw_binary_lock(self, screen):
+        """繪製 C 空間的鎖面與圖片按鍵。"""
+        layout = self.game_ui.ui_layout["puzzle_layouts"]["chapter1_binary_lock"]
+        modal = self.draw_modal_base(screen, width=520, height=480)
+        lock = layout["lock_rect"]
+        scale_x = modal.width / 520
+        scale_y = modal.height / 480
+        target = pygame.Rect(
+            modal.x + round(lock["x"] * scale_x),
+            modal.y + round(lock["y"] * scale_y),
+            round(lock["width"] * scale_x),
+            round(lock["height"] * scale_y),
+        )
+        title = self.game_ui.font_large.render(
+            self.objects[self.current_object_id]["name"], True, (255, 220, 140)
+        )
+        screen.blit(title, title.get_rect(center=(modal.centerx, modal.y + round(30 * scale_y))))
+        attempts = self.puzzle_controller.remaining_attempts
+        if attempts is not None:
+            label = self.game_ui.font_small.render(f"剩餘嘗試次數：{attempts}", True, (235, 190, 160))
+            screen.blit(label, label.get_rect(center=(modal.centerx, modal.y + round(61 * scale_y))))
+
+        buttons = {}
+        asset = layout["asset"]
+        if self.game_ui.draw_asset(screen, asset, target):
+            image_rect = self.game_ui.get_fitted_image_rect(self.game_ui.load_image(asset), target)
+            slots = layout["input_slots"]
+            for index, digit in enumerate(self.puzzle_controller.input_text):
+                text = self.game_ui.font_large.render(digit, True, (225, 255, 255))
+                x_ratio = slots["first_x_ratio"] + index * slots["step_ratio"]
+                center = (
+                    image_rect.x + round(image_rect.width * x_ratio),
+                    image_rect.y + round(image_rect.height * slots["y_ratio"]),
+                )
+                screen.blit(text, text.get_rect(center=center))
+            for digit in ("1", "0"):
+                data = layout["buttons"][digit]
+                buttons[digit] = pygame.Rect(
+                    image_rect.x + round(image_rect.width * data["x_ratio"]),
+                    image_rect.y + round(image_rect.height * data["y_ratio"]),
+                    round(image_rect.width * data["width_ratio"]),
+                    round(image_rect.height * data["height_ratio"]),
+                )
+            if layout.get("debug_hitboxes", False):
+                pygame.draw.rect(screen, (255, 80, 80), buttons["1"], width=2)
+                pygame.draw.rect(screen, (80, 220, 120), buttons["0"], width=2)
+
+        hint = self.game_ui.font_small.render("Esc 返回", True, (210, 210, 220))
+        screen.blit(hint, hint.get_rect(center=(modal.centerx, modal.bottom - 25)))
+        return buttons
+
     def draw_password(
         self,
         screen,
@@ -1280,11 +1330,10 @@ class InteractionUI:
     ):
         """沿用密碼版面並讀取謎題控制器狀態。"""
 
-        modal = self.draw_modal_base(
-            screen,
-            width=520,
-            height=500
-        )
+        if self.puzzle_controller.current_puzzle_id == "chapter1_password":
+            return self.draw_binary_lock(screen)
+
+        modal = self.draw_modal_base(screen, width=520, height=500)
 
         title = self.game_ui.font_large.render(
             self.objects[self.current_object_id]["name"],
@@ -1868,7 +1917,7 @@ class InteractionUI:
 
         # 依道具編號繪圖並保留缺圖備援
         if not self.game_ui.draw_item_asset(
-            screen, self.result.get("object_id", self.current_object_id), icon_rect
+            screen, self.result.get("object_id", self.current_object_id), icon_rect, game=self.game
         ):
             self.game_ui.draw_placeholder_rect(
                 screen,
@@ -1943,7 +1992,7 @@ class InteractionUI:
         # 通知依道具編號顯示共用圖片
         icon_rect = pygame.Rect(modal.centerx - 60, modal.y + 75, 120, 120)
         if not self.game_ui.draw_item_asset(
-            screen, self.notification.get("item_id"), icon_rect
+            screen, self.notification.get("item_id"), icon_rect, game=self.game
         ):
             self.game_ui.draw_placeholder_rect(screen, icon_rect, "Item Placeholder")
 

@@ -88,7 +88,8 @@ class Chapter2FlowTests(unittest.TestCase):
         self.open(object_id)
         for digit in answer:
             self.click(digit)
-        self.click("submit")
+        if self.ui.mode == "password":
+            self.click("submit")
 
     def acknowledge_success(self, message):
         self.assertEqual(self.ui.mode, "message")

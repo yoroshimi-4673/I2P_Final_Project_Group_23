@@ -15,7 +15,8 @@
             "items": [
                 "t0_fixed_diary",
                 "pencil",
-                "rubbing_paper",
+                "rubbing_paper_before_codex",
+                "rubbing_paper_after_codex",
                 "present_fragment",
                 "future_fragment",
                 "past_fragment",

@@ -16,7 +16,7 @@ from controllers.hotbar_controller import HotbarController
 from controllers.puzzle_controller import PuzzleController
 from game_states import DIALOGUE, GAME_OVER, PASSWORD, SPACE
 from managers.game_manager import GameManager
-from managers.interaction_manager import get_door_info, interact_with_puzzle
+from managers.interaction_manager import collect_item, get_door_info, interact_with_puzzle
 from managers.puzzle_manager import PuzzleManager
 from managers.story_manager import StoryManager
 import save_manager
@@ -339,21 +339,25 @@ class PuzzleTests(unittest.TestCase):
         self.assertEqual(self.controller.ui_mode, "custom_mode")
 
     def test_unlimited_ui_omits_attempts_and_uses_configured_length(self):
-        self.puzzles[self.puzzle_id].pop("max_attempts")
-        self.puzzles[self.puzzle_id]["length"] = 4
+        puzzle_id = "t0_bedside_drawer"
+        self.puzzles[puzzle_id].pop("max_attempts", None)
+        self.puzzles[puzzle_id]["length"] = 4
         ui, interaction, _ = self.make_ui()
-        interaction.open_object("exit_door")
+        interaction.open_object(puzzle_id)
         original_font = ui.game_ui.font_small
         font = Mock(wraps=original_font)
         ui.game_ui.font_small = font
         with patch("ui.interaction_ui.pygame.draw.rect", wraps=pygame.draw.rect) as draw_rect:
-            ui.draw(self.screen, (0, 0))
+            buttons = ui.draw(self.screen, (0, 0))
+        self.assertEqual(set(buttons), set("0123456789") | {"clear", "submit", "back"})
+        interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_9))
+        self.assertEqual(self.controller.input_text, "9")
         rendered = [call.args[0] for call in font.render.call_args_list]
         self.assertFalse(any("剩餘嘗試次數" in text or "None" in text for text in rendered))
         boxes = [call for call in draw_rect.call_args_list
                  if call.args[1] == (30, 32, 40)]
         self.assertEqual(len(boxes), 4)
-        self.puzzles[self.puzzle_id].pop("length")
+        self.puzzles[puzzle_id].pop("length")
         ui.draw(self.screen, (0, 0))  # 缺少長度設定仍可安全繪製既有介面
 
     def test_unsolved_door_opens_password_and_preserves_attempts(self):
@@ -364,14 +368,25 @@ class PuzzleTests(unittest.TestCase):
         self.assertEqual(self.controller.current_puzzle_id, "chapter1_password")
         self.assertEqual(self.game.game_state, PASSWORD)
         buttons = ui.draw(self.screen, (0, 0))
-        self.assertTrue(all(key in buttons for key in ("0", "9", "clear", "submit", "back")))
-        interaction.handle_click(buttons, buttons["9"].center)
+        self.assertEqual(list(buttons), ["1", "0"])
+        interaction.handle_click(buttons, buttons["1"].center)
+        interaction.handle_click(buttons, buttons["0"].center)
+        interaction.handle_click(buttons, buttons["0"].center)
+        self.assertEqual(self.controller.input_text, "100")
         interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_BACKSPACE))
+        self.assertEqual(self.controller.input_text, "10")
+        for key in range(pygame.K_2, pygame.K_9 + 1):
+            interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=key))
+        self.assertEqual(self.controller.input_text, "10")
+        for digit in "0100":
+            self.click(ui, interaction, digit)
+        self.assertEqual(ui.mode, "message")
+        self.assertEqual(ui.result["message"].splitlines()[0], "密碼錯誤。")
         self.assertEqual(self.controller.input_text, "")
-        self.controller.append_input(self.wrong)
-        self.click(ui, interaction, "submit")
         self.assertEqual(self.controller.remaining_attempts, 2)
-        self.click(ui, interaction, "back")
+        self.click(ui, interaction, "ok")
+        self.assertEqual(ui.mode, "password")
+        interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
         interaction.open_object("exit_door")
         self.assertEqual(self.controller.remaining_attempts, 2)
 
@@ -384,11 +399,109 @@ class PuzzleTests(unittest.TestCase):
         self.assertEqual(self.game.game_state, SPACE)
         interaction.open_object("exit_door")
         for _ in range(3):
-            self.controller.append_input(self.wrong)
-            interaction.submit_puzzle()
+            for _ in range(6):
+                interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_1))
+            if ui.mode == "message":
+                self.click(ui, interaction, "ok")
         self.assertFalse(ui.is_open())
         self.assertEqual(self.game.game_state, GAME_OVER)
         self.assertEqual(self.game.game_over_reason, "space_c_locked")
+
+    def test_binary_password_submits_on_sixth_digit(self):
+        ui, interaction, _ = self.make_ui()
+        interaction.open_object("exit_door")
+        for digit in "10010":
+            key = pygame.K_0 + int(digit)
+            interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=key))
+        self.assertEqual(self.controller.input_text, "10010")
+        self.assertFalse(self.game.is_puzzle_solved(self.puzzle_id))
+        self.assertEqual(self.controller.remaining_attempts, 3)
+        self.click(ui, interaction, "1")
+        self.assertTrue(self.game.is_puzzle_solved(self.puzzle_id))
+        self.assertEqual(ui.notification["item_id"], "photo_1")
+
+    def test_binary_lock_focus_cycles_and_enter_follows_the_yellow_frame(self):
+        ui, interaction, _ = self.make_ui()
+        interaction.open_object("exit_door")
+        buttons = ui.draw(self.screen, (0, 0))
+        interaction.last_buttons = buttons
+        interaction.update_interaction_hover_focus(buttons, buttons["0"].center, mouse_moved=False)
+        self.assertEqual(interaction.focus_id, "1")
+        for key, target in (
+            (pygame.K_RIGHT, "0"), (pygame.K_RIGHT, "1"),
+            (pygame.K_LEFT, "0"), (pygame.K_LEFT, "1"),
+        ):
+            interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=key))
+            interaction.update_interaction_hover_focus(buttons, buttons["0"].center, mouse_moved=False)
+            self.assertEqual(interaction.focus_id, target)
+
+        enter = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_RETURN)
+        interaction.handle_key(enter)
+        interaction.update_interaction_hover_focus(buttons, buttons["0"].center)
+        self.assertEqual(interaction.focus_id, "0")
+        with patch("controllers.interaction_controller.pygame.draw.rect") as draw_rect:
+            interaction.draw_focus(self.screen, buttons)
+        draw_rect.assert_called_once_with(
+            self.screen, (255, 220, 0), buttons["0"].inflate(8, 8), width=3, border_radius=6
+        )
+        interaction.handle_key(enter)
+        self.assertEqual(self.controller.input_text, "10")
+
+    def test_rubbing_codex_entries_unlock_and_persist_without_inventory_entries(self):
+        ui, _, story = self.make_ui()
+        codex = CodexUI(ui.game_ui, load_data("codex.json"), self.objects)
+        self.assertTrue(codex.select_chapter("chapter_2"))
+        before, after = "rubbing_paper_before_codex", "rubbing_paper_after_codex"
+        items = codex.get_selected_chapter()["items"]
+        self.assertNotIn("rubbing_paper", items)
+        self.assertEqual(items[2:4], [before, after])
+        self.assertEqual(codex.get_chapter_progress(self.game), (0, len(items)))
+        for item_id in (before, after):
+            self.assertFalse(self.objects[item_id].get("collectable", False))
+            self.assertEqual(collect_item(self.game, item_id, self.objects)["status"], "not_collectable")
+        self.assertFalse(self.game.discovered_items)
+        self.game.add_item("rubbing_paper")
+        self.assertTrue(codex.is_unlocked(self.game, before))
+        self.assertFalse(codex.is_unlocked(self.game, after))
+        self.assertEqual(codex.get_chapter_progress(self.game), (1, len(items)))
+        story.complete_t7_rubbing()
+        self.assertEqual(codex.get_chapter_progress(self.game), (2, len(items)))
+        self.assertEqual(self.game.inventory, ["rubbing_paper"])
+        story.enter_t3()
+        self.round_trip_save()
+        self.assertFalse(self.game.inventory)
+        self.assertEqual(self.game.discovered_items, ["rubbing_paper"])
+        self.assertTrue(codex.is_unlocked(self.game, before))
+        self.assertTrue(codex.is_unlocked(self.game, after))
+
+    def test_rubbing_paper_changes_hotbar_and_popup_without_replacing_item(self):
+        ui, interaction, story = self.make_ui()
+        self.game.enter_space("T7")
+        self.game.add_item("pencil")
+        self.game.add_item("rubbing_paper")
+        inventory = self.game.inventory.copy()
+        hotbar = HotbarController(self.game, ui.game_ui, ui, interaction)
+        for completed, filename, description in (
+            (False, "empty_paper.png", "一張空白紙，可以覆在刻痕上進行拓印。"),
+            (True, "paper_0347.png", "拓印完成的紙。上面微微地刻著「0347」四個數字，下面還有一行小字：「刻給還沒出生的我們。」"),
+        ):
+            with self.subTest(completed=completed):
+                if completed:
+                    interaction.open_object("t7_broken_bed")
+                    self.assertTrue(self.game.has_event("t7_rubbing_completed"))
+                asset = f"assets/素材庫/第二章/T+0/{filename}"
+                hotbar.open_item("rubbing_paper")
+                self.assertEqual(ui.result["description"], description)
+                with patch.object(ui.game_ui, "load_image", wraps=ui.game_ui.load_image) as load:
+                    ui.game_ui.draw_hotbar(self.screen, self.game, 0, 0, (0, 0))
+                    self.assertIn(asset, [call.args[0] for call in load.call_args_list])
+                    load.reset_mock()
+                    ui.draw(self.screen, (0, 0))
+                    self.assertIn(asset, [call.args[0] for call in load.call_args_list])
+                self.assertEqual(self.game.inventory, inventory)
+                ui.close()
+        story.enter_t3()
+        self.assertFalse(self.game.has_item("rubbing_paper"))
 
     def test_text_entry_uses_same_rules(self):
         with patch("builtins.input", return_value=self.answer), patch("sys.stdout", new_callable=io.StringIO):

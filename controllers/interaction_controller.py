@@ -321,6 +321,14 @@ class InteractionController:
         return result
 
 
+    def input_password_digit(self, digit):
+        binary_lock = self.puzzle_controller.current_puzzle_id == "chapter1_password"
+        if binary_lock and str(digit) not in ("0", "1"):
+            return
+        self.puzzle_controller.append_input(digit)
+        if binary_lock and len(self.puzzle_controller.input_text) == self.puzzle_controller.puzzle["length"]:
+            self.submit_puzzle()
+
     def submit_puzzle(self):
         """提交目前Puzzle並處理通用完成流程。"""
 
@@ -378,6 +386,10 @@ class InteractionController:
         elif status == "game_over":
 
             self.interaction_ui.close()
+
+        elif status == "wrong" and self.puzzle_controller.current_puzzle_id == "chapter1_password":
+            self.interaction_ui.mode = "message"
+            self.reset_interaction_focus()
 
         return result
 
@@ -566,12 +578,19 @@ class InteractionController:
             )
 
 
-    def update_interaction_hover_focus(self, buttons, mouse_pos):
+    def update_interaction_hover_focus(self, buttons, mouse_pos, mouse_moved=True):
         """滑鼠移到控制項時同步鍵盤焦點。"""
 
         self.ensure_interaction_focus(
             buttons
         )
+
+        if (
+            self.interaction_ui.mode == "password"
+            and self.puzzle_controller.current_puzzle_id == "chapter1_password"
+            and not mouse_moved
+        ):
+            return
 
         for control_id, rect in (
             self.get_interaction_rect_buttons(
@@ -774,7 +793,7 @@ class InteractionController:
                     - pygame.K_0
                 )
 
-                self.puzzle_controller.append_input(
+                self.input_password_digit(
                     digit
                 )
                 return
@@ -1213,11 +1232,14 @@ class InteractionController:
                     )
                 ):
 
-                    self.puzzle_controller.append_input(
+                    self.input_password_digit(
                         digit
                     )
 
                     return
+
+            if self.puzzle_controller.current_puzzle_id == "chapter1_password":
+                return
 
             if buttons[
                 "clear"
@@ -1397,17 +1419,20 @@ class InteractionController:
 
         elif mode == "message":
 
-            if buttons[
-                "ok"
-            ].collidepoint(
-                mouse_pos
-            ):
+            ok_button = buttons.get("ok")
+            if ok_button is not None and ok_button.collidepoint(mouse_pos):
 
                 if (
                     self.puzzle_completion_stage == "message"
                     and self.interaction_ui.result is self.item_notification_result
                 ):
                     self.acknowledge_puzzle_success()
+                elif (
+                    self.puzzle_controller.current_puzzle_id == "chapter1_password"
+                    and self.interaction_ui.result.get("status") == "wrong"
+                ):
+                    self.interaction_ui.mode = "password"
+                    self.reset_interaction_focus()
                 else:
                     self.return_from_interaction()
 
@@ -1503,6 +1528,14 @@ class InteractionController:
         )
 
         if rect is None:
+            return
+
+        if (
+            self.interaction_ui.mode == "password"
+            and self.puzzle_controller.current_puzzle_id == "chapter1_password"
+            and self.focus_id in ("1", "0")
+        ):
+            pygame.draw.rect(screen, (255, 220, 0), rect.inflate(8, 8), width=3, border_radius=6)
             return
 
         pygame.draw.rect(

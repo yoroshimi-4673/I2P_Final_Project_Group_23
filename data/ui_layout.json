@@ -894,6 +894,15 @@
                             150
                         ]
                     ]
+                },
+                "t0_wardrobe": {
+                    "x": 598,
+                    "y": 108,
+                    "width": 108,
+                    "height": 203,
+                    "asset": "assets/素材庫/第二章/T-3/closet.png",
+                    "label": "衣櫃",
+                    "interaction_padding": 40
                 }
             },
             "entry_spawns": {},
@@ -945,15 +954,6 @@
                     "render_mode": "background",
                     "interaction_padding": 30,
                     "reason": "等待人工確認背景座標"
-                }
-            },
-            "decorations": {
-                "t0_wardrobe": {
-                    "x": 598,
-                    "y": 108,
-                    "width": 108,
-                    "height": 203,
-                    "asset": "assets/素材庫/第二章/T-3/closet.png"
                 }
             }
         },
@@ -1144,6 +1144,33 @@
                     "label": "病房門",
                     "render_mode": "background",
                     "interaction_padding": 0
+                },
+                "t7_safe": {
+                    "x": 291,
+                    "y": 196,
+                    "width": 84,
+                    "height": 81,
+                    "asset": "assets/素材庫/第二章/T+0/locker.png",
+                    "label": "保險箱",
+                    "interaction_padding": 40
+                },
+                "t7_bedside_table": {
+                    "x": 507,
+                    "y": 176,
+                    "width": 61,
+                    "height": 121,
+                    "asset": "assets/素材庫/第二章/T+0/drawer.png",
+                    "label": "床頭櫃",
+                    "interaction_padding": 40
+                },
+                "t7_wardrobe": {
+                    "x": 598,
+                    "y": 108,
+                    "width": 108,
+                    "height": 203,
+                    "asset": "assets/素材庫/第二章/T-3/closet.png",
+                    "label": "衣櫃",
+                    "interaction_padding": 40
                 }
             },
             "entry_spawns": {},
@@ -1184,30 +1211,7 @@
                     "kind": "furniture"
                 }
             },
-            "pending_objects": {},
-            "decorations": {
-                "t7_safe": {
-                    "x": 291,
-                    "y": 196,
-                    "width": 84,
-                    "height": 81,
-                    "asset": "assets/素材庫/第二章/T+0/locker.png"
-                },
-                "t7_bedside_table": {
-                    "x": 507,
-                    "y": 176,
-                    "width": 61,
-                    "height": 121,
-                    "asset": "assets/素材庫/第二章/T+0/drawer.png"
-                },
-                "t7_wardrobe": {
-                    "x": 598,
-                    "y": 108,
-                    "width": 108,
-                    "height": 203,
-                    "asset": "assets/素材庫/第二章/T-3/closet.png"
-                }
-            }
+            "pending_objects": {}
         },
         "T3": {
             "background": {
@@ -1449,6 +1453,24 @@
                             541
                         ]
                     ]
+                },
+                "t3_safe": {
+                    "x": 291,
+                    "y": 196,
+                    "width": 84,
+                    "height": 81,
+                    "asset": "assets/素材庫/第二章/T+0/locker.png",
+                    "label": "保險箱",
+                    "interaction_padding": 40
+                },
+                "t3_bedside_table": {
+                    "x": 507,
+                    "y": 176,
+                    "width": 61,
+                    "height": 121,
+                    "asset": "assets/素材庫/第二章/T+0/drawer.png",
+                    "label": "床頭櫃",
+                    "interaction_padding": 40
                 }
             },
             "decorations": {
@@ -1465,20 +1487,6 @@
                         "column": 0,
                         "row": 0
                     }
-                },
-                "t3_safe": {
-                    "x": 291,
-                    "y": 196,
-                    "width": 84,
-                    "height": 81,
-                    "asset": "assets/素材庫/第二章/T+0/locker.png"
-                },
-                "t3_bedside_table": {
-                    "x": 507,
-                    "y": 176,
-                    "width": 61,
-                    "height": 121,
-                    "asset": "assets/素材庫/第二章/T+0/drawer.png"
                 }
             },
             "entry_spawns": {},
@@ -1555,6 +1563,35 @@
         "default_height": 300
     },
     "puzzle_layouts": {
+        "chapter1_binary_lock": {
+            "asset": "assets/素材庫/第一章/空間C/lock.png",
+            "lock_rect": {
+                "x": 15,
+                "y": 80,
+                "width": 490,
+                "height": 345
+            },
+            "input_slots": {
+                "first_x_ratio": 0.307,
+                "step_ratio": 0.079,
+                "y_ratio": 0.365
+            },
+            "buttons": {
+                "1": {
+                    "x_ratio": 0.29,
+                    "y_ratio": 0.555,
+                    "width_ratio": 0.19,
+                    "height_ratio": 0.235
+                },
+                "0": {
+                    "x_ratio": 0.52,
+                    "y_ratio": 0.555,
+                    "width_ratio": 0.19,
+                    "height_ratio": 0.235
+                }
+            },
+            "debug_hitboxes": false
+        },
         "diary_drag": {
             "title_y": 42,
             "book_area": {
