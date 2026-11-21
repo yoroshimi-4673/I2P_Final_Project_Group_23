@@ -1456,7 +1456,8 @@ class GameUI:
         self,
         screen,
         mouse_pos,
-        volume
+        volume,
+        allow_save=True,
     ):
         """繪製共用設定Overlay。"""
 
@@ -1690,35 +1691,9 @@ class GameUI:
                 mouse_pos
             )
         )
-        buttons["save"] = pygame.Rect(
-            modal_rect.x + 35,
-            modal_rect.y + 295,
-            110,
-            35
-        )
-
-        self.draw_button(
-            screen,
-            "存檔",
-            buttons["save"],
-            enabled=False
-        )
-
-        save_text = self.font_small.render(
-            "尚未解鎖",
-            True,
-            (140, 140, 150)
-        )
-
-        screen.blit(
-            save_text,
-            (
-                buttons["save"].right + 10,
-                buttons["save"].centery
-                - save_text.get_height()
-                // 2
-            )
-        )
+        if allow_save:
+            buttons["save"] = pygame.Rect(modal_rect.x + 35, modal_rect.y + 295, 110, 35)
+            self.draw_button(screen, "存檔", buttons["save"], buttons["save"].collidepoint(mouse_pos))
 
         buttons["menu"] = pygame.Rect(
             modal_rect.x + 45,

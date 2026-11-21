@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 import unittest
-from unittest.mock import Mock, mock_open, patch
+from unittest.mock import Mock, patch
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
@@ -129,12 +129,12 @@ class PuzzleTests(unittest.TestCase):
 
     def round_trip_save(self):
         # 使用記憶體檔案驗證真實存讀流程避免碰玩家存檔
-        with patch("save_manager.open", mock_open(), create=True) as file:
-            save_manager.save_game(self.game)
-            serialized = "".join(call.args[0] for call in file().write.call_args_list)
+        with patch("save_manager._write_slot") as write:
+            save_manager.save_game(self.game, 1)
+            serialized = json.dumps(write.call_args.args[1])
         self.game.reset_game()
-        with patch("save_manager.open", mock_open(read_data=serialized), create=True):
-            self.assertTrue(save_manager.load_game(self.game))
+        with patch("save_manager._read_slot", return_value=json.loads(serialized)):
+            self.assertTrue(save_manager.load_game(self.game, 1))
         return json.loads(serialized)
 
     def test_save_load_round_trip(self):
@@ -152,8 +152,8 @@ class PuzzleTests(unittest.TestCase):
             "solved_puzzles": ["password_panel"],
             "puzzle_attempts": {"password_panel": 2}
         }
-        with patch("save_manager.open", mock_open(read_data=json.dumps(old_save)), create=True):
-            self.assertTrue(save_manager.load_game(self.game))
+        with patch("save_manager._read_slot", return_value=old_save):
+            self.assertTrue(save_manager.load_game(self.game, 1))
         self.assertEqual(self.game.solved_puzzles, [self.puzzle_id])
         self.assertEqual(self.game.puzzle_attempts, {self.puzzle_id: 2})
         self.assertTrue(self.manager.is_solved(self.puzzle_id))

@@ -56,6 +56,9 @@ class SettingsController:
         if not settings_buttons:
             return None
 
+        if "save" in settings_buttons and settings_buttons["save"].collidepoint(mouse_pos):
+            return "open_save"
+
         if settings_buttons[
             "slider"
         ].collidepoint(

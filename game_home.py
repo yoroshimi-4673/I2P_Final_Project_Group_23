@@ -26,6 +26,9 @@ from controllers.interaction_controller import InteractionController
 from controllers.hotbar_controller import HotbarController
 from controllers.codex_controller import CodexController
 from controllers.settings_controller import SettingsController
+from controllers.save_controller import SaveController
+from ui.save_ui import SaveUI
+import save_manager
 
 from game_states import (
     DIALOGUE,
@@ -1006,6 +1009,9 @@ UI_CODEX = "codex"
 ui_screen = UI_MENU  # 記錄目前主要顯示的UI頁面
 
 ui_overlay = None  # 記錄Settings等覆蓋式介面
+save_controller = SaveController()
+save_ui = SaveUI(game_ui)
+last_gameplay_frame = None
 
 tutorial_guide_open = False  # 記錄是否開啟新手教學總覽視窗
 tutorial_guide_buttons = {}
@@ -1038,37 +1044,119 @@ def finish_dialogue_and_open_ready_puzzle():
     interaction_controller.finish_interaction_sequence()  # 強制互動先於獎勵與事後反應
 
 
-def start_new_game():
-    """重設UI暫存狀態並交由StoryManager開始新遊戲。"""
-
-    global ui_screen
-    global ui_overlay
-
-    global last_player_space
-
+def reset_gameplay_ui():
     interaction_ui.close()
     interaction_controller.reset_puzzle_completion()
     interaction_controller.pending_post_interaction_dialogue = None
-    puzzle_controller.reset_anchor_slots()  # 新遊戲清除上局碎片暫存狀態
+    interaction_controller.reset_interaction_focus()
+    puzzle_controller.reset_anchor_drag_state()
+    puzzle_controller.anchor_selected_fragment = None
     codex_ui.close_item()
-
-    # 新遊戲開始時清除殘留移動按鍵
     pressed_keys.clear()
-
-    # 下一次進入Space時重新套用出生位置
-    last_player_space = None
-
-    # 新遊戲不保留上一局的裂隙入口資料
+    player.cancel_mouse_movement()
     interaction_controller.pending_entry_rift = None
     interaction_controller.pending_entry_object = None
 
-    hotbar_controller.reset()
 
-    # 第一章劇情內容與流程交由StoryManager管理
+def start_new_game():
+    """重設UI暫存狀態並交由StoryManager開始新遊戲。"""
+    global ui_screen, ui_overlay, last_player_space, last_gameplay_frame
+    reset_gameplay_ui()
+    last_player_space = None
+    last_gameplay_frame = None
+    hotbar_controller.reset()
     story_manager.start_new_game()
 
     ui_screen = UI_GAME
     ui_overlay = None
+
+
+def open_game_save(return_after_save=False):
+    global ui_overlay
+    save_controller.open_ingame(last_gameplay_frame, return_after_save)
+    settings_controller.stop_volume_drag()
+    ui_overlay = "save"
+
+
+def save_current_game(slot):
+    session = {"screen_size": list(screen.get_size())}
+    if game.game_state == DIALOGUE and not dialogue_controller.finished:
+        session["dialogue"] = {
+            "id": dialogue_controller.dialogue_id,
+            "lines": dialogue_controller.lines,
+            "index": dialogue_controller.current_index,
+            "visible_characters": dialogue_controller.visible_characters,
+            "after_action": story_manager.dialogue_after_action,
+            "target_space": story_manager.pending_target_space,
+        }
+    save_manager.save_game(
+        game, slot, player, hotbar_controller, save_controller.screenshot, session=session
+    )
+
+
+def load_saved_game(slot):
+    global screen, screen_width, screen_height
+    global ui_screen, ui_overlay, last_player_space, last_gameplay_frame
+    session = {}
+    if not save_manager.load_game(game, slot, player, hotbar_controller, restored_session=session):
+        return False
+
+    reset_gameplay_ui()
+    story_manager.reset_story_state()
+    size = session.get("screen_size")
+    if size and tuple(size) != screen.get_size():
+        screen_width, screen_height = size
+        screen = pygame.display.set_mode(size, pygame.RESIZABLE)
+    last_player_space = game.current_space if session["has_player_position"] else None
+    last_gameplay_frame = None
+
+    if game.game_state == DIALOGUE:
+        dialogue = session.get("dialogue")
+        if dialogue:
+            dialogue_controller.start(dialogue["id"], dialogue["lines"])
+            dialogue_controller.current_index = dialogue["index"]
+            dialogue_controller.visible_characters = dialogue["visible_characters"]
+            story_manager.dialogue_after_action = dialogue.get("after_action")
+            story_manager.pending_target_space = dialogue.get("target_space")
+        elif game.current_space is not None:
+            game.game_state = SPACE
+        else:
+            story_manager.start_dialogue("intro", after_action="start_first_choice")
+    elif game.game_state == CHOICE:
+        story_manager.start_first_choice()
+
+    ui_screen = UI_GAME
+    ui_overlay = None
+    return True
+
+
+def apply_save_action(action):
+    global ui_screen, ui_overlay, last_gameplay_frame
+    if action is None:
+        return
+    operation, slot = action
+    if operation == "save":
+        try:
+            save_current_game(slot)
+        except (OSError, ValueError, pygame.error):
+            save_controller.complete("save", False)
+        else:
+            save_controller.complete("save", True)
+        return
+    if operation == "load":
+        save_controller.complete("load", load_saved_game(slot))
+        return
+    if operation == "new":
+        save_controller.active_save_slot = slot
+        save_controller.close()
+        start_new_game()
+        return
+    save_controller.close()
+    ui_overlay = "settings" if operation == "settings" else None
+    if operation == "menu":
+        reset_gameplay_ui()
+        last_gameplay_frame = None
+        ui_screen = UI_MENU
 
 
 # ============================================================
@@ -1396,6 +1484,9 @@ while running:
 
         elif event.type == pygame.VIDEORESIZE:
 
+            if (event.w, event.h) == (screen_width, screen_height):
+                continue
+
             screen_width = max(
                 640,
                 event.w
@@ -1550,6 +1641,11 @@ while running:
         # ====================================================
 
         elif event.type == pygame.KEYDOWN:
+
+            if ui_overlay == "save":
+                if event.key == pygame.K_ESCAPE:
+                    apply_save_action(save_controller.back())
+                continue
 
             # Polygon編輯器優先攔截探索模式鍵盤事件
             if (
@@ -2319,13 +2415,34 @@ while running:
     # Settings Overlay
     # ========================================================
 
+    if (
+        ui_screen == UI_GAME
+        and game.current_space is not None
+        and game.game_state in (SPACE, PASSWORD, DIALOGUE)
+        and interaction_ui.mode not in ("circuit", "circuit_exit_confirmation")
+    ):
+        game_ui.draw_space_hud(screen, game)
+
+    if ui_screen == UI_GAME and (
+        ui_overlay is None
+        or (
+            ui_overlay == "settings"
+            and (last_gameplay_frame is None or last_gameplay_frame.get_size() != screen.get_size())
+        )
+    ):
+        last_gameplay_frame = screen.copy()
+
+    if ui_overlay == "save":
+        save_buttons = save_ui.draw(screen, mouse_pos, save_controller)
+
     if ui_overlay == "settings":
 
         settings_buttons = (
             game_ui.draw_settings_overlay(
                 screen,
                 mouse_pos,
-                settings_controller.volume
+                settings_controller.volume,
+                allow_save=ui_screen == UI_GAME,
             )
         )
 
@@ -2348,7 +2465,13 @@ while running:
         # Settings Overlay
         # ----------------------------------------------------
 
-        if ui_overlay == "settings":
+        if ui_overlay == "save":
+            for control, rect in save_buttons.items():
+                if rect.collidepoint(mouse_pos):
+                    apply_save_action(save_controller.activate(control))
+                    break
+
+        elif ui_overlay == "settings":
 
             if tutorial_guide_open:
                 close_rect = tutorial_guide_buttons.get("close")
@@ -2412,10 +2535,14 @@ while running:
 
             elif result == "go_menu":
 
-                interaction_ui.close()
-                interaction_controller.pending_post_interaction_dialogue = None
-                ui_screen = UI_MENU
-                ui_overlay = None
+                if ui_screen == UI_GAME:
+                    open_game_save(return_after_save=True)
+                else:
+                    ui_overlay = None
+
+            elif result == "open_save":
+
+                open_game_save()
 
             elif result == "close_settings":
 
@@ -2434,7 +2561,8 @@ while running:
                 mouse_pos
             ):
 
-                start_new_game()
+                save_controller.open_start()
+                ui_overlay = "save"
 
 
             elif menu_buttons[
@@ -2734,9 +2862,7 @@ while running:
                     mouse_pos
                 ):
 
-                    ui_screen = (
-                        UI_MENU
-                    )
+                    open_game_save(return_after_save=True)
 
 
                 elif game_over_buttons[
@@ -2773,9 +2899,7 @@ while running:
                     mouse_pos
                 ):
 
-                    ui_screen = (
-                        UI_MENU
-                    )
+                    open_game_save(return_after_save=True)
 
 
     # ========================================================
@@ -2795,15 +2919,6 @@ while running:
             mouse_pos
         )
 
-
-    # 空間資訊最後繪製避免被場景遮擋
-    if (
-        ui_screen == UI_GAME
-        and game.current_space is not None
-        and game.game_state in (SPACE, PASSWORD, DIALOGUE)
-        and interaction_ui.mode not in ("circuit", "circuit_exit_confirmation")
-    ):
-        game_ui.draw_space_hud(screen, game)
 
     pygame.display.flip()
 

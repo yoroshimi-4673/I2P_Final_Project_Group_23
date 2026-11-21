@@ -2,7 +2,7 @@
 import copy
 import json
 import unittest
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 import pygame
 import test_chapter2_flow as flow
@@ -122,24 +122,23 @@ class Scene13Tests(unittest.TestCase):
         f.open("ch2_terminal")
         self.drag("past_fragment", "past")
         f.puzzle.multi_input = {"past": "4", "present": "7", "future": "1"}
-        writer = mock_open()
-        with patch("builtins.open", writer):
-            save_manager.save_game(f.game)
-        payload = "".join(call.args[0] for call in writer().write.call_args_list)
+        with patch("save_manager._write_slot") as write:
+            save_manager.save_game(f.game, 1)
+            payload = json.dumps(write.call_args.args[1])
         saved = json.loads(payload)
         self.assertEqual(saved["scene13_anchor_slots"]["past"], "past_fragment")
         self.assertNotIn("multi_input", saved)
         restored = GameManager()
         reference = restored.scene13_anchor_slots
-        with patch("builtins.open", mock_open(read_data=payload)):
-            self.assertTrue(save_manager.load_game(restored))
+        with patch("save_manager._read_slot", return_value=json.loads(payload)):
+            self.assertTrue(save_manager.load_game(restored, 1))
         self.assertIs(restored.scene13_anchor_slots, reference)
         f.build(restored)
         self.assertEqual(f.puzzle.anchor_slots["past"], "past_fragment")
         self.assertEqual(f.puzzle.multi_input, {})
         del saved["scene13_anchor_slots"]
-        with patch("builtins.open", mock_open(read_data=json.dumps(saved))):
-            self.assertTrue(save_manager.load_game(restored))
+        with patch("save_manager._read_slot", return_value=saved):
+            self.assertTrue(save_manager.load_game(restored, 1))
         self.assertEqual(f.puzzle.anchor_slots, {"past": None, "present": None, "future": None})
         restored.scene13_anchor_slots["past"] = "past_fragment"
         restored.reset_game()

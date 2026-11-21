@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import types
 import unittest
-from unittest.mock import Mock, mock_open, patch
+from unittest.mock import Mock, patch
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -162,12 +162,12 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(surface.get_at((0, 0))[:3], (255, 255, 255))
         self.finish()
 
-        with patch("save_manager.open", mock_open(), create=True) as file:
-            save_manager.save_game(self.game)
-            saved = "".join(call.args[0] for call in file().write.call_args_list)
+        with patch("save_manager._write_slot") as write:
+            save_manager.save_game(self.game, 1)
+            saved = json.loads(json.dumps(write.call_args.args[1]))
         restored = GameManager()
-        with patch("save_manager.open", mock_open(read_data=saved), create=True):
-            self.assertTrue(save_manager.load_game(restored))
+        with patch("save_manager._read_slot", return_value=saved):
+            self.assertTrue(save_manager.load_game(restored, 1))
         self.build(restored)
         self.assertTrue(restored.has_event("t7_circuit_completed"))
         self.assertTrue(restored.is_puzzle_solved("t7_circuit"))

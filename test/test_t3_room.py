@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 import unittest
-from unittest.mock import mock_open, patch
+from unittest.mock import patch
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
@@ -164,13 +164,12 @@ class T3RoomTests(unittest.TestCase):
         self.f.click("t3_bed_board")
         self.f.finish()
         self.assertEqual(g.game_state, SPACE)
-        writer = mock_open()
-        with patch("builtins.open", writer):
-            save_manager.save_game(g)
-        payload = "".join(call.args[0] for call in writer().write.call_args_list)
+        with patch("save_manager._write_slot") as write:
+            save_manager.save_game(g, 1)
+            payload = json.loads(json.dumps(write.call_args.args[1]))
         restored = GameManager()
-        with patch("builtins.open", mock_open(read_data=payload)):
-            self.assertTrue(save_manager.load_game(restored))
+        with patch("save_manager._read_slot", return_value=payload):
+            self.assertTrue(save_manager.load_game(restored, 1))
         self.f.build(restored)
         self.f.open("t3_desk")
         self.assertEqual(self.f.ui.mode, "container")
