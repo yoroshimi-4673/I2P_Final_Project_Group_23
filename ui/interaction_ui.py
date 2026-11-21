@@ -2396,7 +2396,7 @@ class InteractionUI:
         screen,
         mouse_pos
     ):
-        """顯示完整陪伴日記目前頁面。"""
+        """顯示完整陪伴日記目前跨頁圖片。"""
 
         diary = self.objects.get(
             self.current_object_id,
@@ -2409,116 +2409,96 @@ class InteractionUI:
         )
 
         if not pages:
-
             return {}
 
         index = max(
             0,
             min(
-                self.puzzle_controller
-                .diary_reader_page,
+                self.puzzle_controller.diary_reader_page,
                 len(pages) - 1
             )
         )
 
-        self.puzzle_controller.diary_reader_page = (
-            index
-        )
-
-        page = pages[
-            index
-        ]
+        self.puzzle_controller.diary_reader_page = index
+        page = pages[index]
 
         modal = self.draw_modal_base(
             screen,
-            width=650,
-            height=470
+            width=730,
+            height=530
         )
 
-        title = (
-            self.game_ui.font_large.render(
-                "《陪伴日記》",
-                True,
-                (255, 220, 140)
-            )
+        title = self.game_ui.font_large.render(
+            "《陪伴日記》",
+            True,
+            (255, 220, 140)
         )
-
         screen.blit(
             title,
             title.get_rect(
-                center=(
-                    modal.centerx,
-                    modal.y + 40
-                )
+                center=(modal.centerx, modal.y + 32)
             )
         )
 
-        page_number = (
-            self.game_ui.font_small.render(
-                f"{index + 1} / {len(pages)}",
-                True,
-                (185, 185, 195)
-            )
+        page_number = self.game_ui.font_small.render(
+            f"{page.get('month', '')}（{index + 1} / {len(pages)}）",
+            True,
+            (200, 205, 220)
         )
-
         screen.blit(
             page_number,
             page_number.get_rect(
-                center=(
-                    modal.centerx,
-                    modal.y + 75
-                )
+                center=(modal.centerx, modal.y + 62)
             )
         )
 
-        month = (
-            self.game_ui.font_ui.render(
-                page.get(
-                    "month",
-                    ""
-                ),
-                True,
-                (245, 245, 245)
-            )
+        image_area = pygame.Rect(
+            modal.x + 28,
+            modal.y + 82,
+            modal.width - 56,
+            modal.height - 160
         )
 
-        screen.blit(
-            month,
-            (
-                modal.x + 55,
-                modal.y + 115
-            )
+        asset_path = page.get("ui_asset")
+        page_surf = (
+            self._get_scaled_diary_surface(asset_path, image_area.size)
+            if asset_path
+            else None
         )
 
-        self.draw_multiline_text(
-            screen,
-            page.get(
-                "text",
-                ""
-            ),
-            modal.x + 55,
-            modal.y + 165,
-            modal.width - 110,
-            font=self.game_ui.font_ui
-        )
+        if page_surf is not None:
+            screen.blit(
+                page_surf,
+                page_surf.get_rect(center=image_area.center)
+            )
+        else:
+            # 若圖片尚未載入則退回顯示文字
+            self.draw_multiline_text(
+                screen,
+                page.get("text", ""),
+                image_area.x + 20,
+                image_area.y + 20,
+                image_area.width - 40,
+                font=self.game_ui.font_ui
+            )
 
         previous_rect = pygame.Rect(
             modal.x + 55,
-            modal.bottom - 65,
+            modal.bottom - 58,
             120,
             38
         )
 
         next_rect = pygame.Rect(
             modal.right - 175,
-            modal.bottom - 65,
+            modal.bottom - 58,
             120,
             38
         )
 
         close_rect = pygame.Rect(
             modal.centerx - 60,
-            modal.bottom - 65,
+            modal.bottom - 58,
             120,
             38
         )
@@ -2527,9 +2507,7 @@ class InteractionUI:
             screen,
             "上一頁",
             previous_rect,
-            previous_rect.collidepoint(
-                mouse_pos
-            ),
+            previous_rect.collidepoint(mouse_pos),
             enabled=index > 0
         )
 
@@ -2537,18 +2515,14 @@ class InteractionUI:
             screen,
             "關閉",
             close_rect,
-            close_rect.collidepoint(
-                mouse_pos
-            )
+            close_rect.collidepoint(mouse_pos)
         )
 
         self.game_ui.draw_button(
             screen,
             "下一頁",
             next_rect,
-            next_rect.collidepoint(
-                mouse_pos
-            ),
+            next_rect.collidepoint(mouse_pos),
             enabled=index < len(pages) - 1
         )
 
