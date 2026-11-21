@@ -4,6 +4,8 @@ from save_manager import VALID_SAVE_SLOTS, get_save_slot_info
 class SaveController:
     """管理選擇欄位、確認與回到遊戲的介面流程。"""
 
+    START_ACTIONS = (("new", "新遊戲"), ("load", "讀取遊戲"), ("back", "返回"))
+
     def __init__(self):
         self.active_save_slot = None
         self.close()
@@ -12,6 +14,8 @@ class SaveController:
         self.mode = None
         self.operation = None
         self.selected_slot = None
+        self.focused_slot = VALID_SAVE_SLOTS[0]
+        self.focused_action = None
         self.slots = {}
         self.screenshot = None
         self.return_after_save = False
@@ -19,21 +23,54 @@ class SaveController:
 
     def open_start(self):
         self.close()
-        self.mode = "start"
+        self.show("start")
 
     def open_ingame(self, screenshot, return_after_save=False):
         self.close()
         self.screenshot = screenshot
         self.return_after_save = return_after_save
         if return_after_save:
-            self.mode = "return"
+            self.show("return")
         else:
             self.open_slots("save")
 
-    def open_slots(self, operation):
+    def open_slots(self, operation, preferred_slot=None):
         self.operation = operation
         self.slots = {slot: get_save_slot_info(slot) for slot in VALID_SAVE_SLOTS}
-        self.mode = "slots"
+        self.focused_slot = preferred_slot or self.active_save_slot or VALID_SAVE_SLOTS[0]
+        self.show("slots")
+
+    def show(self, mode):
+        self.mode = mode
+        choices = self.action_choices()
+        self.focused_action = choices[0][0] if choices else None
+
+    def action_choices(self):
+        if self.mode == "start":
+            return self.START_ACTIONS
+        if self.mode in ("return", "confirm", "overwrite", "saved", "error"):
+            return self.confirmation()[1]
+        return ()
+
+    def handle_navigation(self, key):
+        if key == "escape":
+            return self.back()
+        if key == "enter":
+            return self.activate(self.focused_slot if self.mode == "slots" else self.focused_action)
+
+        if self.mode == "slots" and key in ("up", "down"):
+            index = VALID_SAVE_SLOTS.index(self.focused_slot)
+            step = 1 if key == "down" else -1
+            self.focused_slot = VALID_SAVE_SLOTS[(index + step) % len(VALID_SAVE_SLOTS)]
+        elif (
+            (self.mode == "start" and key in ("up", "down"))
+            or (self.mode not in ("slots", "start") and key in ("left", "right"))
+        ):
+            controls = [control for control, _ in self.action_choices()]
+            if controls:
+                step = 1 if key in ("right", "down") else -1
+                self.focused_action = controls[(controls.index(self.focused_action) + step) % len(controls)]
+        return None
 
     def complete(self, operation, success):
         if success:
@@ -42,7 +79,7 @@ class SaveController:
             self.close()
         else:
             self.message = "存檔完成。" if success else "無法完成存讀檔，請重試。"
-            self.mode = "saved" if success else "error"
+            self.show("saved" if success else "error")
 
     def activate(self, control):
         if self.mode == "start" and control in ("new", "load"):
@@ -52,18 +89,19 @@ class SaveController:
         elif self.mode == "return" and control == "discard":
             return "menu", None
         elif self.mode == "slots" and control in self.slots:
+            self.focused_slot = control
             self.selected_slot = control
             if self.operation == "load" and self.slots[control]["status"] == "CORRUPTED":
                 self.message = "此欄位的存檔已損毀，無法讀取。"
-                self.mode = "error"
+                self.show("error")
             else:
-                self.mode = "confirm"
+                self.show("confirm")
         elif self.mode in ("confirm", "overwrite") and control == "yes":
             slot = self.selected_slot
             status = self.slots[slot]["status"]
             if self.operation == "save":
                 if status != "NO DATA" and self.mode == "confirm":
-                    self.mode = "overwrite"
+                    self.show("overwrite")
                 else:
                     return "save", slot
             elif self.operation == "new" or status == "NO DATA":
@@ -75,16 +113,18 @@ class SaveController:
         elif control in ("back", "no"):
             return self.back()
         elif self.mode == "error" and control == "yes":
-            self.open_slots(self.operation)
+            self.open_slots(self.operation, self.selected_slot)
         return None
 
     def back(self):
         if self.mode == "saved":
             return ("menu" if self.return_after_save else "game"), None
         if self.mode in ("confirm", "overwrite", "error"):
-            self.open_slots(self.operation)
+            self.open_slots(self.operation, self.selected_slot)
         elif self.mode == "slots" and self.operation != "save":
+            operation = self.operation
             self.open_start()
+            self.focused_action = operation
         elif self.mode == "start":
             return "menu", None
         else:

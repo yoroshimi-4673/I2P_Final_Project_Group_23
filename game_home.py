@@ -1643,8 +1643,14 @@ while running:
         elif event.type == pygame.KEYDOWN:
 
             if ui_overlay == "save":
-                if event.key == pygame.K_ESCAPE:
-                    apply_save_action(save_controller.back())
+                key = {
+                    pygame.K_UP: "up", pygame.K_DOWN: "down",
+                    pygame.K_LEFT: "left", pygame.K_RIGHT: "right",
+                    pygame.K_RETURN: "enter", pygame.K_KP_ENTER: "enter",
+                    pygame.K_ESCAPE: "escape",
+                }.get(event.key)
+                if key is not None:
+                    apply_save_action(save_controller.handle_navigation(key))
                 continue
 
             # Polygon編輯器優先攔截探索模式鍵盤事件

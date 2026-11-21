@@ -218,3 +218,80 @@ class SaveSlotTests(unittest.TestCase):
         controller.activate("load")
         self.assertEqual(set(view.draw(screen, (0, 0), controller)), {1, 2, 3, "back"})
         self.assertTrue(controller.slots[2]["exists"])
+
+    def test_keyboard_wraps_start_and_slot_focus_and_activates_the_same_actions(self):
+        controller = SaveController()
+        controller.open_start()
+        self.assertEqual(controller.focused_action, "new")
+        for key, expected in (("down", "load"), ("down", "back"), ("down", "new"), ("up", "back")):
+            controller.handle_navigation(key)
+            self.assertEqual(controller.focused_action, expected)
+        self.assertEqual(controller.handle_navigation("enter"), ("menu", None))
+        self.assertEqual(controller.handle_navigation("escape"), ("menu", None))
+
+        controller.open_start()
+        controller.handle_navigation("down")
+        controller.handle_navigation("enter")
+        self.assertEqual((controller.operation, controller.focused_slot), ("load", 1))
+        for key, expected in (("down", 2), ("down", 3), ("down", 1), ("up", 3)):
+            controller.handle_navigation(key)
+            self.assertEqual(controller.focused_slot, expected)
+        controller.handle_navigation("enter")
+        self.assertEqual((controller.selected_slot, controller.focused_action), (3, "yes"))
+        controller.handle_navigation("right")
+        self.assertEqual(controller.focused_action, "no")
+        controller.handle_navigation("left")
+        self.assertEqual(controller.focused_action, "yes")
+        controller.handle_navigation("escape")
+        self.assertEqual((controller.mode, controller.focused_slot), ("slots", 3))
+        controller.handle_navigation("escape")
+        self.assertEqual((controller.mode, controller.focused_action), ("start", "load"))
+
+        controller.active_save_slot = 2
+        controller.handle_navigation("enter")
+        self.assertEqual(controller.focused_slot, 2)
+
+    def test_return_and_corrupt_confirmation_support_keyboard(self):
+        controller = SaveController()
+        for moves, expected in ((0, None), (1, ("menu", None)), (2, ("settings", None))):
+            controller.open_ingame(None, return_after_save=True)
+            for _ in range(moves):
+                controller.handle_navigation("right")
+            self.assertEqual(controller.handle_navigation("enter"), expected)
+            if moves == 0:
+                self.assertEqual((controller.mode, controller.operation), ("slots", "save"))
+        controller.open_ingame(None, return_after_save=True)
+        self.assertEqual(controller.handle_navigation("escape"), ("settings", None))
+
+        path = saves.get_save_path(2)
+        path.parent.mkdir()
+        path.write_text("{", encoding="utf-8")
+        controller.open_slots("load")
+        controller.handle_navigation("down")
+        self.assertEqual(controller.focused_slot, 2)
+        controller.handle_navigation("enter")
+        self.assertEqual((controller.mode, controller.focused_action), ("error", "yes"))
+
+    def test_scaled_rows_and_hover_leave_keyboard_focus_intact(self):
+        pygame.display.init()
+        pygame.font.init()
+        self.addCleanup(pygame.quit)
+        gui = GameUI({"base_resolution": {"width": 800, "height": 600}}, {}, {})
+        saves.save_game(self.game, 2)
+        controller = SaveController()
+        controller.active_save_slot = 2
+        controller.open_slots("load")
+        controller.slots[2]["metadata"]["saved_at"] = "malformed timestamp"
+        view = SaveUI(gui)
+        for size in ((640, 480), (800, 600), (1024, 768)):
+            with self.subTest(size=size):
+                screen = pygame.display.set_mode(size)
+                buttons = view.draw(screen, (0, 0), controller)
+                buttons = view.draw(screen, buttons[3].center, controller)
+                self.assertEqual(controller.focused_slot, 2)
+                self.assertTrue(all(screen.get_rect().contains(rect) for rect in buttons.values()))
+                self.assertLess(buttons[3].bottom, gui.scale_y(screen, 544))
+                self.assertEqual(screen.get_at((buttons[2].x + 5, buttons[2].centery))[:3], view.FOCUS)
+                self.assertNotEqual(screen.get_at((buttons[3].x + 5, buttons[3].centery))[:3], view.FOCUS)
+        controller.activate(3)
+        self.assertEqual((controller.focused_slot, controller.selected_slot), (3, 3))
