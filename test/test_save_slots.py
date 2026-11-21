@@ -19,9 +19,84 @@ from managers.game_manager import GameManager
 import save_manager as saves
 from ui.game_ui import GameUI
 from ui.save_ui import SaveUI
+from test.test_chapter2_flow import home_function
 
 
 class SaveSlotTests(unittest.TestCase):
+    def test_delete_flow_cancels_one_layer_at_a_time_and_accepts_corruption(self):
+        saves.save_game(self.game, 2)
+        saves.get_save_path(3).write_text("{", encoding="utf-8")
+        controller = SaveController()
+        nav = controller.handle_navigation
+        for operation in ("new", "save"):
+            controller.open_slots(operation)
+            nav("reset")
+            self.assertEqual(controller.mode, "slots")
+        controller.open_slots("load")
+        nav("reset")
+        self.assertEqual(controller.mode, "delete_select")
+        self.assertIsNone(controller.selected_slot)
+        self.assertIsNone(nav("enter"))
+        self.assertEqual(controller.mode, "delete_select")
+        nav("down")
+        self.assertEqual(controller.focused_slot, 2)
+        nav("enter")
+        self.assertEqual((controller.mode, controller.selected_slot, controller.focused_action),
+                         ("delete_confirm_1", 2, "cancel"))
+        nav("left")
+        self.assertIsNone(nav("enter"))
+        self.assertEqual(controller.mode, "delete_confirm_2")
+        self.assertEqual(controller.confirmation()[0], "你真的確定要刪除嗎？請注意此操作無法復原。")
+        self.assertEqual(controller.focused_action, "cancel")
+        nav("escape")
+        self.assertEqual((controller.mode, controller.focused_action), ("delete_confirm_1", "cancel"))
+        nav("escape")
+        self.assertEqual((controller.mode, controller.focused_slot), ("delete_select", 2))
+        nav("down")
+        nav("enter")
+        self.assertEqual((controller.mode, controller.selected_slot), ("delete_confirm_1", 3))
+        nav("escape")
+        nav("escape")
+        self.assertEqual((controller.mode, controller.operation), ("slots", "load"))
+
+    def test_only_second_confirmation_resets_files_and_clears_legacy_slot_one(self):
+        screenshot = pygame.Surface((16, 16))
+        saves.save_game(self.game, 2, screenshot_surface=screenshot)
+        second = {path: path.read_bytes() for path in (saves.get_save_path(2), saves.get_thumbnail_path(2))}
+        for with_new_save in (False, True):
+            with self.subTest(with_new_save=with_new_save):
+                self.legacy.write_text('{"game_state":"space","current_space":"B"}', encoding="utf-8")
+                if with_new_save:
+                    saves.save_game(self.game, 1, screenshot_surface=screenshot)
+                controller = SaveController()
+                controller.active_save_slot = 1
+                controller.open_slots("load")
+                controller.handle_navigation("reset")
+                controller.handle_click(1)
+                self.assertIsNone(controller.selected_slot)
+                controller.handle_click(1)
+                self.assertIsNone(controller.activate("delete"))
+                self.assertTrue(self.legacy.is_file())
+                if with_new_save:
+                    self.assertTrue(saves.get_save_path(1).is_file())
+                    self.assertTrue(saves.get_thumbnail_path(1).is_file())
+                controller.handle_navigation("left")
+                action = controller.handle_navigation("enter")
+                self.assertEqual(action, ("reset", 1))
+                self.assertTrue(self.legacy.is_file())
+                apply = home_function("apply_save_action", {
+                    "save_manager": saves, "save_controller": controller,
+                })
+                apply(action)
+                self.assertFalse(self.legacy.exists())
+                self.assertFalse(saves.get_save_path(1).exists())
+                self.assertFalse(saves.get_thumbnail_path(1).exists())
+                self.assertIsNone(controller.active_save_slot)
+                self.assertEqual(controller.confirmation()[0], "SLOT 1 已刪除。")
+                controller.handle_navigation("enter")
+                self.assertEqual(controller.slots[1]["status"], "NO DATA")
+                self.assertEqual({path: path.read_bytes() for path in second}, second)
+
     def setUp(self):
         directory = Path(gettempdir()) / f"i2p-save-test-{uuid4().hex}"
         directory.mkdir()

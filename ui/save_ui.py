@@ -74,9 +74,11 @@ class SaveUI:
         self._text(screen, title, 55, 32, font=self.game_ui.font_large)
         pygame.draw.rect(screen, self.BORDER, self._rect(screen, 55, 82, 690, 1))
 
-    def draw_footer_hint(self, screen, *, horizontal=False, dismiss_only=False):
+    def draw_footer_hint(self, screen, *, text=None, horizontal=False, dismiss_only=False):
         pygame.draw.rect(screen, self.BORDER, self._rect(screen, 55, 544, 690, 1))
-        if dismiss_only:
+        if text is not None:
+            hint = text
+        elif dismiss_only:
             hint = "Enter 確定    Esc 返回"
         elif horizontal:
             hint = "← → 選擇    Enter 確認    Esc 取消"
@@ -93,7 +95,7 @@ class SaveUI:
                 screen, mouse, controller.action_choices(), 190, 120,
                 controller.focused_action, vertical=True,
             )
-        if controller.mode == "slots":
+        if controller.mode in ("slots", "delete_select"):
             return self.draw_slots(screen, mouse, controller)
         return self.draw_confirmation(screen, mouse, controller)
 
@@ -110,15 +112,21 @@ class SaveUI:
             surface = font.render(line, True, self.INK)
             screen.blit(surface, surface.get_rect(midtop=(modal.centerx, y)))
             y += font.get_linesize()
-        self.draw_footer_hint(screen, horizontal=True, dismiss_only=len(choices) == 1)
+        hint = "← → 選擇    Enter 確認    Esc 返回" if controller.mode in (
+            "delete_confirm_1", "delete_confirm_2"
+        ) else None
+        self.draw_footer_hint(screen, text=hint, horizontal=True, dismiss_only=len(choices) == 1)
         return self._buttons(screen, mouse, choices, 400, 344, controller.focused_action)
 
     def draw_slots(self, screen, mouse, controller):
         titles = {"new": "新遊戲", "load": "讀取遊戲", "save": "存檔"}
-        self.draw_title(screen, titles[controller.operation])
+        deleting = controller.mode == "delete_select"
+        self.draw_title(screen, "刪除存檔" if deleting else titles[controller.operation])
+        if deleting:
+            self._text(screen, "請選擇欲刪除的存檔。", 55, 91, color=self.MUTED)
         buttons = {}
         for index, (slot, info) in enumerate(controller.slots.items()):
-            y = 105 + 135 * index
+            y = (119 if deleting else 105) + 135 * index
             row = self._rect(screen, 55, y, 690, 120)
             focused = controller.focused_slot == slot
             hovered = row.collidepoint(mouse)
@@ -133,7 +141,12 @@ class SaveUI:
             self.draw_thumbnail(screen, info, y)
             self.draw_slot_metadata(screen, info, y, color)
             buttons[slot] = row
-        self.draw_footer_hint(screen)
+        hint = None
+        if deleting:
+            hint = "↑ ↓ 選擇    Enter 選取    Esc 返回"
+        elif controller.operation == "load":
+            hint = "↑ ↓ 選擇    Enter 讀取    R 刪除存檔    Esc 返回"
+        self.draw_footer_hint(screen, text=hint)
         buttons.update(self._buttons(screen, mouse, (("back", "返回"),), 670, 552))
         return buttons
 
