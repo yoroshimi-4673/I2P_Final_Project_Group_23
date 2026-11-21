@@ -198,12 +198,20 @@
         "description": "抽屜裝著三位數密碼鎖。旁邊寫著：「她長到這裡，我就把秘密還給她。」",
         "puzzle_id": "t0_bedside_drawer"
     },
+    "t0_desk": {
+        "name": "書桌",
+        "type": "container",
+        "space": "T0",
+        "description": "房間裡的一張書桌。",
+        "contents": ["t0_diary"]
+    },
     "t0_diary": {
         "name": "陪伴日記",
         "type": "puzzle",
         "space": "T0",
         "description": "一本由黎琛寫下、卻沒有記憶的陪伴日記。",
-        "puzzle_id": "t0_diary_restore"
+        "puzzle_id": "t0_diary_restore",
+        "hide_after_discovered": "t0_fixed_diary"
     },
     "t0_child_safe": {
         "name": "兒童保險箱",
@@ -276,13 +284,24 @@
         ],
         "knowledge_reward": "number_0347"
     },
+    "t7_desk": {
+        "name": "書桌",
+        "type": "container",
+        "space": "T7",
+        "description": "七年後的書桌。",
+        "contents": ["t7_letter", "t7_desk_drawer"]
+    },
     "t7_letter": {
         "name": "給爸爸的信",
-        "type": "readable",
+        "type": "item",
         "space": "T7",
         "description": "一封泛黃的信，信封上寫著：「給爸爸」。",
         "ui_asset": "assets/素材庫/第二章/T+7/letter.png",
-        "knowledge_reward": "future_age_14"
+        "reader_asset": "assets/素材庫/第二章/T+7/letter_inside.png",
+        "reader_type": "document",
+        "collectable": true,
+        "knowledge_reward": "future_age_14",
+        "hide_after_discovered": "t7_letter"
     },
     "t7_calendar": {
         "name": "牆上的日曆",
@@ -366,7 +385,8 @@
         "type": "item",
         "description": "桌上放著一把小美工刀。",
         "ui_asset": "assets/素材庫/第二章/T-3/knife.png",
-        "collectable": true
+        "collectable": true,
+        "hide_after_discovered": "t3_knife"
     },
     "t3_bed_board": {
         "name": "床板底部",

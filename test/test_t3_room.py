@@ -49,8 +49,9 @@ class T3RoomTests(unittest.TestCase):
     def search(self, object_id):
         self.f.open(object_id)
         self.assertEqual(self.f.game.game_state, SPACE)
-        if object_id == "t3_desk":
-            self.assertIn(self.f.ui.mode, ("item_notification", "message"))
+        if object_id == "t3_desk" and not self.f.game.has_discovered_item("t3_knife"):
+            self.f.click("t3_knife")
+            self.assertEqual(self.f.ui.mode, "item_notification")
             self.f.click("ok")
         self.f.click("back" if object_id == "t3_wardrobe" else "close")
         self.finish_reaction()
@@ -81,6 +82,8 @@ class T3RoomTests(unittest.TestCase):
         self.assertFalse(g.has_item("t3_knife"))
         self.f.ui.close()
         self.f.open("t3_desk")
+        self.assertEqual([child["object_id"] for child in self.f.ui.result["contents"]], ["t3_knife"])
+        self.f.click("t3_knife")
         self.assertEqual(self.f.ui.mode, "item_notification")
         self.assertEqual(self.f.ui.notification["item_id"], "t3_knife")
         self.assertEqual(g.game_state, SPACE)
@@ -99,16 +102,16 @@ class T3RoomTests(unittest.TestCase):
         self.finish_reaction()
 
         self.f.open("t3_desk")
-        self.assertEqual(self.f.ui.mode, "message")
-        self.assertIn("已經被拿走", self.f.ui.result["description"])
-        self.f.click("ok")
         self.assertEqual(self.f.ui.mode, "container")
+        self.assertEqual(self.f.ui.result["contents"], [])
         self.assertEqual(g.game_state, SPACE)
         self.f.click("close")
         self.finish_reaction()
         self.assertEqual(g.inventory.count("t3_knife"), 1)
         g.remove_item("t3_knife")
-        self.search("t3_desk")
+        self.f.open("t3_desk")
+        self.f.interaction.open_container_child("t3_knife")
+        self.assertEqual(self.f.ui.result["contents"], [])
         self.assertFalse(g.has_item("t3_knife"))
 
     def test_wrong_searches_never_change_attempts_and_window_reveals_box(self):
@@ -147,7 +150,8 @@ class T3RoomTests(unittest.TestCase):
         self.assertTrue(self.f.game.has_event("t3_completed"))
         self.assertTrue(self.f.game.has_item("t3_knife"))
         self.f.finish()
-        self.finish_reaction()
+        self.assertEqual(self.f.game.game_state, SPACE)
+        self.assertFalse(self.f.ui.is_open())
 
     def test_existing_save_state_retains_search_knife_carving_and_puzzle(self):
         self.search("t3_desk")
@@ -159,7 +163,7 @@ class T3RoomTests(unittest.TestCase):
         self.f.open("t3_bed")
         self.f.click("t3_bed_board")
         self.f.finish()
-        self.finish_reaction()
+        self.assertEqual(g.game_state, SPACE)
         writer = mock_open()
         with patch("builtins.open", writer):
             save_manager.save_game(g)
@@ -169,7 +173,10 @@ class T3RoomTests(unittest.TestCase):
             self.assertTrue(save_manager.load_game(restored))
         self.f.build(restored)
         self.f.open("t3_desk")
-        self.assertEqual(self.f.ui.mode, "message")
+        self.assertEqual(self.f.ui.mode, "container")
+        self.assertFalse(self.f.ui.result["contents"])
+        self.f.click("close")
+        self.f.dialogue.start.assert_not_called()
         self.assertEqual(restored.inventory.count("t3_knife"), 1)
         self.assertTrue(restored.has_event("t3_0347_carved"))
         self.assertTrue(restored.is_puzzle_solved("t3_time_capsule"))
@@ -181,6 +188,13 @@ class T3RoomTests(unittest.TestCase):
         gui = self.f.game_ui
         room = self.f.layout["spaces"]["T3"]
         manager = MapManager(copy.deepcopy(self.f.layout), gui, self.f.game)
+        furniture_bodies = {
+            "desk_body": (138, 237, 109, 69),
+            "safe_body": (300, 209, 69, 50),
+            "bed_body": (405, 224, 82, 80),
+            "bedside_table_body": (510, 221, 55, 76),
+            "wardrobe_body": (604, 157, 95, 132),
+        }
         for size in ((800, 600), (640, 480), (1280, 720)):
             surface = pygame.Surface(size)
             runtime = manager.build_space_runtime_data("T3", surface)
@@ -188,15 +202,15 @@ class T3RoomTests(unittest.TestCase):
             self.assertNotIn("t3_bed_board", runtime["object_rects"])
             self.assertNotIn("young_li_nian", runtime["interaction_rects"])
             self.assertIn("t3_windowsill", runtime["interaction_rects"])
-            self.assertEqual(set(runtime["collision_rects"]), {
-                "t3_bed_body", "t3_wardrobe_body", "t3_desk_body"
-            })
-            for object_id in ("t3_bed", "t3_wardrobe", "t3_desk"):
-                layout = room["objects"][object_id]
-                target = gui.scale_rect(surface, layout)
-                image = gui.load_image(layout["asset"])
-                expected = gui.scale_image_to_fit(image, target).get_rect(center=target.center)
-                self.assertEqual(runtime["collision_rects"][object_id + "_body"], expected)
+            for space in ("T3", "T0", "T7"):
+                with self.subTest(space=space, size=size):
+                    expected = {
+                        f"{space.lower()}_{suffix}": gui.scale_rect(
+                            surface, dict(zip(("x", "y", "width", "height"), coords))
+                        )
+                        for suffix, coords in furniture_bodies.items()
+                    }
+                    self.assertEqual(manager.get_collision_rects(space, surface), expected)
             self.assertEqual(
                 runtime["interaction_rects"]["t3_windowsill"],
                 gui.scale_rect(surface, room["objects"]["t3_windowsill"]),

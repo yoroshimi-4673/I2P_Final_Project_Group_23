@@ -96,6 +96,10 @@ class InteractionUI:
         self.result = previous.get(
             "result"
         )
+        if self.mode == "container":
+            from managers.interaction_manager import get_container_info
+
+            self.result = get_container_info(self.game, self.current_object_id, self.objects)
 
 
     def push_current(self):
@@ -165,7 +169,8 @@ class InteractionUI:
                 ""
             ),
             "asset": current_object.get(
-                "ui_asset"
+                "reader_asset",
+                current_object.get("ui_asset")
             )
         }
 

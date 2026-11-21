@@ -48,7 +48,7 @@ from ui.interaction_ui import InteractionUI
 pygame.init()
 pygame.key.stop_text_input()
 
-DEBUG_COLLISION = False  # 正式遊玩預設隱藏碰撞校正圖層
+DEBUG_COLLISION = True  # 正式遊玩預設隱藏碰撞校正圖層
 POLYGON_EDITOR_ENABLED = True  # Enable mouse and keyboard polygon editing
 polygon_editor_active = False  # 記錄目前是否正在繪製Polygon
 polygon_editor_points = []  # 暫存本次繪製的Base座標頂點

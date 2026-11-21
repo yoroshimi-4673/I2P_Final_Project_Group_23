@@ -183,34 +183,43 @@ class DiaryDragTests(unittest.TestCase):
         self.assertTrue(all(value is None for value in self.f.puzzle.diary_slots.values()))
         self.assertTrue(self.f.manager.can_attempt("t0_child_safe"))
 
-    def test_table_and_hotbar_use_same_six_page_reader(self):
+    def test_restored_diary_disappears_from_desk_and_hotbar_reader_keeps_all_months(self):
         self.restore_diary()
         self.f.acknowledge_success("日記頁已經按照月份恢復。")
         self.f.acknowledge_rewards("t0_fixed_diary")
-        self.f.open("t0_diary")
+        self.f.open("t0_desk")
+        self.assertEqual(self.f.ui.result["contents"], [])
+        self.f.game.remove_item("t0_fixed_diary")
+        self.f.open("t0_desk")
+        self.assertEqual(self.f.ui.result["contents"], [])
+        self.f.click("close")
+        self.f.game.add_item("t0_fixed_diary")
+        hotbar = HotbarController(self.f.game, self.f.game_ui, self.f.ui, self.f.interaction)
+        hotbar.open_item("t0_fixed_diary")
         self.assertEqual(self.f.ui.mode, "diary_reader")
+        self.assertEqual(self.f.ui.current_object_id, "t0_fixed_diary")
         expected = [
             ("一月", "今天陪她只有一小時。本月缺席：2 次。"),
             ("二月", "她畫了一幅畫給我。本月缺席：3 次。"),
             ("三月", "她問我，爸爸為什麼總是在加班。本月缺席：5 次。"),
             ("四月", "我送她的繪本，她只翻到第一頁。本月缺席：8 次。"),
             ("五月", "護士說，她最近都不再問了。本月缺席：13 次。"),
-            ("六月", "本月缺席：＿＿ 次（還沒到）")
+            ("六月", "六月：本月缺席：＿＿ 次（還沒到）")
         ]
         pages = self.f.objects["t0_fixed_diary"]["pages"]
-        self.assertEqual([(p["month"], p["text"]) for p in pages], expected)
+        self.assertEqual(
+            [(month, text) for page in pages
+             for month, text in zip(page["month"].split("・"), page["text"].splitlines(), strict=True)],
+            expected
+        )
         self.f.click("previous")
         self.assertEqual(self.f.puzzle.diary_reader_page, 0)
         for _ in range(7):
             self.f.click("next")
-        self.assertEqual(self.f.puzzle.diary_reader_page, 5)
+        self.assertEqual(self.f.puzzle.diary_reader_page, len(pages) - 1)
         for _ in range(7):
             self.f.click("previous")
         self.assertEqual(self.f.puzzle.diary_reader_page, 0)
-        hotbar = HotbarController(self.f.game, self.f.game_ui, self.f.ui, self.f.interaction)
-        hotbar.open_item("t0_fixed_diary")
-        self.assertEqual(self.f.ui.mode, "diary_reader")
-        self.assertEqual(self.f.ui.current_object_id, "t0_fixed_diary")
 
     def test_all_exits_confirmation_cancel_and_corresponding_door_spawn(self):
         manager = MapManager(copy.deepcopy(self.f.layout), self.f.game_ui, self.f.game)

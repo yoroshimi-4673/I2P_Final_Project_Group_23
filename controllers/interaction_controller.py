@@ -63,14 +63,14 @@ class InteractionController:
         object_type = current_object["type"]
 
         # 三個錯誤搜尋位置在互動結束後播放反應
-        if self.game.current_space == "T3" and object_id in (
-            "t3_bed", "t3_desk", "t3_wardrobe"
+        if (
+            self.game.current_space == "T3"
+            and object_id in ("t3_bed", "t3_desk", "t3_wardrobe")
+            and not self.game.has_event("t3_capsule_opened")
         ):
             self.pending_post_interaction_dialogue = object_id
             self.reset_interaction_focus()
             self.interaction_ui.open_object(object_id)
-            if object_id == "t3_desk":
-                self.open_container_child("t3_knife")
             return
 
 
@@ -427,7 +427,7 @@ class InteractionController:
 
         object_id = self.pending_post_interaction_dialogue
         self.pending_post_interaction_dialogue = None  # 播放前清除避免重複觸發反應
-        if self.game.current_space == "T3":
+        if self.game.current_space == "T3" and not self.game.has_event("t3_capsule_opened"):
             self.story_manager.start_t3_search(object_id)
 
     def return_from_interaction(self):
@@ -837,7 +837,7 @@ class InteractionController:
 
 
             if self.interaction_ui.mode == "readable":
-                self.close_readable()
+                self.interaction_ui.close()
 
             elif self.interaction_ui.mode == "password":
                 self.interaction_ui.close()
@@ -849,13 +849,13 @@ class InteractionController:
                 self.interaction_ui.close()
                 self.finish_interaction_sequence()
 
-    def close_readable(self):
-        """關閉文件並僅於首次閱讀後播放劇情。"""
-
-        object_id = self.interaction_ui.current_object_id
-        self.interaction_ui.close()
-
-        if object_id == "t7_letter" and not self.game.has_event("t7_letter_read"):
+    def open_inventory_document(self, item_id, item_data):
+        """開啟背包文件，首次讀信時啟動原有劇情。"""
+        self.interaction_ui.open_readable(item_id)
+        if (
+            item_data.get("knowledge_reward") == "future_age_14"
+            and not self.game.has_event("t7_letter_read")
+        ):
             self.story_manager.complete_t7_letter()
 
 
@@ -1361,7 +1361,7 @@ class InteractionController:
         elif mode == "readable":
 
             if buttons["close"].collidepoint(mouse_pos):
-                self.close_readable()
+                self.interaction_ui.close()
 
         elif mode == "item":
 
@@ -1427,19 +1427,20 @@ class InteractionController:
             child_id
         ]
 
-        # 美工刀只能從書桌容器的子道具取得
-        if child_id == "t3_knife" and self.interaction_ui.current_object_id == "t3_desk":
-            self.interaction_ui.push_current()
+        hide_item_id = child.get("hide_after_discovered")
+        if hide_item_id is not None and self.game.has_discovered_item(hide_item_id):
+            return
+
+        if child["type"] == "item" and child.get("collectable"):
             if self.game.has_discovered_item(child_id):
-                self.interaction_ui.open_message(
-                    "美工刀已經被拿走了。", child_id
-                )
-            else:
-                result = collect_item(self.game, child_id, self.interaction_ui.objects)
-                self.interaction_ui.current_object_id = child_id
-                self.interaction_ui.result = result
-                self.interaction_ui.notification = result
-                self.interaction_ui.mode = "item_notification"
+                return
+
+            self.interaction_ui.push_current()
+            result = collect_item(self.game, child_id, self.interaction_ui.objects)
+            self.interaction_ui.current_object_id = child_id
+            self.interaction_ui.result = result
+            self.interaction_ui.notification = result
+            self.interaction_ui.mode = "item_notification"
             return
 
         if child[
