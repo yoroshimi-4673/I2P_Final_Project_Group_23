@@ -270,8 +270,8 @@
                 "workbench": {
                     "x": 70,
                     "y": 195,
-                    "width": 230,
-                    "height": 150,
+                    "width": 110,
+                    "height": 96,
                     "asset": "assets/素材庫/第一章/空間B/desk.png",
                     "label": "工作檯",
                     "interaction_padding": 40
@@ -297,8 +297,8 @@
                 "ceiling_rift": {
                     "x": 535,
                     "y": 55,
-                    "width": 185,
-                    "height": 130,
+                    "width": 80,
+                    "height": 76,
                     "asset": "assets/素材庫/第一章/空間B/path.png",
                     "label": "通風管裂隙",
                     "interaction_padding": 30
@@ -316,10 +316,10 @@
             },
             "collision_zones": {
                 "workbench_body": {
-                    "x": 70,
-                    "y": 195,
-                    "width": 230,
-                    "height": 150,
+                    "x": 76,
+                    "y": 205,
+                    "width": 97,
+                    "height": 80,
                     "kind": "furniture"
                 },
                 "calendar_body": {
@@ -922,10 +922,10 @@
                     "kind": "furniture"
                 },
                 "t0_bed_body": {
-                    "x": 405,
-                    "y": 224,
-                    "width": 82,
-                    "height": 80,
+                    "x": 407,
+                    "y": 205,
+                    "width": 79,
+                    "height": 113,
                     "kind": "furniture"
                 },
                 "t0_bedside_table_body": {
@@ -1190,10 +1190,10 @@
                     "kind": "furniture"
                 },
                 "t7_bed_body": {
-                    "x": 405,
-                    "y": 224,
-                    "width": 82,
-                    "height": 80,
+                    "x": 407,
+                    "y": 205,
+                    "width": 79,
+                    "height": 113,
                     "kind": "furniture"
                 },
                 "t7_bedside_table_body": {
@@ -1475,15 +1475,15 @@
             },
             "decorations": {
                 "young_li_nian": {
-                    "x": 120,
-                    "y": 215,
-                    "width": 55,
-                    "height": 75,
+                    "x": 445,
+                    "y": 253,
+                    "width": 83,
+                    "height": 113,
                     "asset": "assets/素材庫/角色/daughter.png",
                     "label": "四歲黎念",
                     "sprite_sheet": {
                         "columns": 4,
-                        "rows": 3,
+                        "rows": 4,
                         "column": 0,
                         "row": 0
                     }
@@ -1506,10 +1506,10 @@
                     "kind": "furniture"
                 },
                 "t3_bed_body": {
-                    "x": 405,
-                    "y": 224,
-                    "width": 82,
-                    "height": 80,
+                    "x": 407,
+                    "y": 205,
+                    "width": 79,
+                    "height": 113,
                     "kind": "furniture"
                 },
                 "t3_bedside_table_body": {
