@@ -331,10 +331,10 @@ class StoryManager:
             "T0"
         )
 
-        self.start_dialogue(
-            "scene_10_entry",
-            after_action="return_to_space"
-        )
+        if not self.game.has_event("scene_10_entered_once"):
+            self.game.complete_event("scene_10_entered_once")  # 首次播放前記錄進房事件
+            if not self.game.has_event("t0_completed"):  # 已完成病房的舊存檔略過進場
+                self.start_dialogue("scene_10_entry", after_action="return_to_space")
 
         return True
 
@@ -405,13 +405,17 @@ class StoryManager:
 
         if not self.game.has_event("t7_circuit_completed"):
             self.start_dialogue("scene_11_circuit_intro", after_action="open_t7_circuit")
+        elif not self.game.has_event("scene_11_entered_once"):
+            self.game.complete_event("scene_11_entered_once")  # 相容已修好電路的舊版存檔
         return True
 
     def complete_t7_circuit(self):
         """恢復未來病房供電並播放正式進場台詞。"""
         if not self.game.has_event("t7_circuit_completed"):
             self.game.complete_event("t7_circuit_completed")
-            self.start_dialogue("scene_11_entry", after_action="return_to_space")
+            if not self.game.has_event("scene_11_entered_once"):
+                self.game.complete_event("scene_11_entered_once")  # 正式進場對話只在首次供電播放
+                self.start_dialogue("scene_11_entry", after_action="return_to_space")
 
     def complete_t7_rubbing(self):
         """保存0347情報並播放拓印劇情。"""
@@ -486,6 +490,12 @@ class StoryManager:
         self.game.enter_space(
             "T3"
         )
+
+        if self.game.has_event("scene_12_entered_once"):
+            return
+        self.game.complete_event("scene_12_entered_once")  # 記錄首次進房以避免再次化灰
+        if self.game.has_event("t3_items_turned_to_ash"):
+            return  # 舊存檔已化灰時直接恢復探索
 
         items_to_remove = [
             "rubbing_paper",
@@ -739,18 +749,21 @@ class StoryManager:
 
         elif action == "enter_selected_space":
 
-            if self.pending_target_space is not None:
+            target = self.pending_target_space  # 保存序章選擇的實際目的地
+            if target is not None:
 
                 self.game.current_scene = (
                     "exploration"
                 )
 
                 self.game.enter_space(
-                    self.pending_target_space
+                    target
                 )
 
             # 完成切換後清除暫存目標空間
             self.pending_target_space = None
+            if target == "A":
+                return "first_choice_a"  # 只在序章選入空間甲時回傳入口
 
         elif action == "finish_photo_story":
 

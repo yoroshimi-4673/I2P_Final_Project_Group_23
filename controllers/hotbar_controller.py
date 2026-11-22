@@ -132,36 +132,25 @@ class HotbarController:
 
         return True
 
-    def move_page_left(
-        self,
-    ):
+    def move_page_left(self):
         """Hotbar向左翻動一格。"""
 
-        self.offset = max(
-            0,
-            self.offset - 1
-        )
+        return self._move_page(-1)
 
-        self.selected_slot = 0
-
-    def move_page_right(
-        self,
-        visible_slots
-    ):
+    def move_page_right(self):
         """Hotbar向右翻動一格。"""
 
-        max_offset = max(
-            0,
-            len(self.game.inventory)
-            - visible_slots
-        )
+        return self._move_page(1)
 
-        self.offset = min(
-            max_offset,
-            self.offset + 1
-        )
-
+    def _move_page(self, delta):
+        limit = self.game_ui.get_hotbar_max_offset(self.game)
+        current = max(0, min(self.offset, limit))
+        self.offset = max(0, min(current + delta, limit))
+        if self.offset == current:
+            return False
         self.selected_slot = 0
+        self.selected_item = None
+        return True
 
     def handle_key(
         self,

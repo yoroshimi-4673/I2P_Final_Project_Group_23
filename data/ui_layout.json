@@ -162,6 +162,10 @@
                 "rift_C_A": {
                     "x": 190,
                     "y": 405
+                },
+                "first_choice_a": {
+                    "center": [210, 337],
+                    "direction": 3
                 }
             },
             "collision_zones": {
@@ -635,15 +639,18 @@
             "entry_spawns": {
                 "door_t0": {
                     "x": 201,
-                    "y": 229
+                    "y": 229,
+                    "direction": 1
                 },
                 "door_t3": {
                     "x": 201,
-                    "y": 53
+                    "y": 53,
+                    "direction": 1
                 },
                 "door_t7": {
                     "x": 201,
-                    "y": 431
+                    "y": 431,
+                    "direction": 1
                 }
             },
             "collision_zones": {
@@ -667,6 +674,7 @@
                 "y": 350,
                 "width": 80,
                 "height": 100,
+                "direction": 2,
                 "label": "黎琛"
             },
             "walkable_polygon": [
@@ -967,6 +975,7 @@
                 "y": 350,
                 "width": 80,
                 "height": 100,
+                "direction": 2,
                 "label": "黎琛"
             },
             "walkable_polygon": [
@@ -1223,6 +1232,7 @@
                 "y": 350,
                 "width": 80,
                 "height": 100,
+                "direction": 2,
                 "label": "黎琛"
             },
             "walkable_polygon": [

@@ -91,7 +91,7 @@ class Chapter2FlowTests(unittest.TestCase):
 
     def solve_circuit(self):
         rotations = {
-            (4, 1): 3, (3, 1): 1, (3, 3): 3, (2, 3): 2,
+            (4, 1): 3, (3, 1): 1, (3, 3): 3, (2, 3): 2, (2, 2): 1,
             (1, 1): 1, (1, 3): 1, (1, 5): 1, (1, 6): 2,
             (2, 6): 3, (2, 5): 1, (3, 5): 0, (4, 6): 0,
             (4, 8): 3, (3, 8): 1, (3, 9): 3, (2, 9): 0,
@@ -620,7 +620,9 @@ class Chapter2FlowTests(unittest.TestCase):
         }
         for door, (spawn, position) in expected.items():
             with self.subTest(door=door):
-                self.assertEqual(corridor["entry_spawns"][door], dict(zip(("x", "y"), spawn)))
+                self.assertEqual(corridor["entry_spawns"][door], {
+                    "x": spawn[0], "y": spawn[1], "direction": 1,
+                })
                 layout = corridor["objects"][door]
                 self.assertEqual((layout["x"], layout["y"]), position)
 
@@ -649,6 +651,7 @@ class Chapter2FlowTests(unittest.TestCase):
                     spawn.update(manager.get_object_entry_spawn(target, door))
                 expected = self.game_ui.scale_rect(self.screen, spawn).center
                 manager.place_player(player, source, self.screen)
+                player.direction = 3
                 player.set_mouse_target((10, 10))
                 keys = {pygame.K_w}
                 self.interaction.pending_entry_rift = rift
@@ -656,12 +659,86 @@ class Chapter2FlowTests(unittest.TestCase):
                 with patch.object(manager, "place_player", wraps=manager.place_player) as placement:
                     self.assertTrue(place(target, source, manager, player, self.screen, self.interaction, keys))
                     self.assertEqual(player.rect.center, expected)
+                    expected_direction = 1 if door else 2 if target in ("T0", "T7", "T3") else 3
+                    self.assertEqual(player.direction, expected_direction)
                     self.assertFalse(keys)
                     self.assertIsNone(player.mouse_target)
                     self.assertIsNone(self.interaction.pending_entry_rift)
                     self.assertIsNone(self.interaction.pending_entry_object)
                     self.assertFalse(place(target, target, manager, player, self.screen, self.interaction, keys))
                     placement.assert_called_once_with(player, target, self.screen, rift, door)
+
+    def test_first_choice_a_spawns_at_scaled_center_facing_left(self):
+        self.story.start_first_choice()
+        self.story.start_choice_result(self.dialogues["scene_04_choice"]["options"]["A"])
+        self.finish()
+        self.assertEqual(self.interaction.pending_entry_rift, "first_choice_a")
+        manager = MapManager(self.layout, self.game_ui, self.game)
+        place = home_function("place_player_on_space_change", {})
+        for size in ((800, 600), (1024, 768), (1200, 900)):
+            with self.subTest(size=size):
+                surface = pygame.Surface(size)
+                player = Player(0, 0)
+                self.interaction.pending_entry_rift = "first_choice_a"
+                self.assertTrue(place("A", None, manager, player, surface, self.interaction, set()))
+                self.assertEqual(player.rect.center, (210 * size[0] // 800, 337 * size[1] // 600))
+                self.assertEqual(player.direction, 3)
+                self.assertIsNone(self.interaction.pending_entry_rift)
+
+    def test_time_room_entry_dialogues_and_ashes_are_once_only(self):
+        self.game.complete_event("t0_unlocked")
+        self.story.enter_t0()
+        self.expect_dialogue("scene_10_entry")
+        self.finish()
+        self.story.return_to_chapter2_corridor()
+        dialogue_count = self.dialogue.start.call_count
+        self.story.enter_t0()
+        self.assertEqual(self.dialogue.start.call_count, dialogue_count)
+        self.assertEqual(self.game.game_state, SPACE)
+        self.assertTrue(self.game.has_event("scene_10_entered_once"))
+
+        self.game.complete_event("t7_unlocked")
+        self.story.enter_t7()
+        self.expect_dialogue("scene_11_circuit_intro")
+        self.story.complete_t7_circuit()
+        self.expect_dialogue("scene_11_entry")
+        self.finish()
+        self.story.return_to_chapter2_corridor()
+        dialogue_count = self.dialogue.start.call_count
+        self.story.enter_t7()
+        self.assertEqual(self.dialogue.start.call_count, dialogue_count)
+        self.assertEqual(self.game.game_state, SPACE)
+        self.assertTrue(self.game.has_event("scene_11_entered_once"))
+
+        items = ("rubbing_paper", "pencil", "t7_letter")
+        for item in items:
+            self.game.add_item(item)
+        self.story.enter_t3()
+        self.expect_dialogue("scene_12_entry")
+        self.assertFalse(set(items) & set(self.game.inventory))
+        self.finish()
+        self.story.return_to_chapter2_corridor()
+        for item in items:
+            self.game.add_item(item)
+        dialogue_count = self.dialogue.start.call_count
+        self.story.enter_t3()
+        self.assertEqual(self.dialogue.start.call_count, dialogue_count)
+        self.assertEqual(self.game.game_state, SPACE)
+        self.assertTrue(set(items) <= set(self.game.inventory))
+        self.assertTrue(self.game.has_event("scene_12_entered_once"))
+
+    def test_resize_quantizes_to_four_by_three(self):
+        resize = home_function("get_4_3_window_size", {})
+        for requested, expected in (
+            ((1200, 600), (1200, 900)), ((800, 900), (1200, 900)),
+            ((1024, 768), (1024, 768)), ((800, 600), (800, 600)),
+            ((301, 195), (640, 480)),
+        ):
+            with self.subTest(requested=requested):
+                self.assertEqual(resize(*requested), expected)
+        for width, height in ((1001, 768), (835, 704), (1432, 477)):
+            corrected = resize(width, height)
+            self.assertEqual(corrected[0] * 3, corrected[1] * 4)
 
     def test_dialogue_background_can_hide_player_without_hiding_space(self):
         player = Mock()

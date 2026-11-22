@@ -353,6 +353,30 @@ def draw_player_navigation_guide(
     )
 
 
+def handle_hotbar_click(hotbar_data, mouse_pos):
+    if hotbar_data is None:
+        return False
+
+    for index, rect in enumerate(hotbar_data["slots"]):
+        if rect.collidepoint(mouse_pos):
+            if hotbar_controller.select_slot(index, hotbar_data["visible_items"]):
+                player.cancel_mouse_movement()
+            return True  # 空格也攔截點擊避免觸發移動
+
+    left = hotbar_data["left"]
+    right = hotbar_data["right"]
+    if left is not None and left.collidepoint(mouse_pos):
+        moved = hotbar_controller.move_page_left()
+    elif right is not None and right.collidepoint(mouse_pos):
+        moved = hotbar_controller.move_page_right()
+    else:
+        return False
+
+    if moved:
+        player.cancel_mouse_movement()
+    return True
+
+
 def navigate_to_click(position, obstacles, walkable_polygon, interaction_target=None):
     """依照本幀空間資料規劃地面或物件點擊路線。"""
     interaction_rect = None
@@ -562,10 +586,8 @@ def draw_interaction_prompt(
         "id"
     ]
 
-    object_name = objects.get(
-        object_id,
-        {}
-    ).get(
+    object_data = objects.get(object_id, {})
+    object_name = object_data.get(
         "name",
         object_id
     )
@@ -591,16 +613,10 @@ def draw_interaction_prompt(
     )
 
     # 第二章時間門直接顯示門名
-    if (
-        game.current_space
-        == "CH2_CORRIDOR"
-        and objects.get(
-            object_id,
-            {}
-        ).get(
-            "type"
-        ) == "time_door"
-    ):
+    if game.current_space in ("T0", "T7", "T3") and object_data.get("type") == "time_exit":
+        prompt_text = "[E]：離開房間"  # 房內出口使用獨立的離開提示
+
+    elif game.current_space == "CH2_CORRIDOR" and object_data.get("type") == "time_door":
 
         prompt_text = (
             f"[E] {object_name}"
@@ -1032,10 +1048,21 @@ tutorial_guide_buttons = {}
 # Game Flow
 # ============================================================
 
+def advance_current_dialogue():
+    line = dialogue_controller.get_current_line() or {}  # 保留剛讀完的節點資料
+    result = dialogue_controller.advance()
+    if result == "dialogue_finished":
+        finish_dialogue_and_open_ready_puzzle()
+    elif result == "next_line" and line.get("item_notification"):
+        interaction_controller.show_dialogue_item_notification(line["item_notification"])
+
+
 def finish_dialogue_and_open_ready_puzzle():
     """對話結束後開啟已準備好的謎題介面。"""
 
     action = story_manager.finish_dialogue_action()
+    if action == "first_choice_a":
+        interaction_controller.pending_entry_rift = action  # 沿用一次性的入口出生配置
     if (
         action == "open_t7_circuit"
         and game.current_space == "T7"
@@ -1144,6 +1171,41 @@ def save_current_game(slot):
     )
 
 
+def get_4_3_window_size(width, height, previous_size=(800, 600)):
+    """依變化較大的邊選擇四比三視窗尺寸。"""
+    old_width, old_height = previous_size
+    width_drives = abs(width - old_width) * 3 >= abs(height - old_height) * 4
+    units = max(160, round(width / 4 if width_drives else height / 3))  # 保留最小視窗與整數比例
+    return units * 4, units * 3
+
+
+def scale_player_for_window(old_size, new_size):
+    if old_size == new_size:
+        return
+    scale_x = new_size[0] / old_size[0]
+    scale_y = new_size[1] / old_size[1]
+    center_x, center_y = player.rect.center
+    player.rect.size = (
+        max(1, round(player.rect.width * scale_x)),
+        max(1, round(player.rect.height * scale_y)),
+    )
+    player.rect.center = (round(center_x * scale_x), round(center_y * scale_y))
+    player.position.update(player.rect.topleft)  # 保留角色在場景中的相對位置
+
+
+def resize_game_window(width, height):
+    global screen, screen_width, screen_height
+    old_size = (screen_width, screen_height)
+    size = get_4_3_window_size(width, height, old_size)
+    if pygame.display.get_window_size() != size or screen.get_size() != size:
+        screen = pygame.display.set_mode(size, pygame.RESIZABLE)  # 只修正尚未符合比例的視窗
+    if game.current_space is not None and last_player_space == game.current_space:
+        scale_player_for_window(old_size, size)
+    screen_width, screen_height = size
+    if old_size != size:
+        player.cancel_mouse_movement()  # 清除縮放前的滑鼠導航座標
+
+
 def load_saved_game(slot):
     global screen, screen_width, screen_height
     global ui_screen, ui_overlay, last_player_space, last_gameplay_frame
@@ -1154,9 +1216,14 @@ def load_saved_game(slot):
     reset_gameplay_ui()
     story_manager.reset_story_state()
     size = session.get("screen_size")
-    if size and tuple(size) != screen.get_size():
-        screen_width, screen_height = size
-        screen = pygame.display.set_mode(size, pygame.RESIZABLE)
+    if size:
+        saved_size = tuple(size)
+        corrected_size = get_4_3_window_size(*saved_size)
+        if session["has_player_position"]:
+            scale_player_for_window(saved_size, corrected_size)  # 舊比例存檔保留相對位置
+        if pygame.display.get_window_size() != corrected_size or screen.get_size() != corrected_size:
+            screen = pygame.display.set_mode(corrected_size, pygame.RESIZABLE)
+        screen_width, screen_height = corrected_size
     last_player_space = game.current_space if session["has_player_position"] else None
     last_gameplay_frame = None
 
@@ -1560,32 +1627,7 @@ while running:
 
         elif event.type == pygame.VIDEORESIZE:
 
-            if (event.w, event.h) == (screen_width, screen_height):
-                continue
-
-            screen_width = max(
-                640,
-                event.w
-            )
-
-            screen_height = max(
-                480,
-                event.h
-            )
-
-            screen = pygame.display.set_mode(
-                (
-                    screen_width,
-                    screen_height
-                ),
-                pygame.RESIZABLE
-            )
-
-            # 視窗縮放後重新套用Space出生座標比例
-            last_player_space = None
-
-            # 縮放後取消舊的滑鼠目標座標
-            player.cancel_mouse_movement()
+            resize_game_window(event.w, event.h)  # 拖曳縮放與設定按鈕共用入口
 
 
         # ====================================================
@@ -1941,17 +1983,7 @@ while running:
                     pygame.K_SPACE
                 ):
 
-                    result = (
-                        dialogue_controller
-                        .advance()
-                    )
-
-                    if (
-                        result
-                        == "dialogue_finished"
-                    ):
-
-                        finish_dialogue_and_open_ready_puzzle()
+                    advance_current_dialogue()  # 鍵盤與滑鼠共用同一個前進流程
 
                 continue
 
@@ -2086,6 +2118,7 @@ while running:
         and game.game_state
         == DIALOGUE
         and ui_overlay is None
+        and interaction_ui.mode != "item_notification"
     ):
 
         dialogue_controller.update(
@@ -2204,7 +2237,10 @@ while running:
             draw_dialogue_background(screen, mouse_pos, draw_player=not hide_player_this_frame)
 
             line = dialogue_controller.get_current_line() or {}  # 取得當前節點的對話框設定
-            if dialogue_controller.dialogue_id != "intro" or not line.get("hide_dialogue_box", False):
+            if (
+                interaction_ui.mode != "item_notification"
+                and (dialogue_controller.dialogue_id != "intro" or not line.get("hide_dialogue_box", False))
+            ):
                 draw_dialogue_box(  # 純畫面序章節點略過對話框繪製
                     screen,
                     dialogue_controller,
@@ -2575,37 +2611,11 @@ while running:
 
             if result == "resolution_800":
 
-                screen_width = 800
-                screen_height = 600
-
-                screen = pygame.display.set_mode(
-                    (
-                        screen_width,
-                        screen_height
-                    ),
-                    pygame.RESIZABLE
-                )
-
-                # 視窗縮放後重新套用出生座標比例
-                last_player_space = None
-                player.cancel_mouse_movement()
+                resize_game_window(800, 600)  # 套用四比三標準預設解析度
 
             elif result == "resolution_1024":
 
-                screen_width = 1024
-                screen_height = 768
-
-                screen = pygame.display.set_mode(
-                    (
-                        screen_width,
-                        screen_height
-                    ),
-                    pygame.RESIZABLE
-                )
-
-                # 視窗縮放後重新套用出生座標比例
-                last_player_space = None
-                player.cancel_mouse_movement()
+                resize_game_window(1024, 768)  # 套用四比三較大預設解析度
 
             elif result == "open_codex":
 
@@ -2735,17 +2745,7 @@ while running:
 
             elif game.game_state == DIALOGUE:
 
-                result = (
-                    dialogue_controller
-                    .advance()
-                )
-
-                if (
-                    result
-                    == "dialogue_finished"
-                ):
-
-                    finish_dialogue_and_open_ready_puzzle()
+                advance_current_dialogue()  # 完成一句台詞後檢查道具提示
 
 
             # =================================================
@@ -2779,7 +2779,9 @@ while running:
 
             elif game.game_state == SPACE and not hide_player_this_frame:
 
-                click_handled = False
+                # 道具欄覆蓋房門時優先接收點擊
+                click_handled = game.chapter >= 2 and handle_hotbar_click(hotbar_data, mouse_pos)
+                scene_objects = () if click_handled else object_rects.items()
 
                 # ---------------------------------------------
                 # Scene Object
@@ -2788,7 +2790,7 @@ while running:
                 for (
                     object_id,
                     rect
-                ) in object_rects.items():
+                ) in scene_objects:
 
                     if rect.collidepoint(
                         mouse_pos
@@ -2817,99 +2819,8 @@ while running:
                 # Hotbar
                 # ---------------------------------------------
 
-                if (
-                    not click_handled
-                    and hotbar_data
-                    is not None
-                ):
-
-                    slot_rects = (
-                        hotbar_data[
-                            "slots"
-                        ]
-                    )
-
-                    visible_items = (
-                        hotbar_data[
-                            "visible_items"
-                        ]
-                    )
-
-                    # Hotbar區域本身優先攔截地面移動
-                    for (
-                        index,
-                        rect
-                    ) in enumerate(
-                        slot_rects
-                    ):
-
-                        if rect.collidepoint(
-                            mouse_pos
-                        ):
-
-                            click_handled = True
-
-                            if hotbar_controller.select_slot(
-                                index,
-                                visible_items
-                            ):
-                                player.cancel_mouse_movement()
-
-                            break
-
-
-                    if not click_handled:
-
-                        arrow_left = (
-                            hotbar_data[
-                                "left"
-                            ]
-                        )
-
-                        arrow_right = (
-                            hotbar_data[
-                                "right"
-                            ]
-                        )
-
-                        visible_slots = (
-                            ui_layout[
-                                "hotbar"
-                            ].get(
-                                "visible_slots",
-                                5
-                            )
-                        )
-
-                        if (
-                            arrow_left
-                            is not None
-                            and arrow_left
-                            .collidepoint(
-                                mouse_pos
-                            )
-                        ):
-
-                            hotbar_controller.move_page_left()
-                            click_handled = True
-
-                            player.cancel_mouse_movement()
-
-
-                        elif (
-                            arrow_right
-                            is not None
-                            and arrow_right
-                            .collidepoint(
-                                mouse_pos
-                            )
-                        ):
-
-                            hotbar_controller.move_page_right(visible_slots)
-                            click_handled = True
-
-                            player.cancel_mouse_movement()
-
+                if not click_handled and game.chapter < 2:
+                    click_handled = handle_hotbar_click(hotbar_data, mouse_pos)
 
                 # ---------------------------------------------
                 # Empty Ground

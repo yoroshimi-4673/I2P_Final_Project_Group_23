@@ -346,6 +346,12 @@ class MapManager:
             screen,
             player_layout
         )
+        center = player_layout.get("center")  # 獨立縮放明確指定的出生中心
+        if center is not None:
+            spawn_rect.center = (
+                self.game_ui.scale_x(screen, center[0]),
+                self.game_ui.scale_y(screen, center[1]),
+            )
 
         # 角色尺寸跟隨目前Space的Player版面，並縮小至75%
         player_width = int(
@@ -373,5 +379,8 @@ class MapManager:
 
         # 切換Space後取消舊的滑鼠移動目標
         player.cancel_mouse_movement()
+        if "direction" in player_layout:
+            player.direction = player_layout["direction"]  # 僅指定入口覆寫角色原本朝向
+            player.frame_index = 0  # 進門後先顯示該方向的站姿
 
         return True
