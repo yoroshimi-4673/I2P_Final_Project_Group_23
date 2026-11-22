@@ -1,6 +1,5 @@
 """T-3 搜尋、容器子道具、固定 NPC 與既有狀態持久化。"""
 import copy
-import ast
 import json
 import os
 from pathlib import Path
@@ -15,7 +14,9 @@ import test_chapter2_flow as flow
 from game_states import SPACE
 from managers.game_manager import GameManager
 from managers.map_manager import MapManager
-import save_manager
+from managers.interaction_target_manager import InteractionTargetManager
+from player import Player
+import managers.save_manager as save_manager
 
 
 class T3RoomTests(unittest.TestCase):
@@ -240,25 +241,19 @@ class T3RoomTests(unittest.TestCase):
         g = self.f.game
         manager = MapManager(copy.deepcopy(self.f.layout), gui, self.f.game)
         runtime = manager.build_space_runtime_data("T3", self.screen)
-        source = ast.parse((flow.ROOT / "game_home.py").read_text(encoding="utf-8"))
-        function = next(node for node in source.body if isinstance(node, ast.FunctionDef)
-                        and node.name == "get_nearest_interaction_target")
-        from types import SimpleNamespace
-        namespace = {
-            "pygame": pygame, "game": g, "ui_layout": self.f.layout,
-            "player": SimpleNamespace(rect=pygame.Rect(350, 130, 20, 20), direction=0),
-            "is_in_interaction_region": lambda *args: True
-        }
-        exec(compile(ast.Module(body=[function], type_ignores=[]), "game_home.py", "exec"), namespace)
+        targets = InteractionTargetManager(self.f.layout, gui, g)
+        player = Player(350, 130, width=20, height=20)
         self.assertNotIn("t3_time_capsule", runtime["object_rects"])
         rects = {"t3_time_capsule": gui.scale_rect(self.screen, self.f.layout["spaces"]["T3"]["objects"]["t3_time_capsule"])}
-        get_target = namespace["get_nearest_interaction_target"]
-        self.assertIsNone(get_target(rects, rects))
+        # 即使呼叫端提供膠囊矩形也必須等解鎖
+        self.assertIsNone(targets.get_interaction_target(player, "T3", rects, rects, self.screen))
         self.assertNotIn("t3_time_capsule", gui.draw_space(self.screen, g, (350, 130)))
         self.f.open("t3_windowsill")
         self.assertTrue(g.has_event("t3_time_capsule_found"))
         self.assertIn("t3_time_capsule", gui.draw_space(self.screen, g, (350, 130)))
-        self.assertEqual(get_target(rects, rects)["id"], "t3_time_capsule")
+        self.assertEqual(
+            targets.get_interaction_target(player, "T3", rects, rects, self.screen)["id"], "t3_time_capsule"
+        )
 
 
 if __name__ == "__main__":

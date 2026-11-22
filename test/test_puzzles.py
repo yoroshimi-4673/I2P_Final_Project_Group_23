@@ -19,7 +19,7 @@ from managers.game_manager import GameManager
 from managers.interaction_manager import collect_item, get_door_info, interact_with_puzzle
 from managers.puzzle_manager import PuzzleManager
 from managers.story_manager import StoryManager
-import save_manager
+import managers.save_manager as save_manager
 from ui.dialogue_ui import ChoiceController, DialogueController
 from ui.game_ui import GameUI
 from ui.codex_ui import CodexUI

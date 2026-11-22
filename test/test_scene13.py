@@ -9,7 +9,7 @@ import test_chapter2_flow as flow
 from game_states import DIALOGUE, SPACE
 from managers.game_manager import GameManager
 from managers.map_manager import MapManager
-import save_manager
+import managers.save_manager as save_manager
 
 
 class Scene13Tests(unittest.TestCase):

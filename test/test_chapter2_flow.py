@@ -18,10 +18,11 @@ from controllers.puzzle_controller import PuzzleController
 from game_states import DIALOGUE, GAME_OVER, PASSWORD, SPACE
 from managers.game_manager import GameManager
 from managers.map_manager import MapManager
+from managers.interaction_target_manager import InteractionTargetManager
 from managers.puzzle_manager import PuzzleManager
 from managers.story_manager import StoryManager
 from player import Player
-import save_manager
+import managers.save_manager as save_manager
 from ui.game_ui import GameUI
 from ui.interaction_ui import InteractionUI
 
@@ -597,29 +598,26 @@ class Chapter2FlowTests(unittest.TestCase):
     def test_windowsill_interaction_polygon(self):
         manager = MapManager(self.layout, self.game_ui, self.game)
         player = Player(0, 0, width=2, height=2)
-        in_region = home_function("is_in_interaction_region", {
-            "ui_layout": self.layout, "game": self.game, "game_ui": self.game_ui,
-            "screen": self.screen, "player": player,
-        })
+        targets = InteractionTargetManager(self.layout, self.game_ui, self.game)
         for space, object_id in (("T0", "t0_windowsill"), ("T3", "t3_windowsill")):
             with self.subTest(space=space):
                 self.game.enter_space(space)
                 rect = manager.get_interaction_rects(space, self.screen)[object_id]
                 self.assertEqual(rect, pygame.Rect(293, 150, 201, 47))
                 player.rect.center = (390, 175)
-                self.assertTrue(in_region(object_id, rect))
+                self.assertTrue(targets.is_in_interaction_region(player, space, object_id, rect, self.screen))
                 player.rect.center = (295, 153)
-                self.assertFalse(in_region(object_id, rect))
+                self.assertTrue(player.rect.colliderect(rect))  # 粗略矩形相交仍須通過多邊形
+                self.assertIsNone(targets.get_interaction_target(
+                    player, space, {object_id: rect}, {object_id: rect}, self.screen
+                ))
 
     def test_interaction_prefers_front_and_falls_back_to_nearest(self):
         self.game.enter_space("T0")
         player = Player(0, 0)
         player.rect.center = (100, 100)
         player.direction = 1
-        get_target = home_function("get_nearest_interaction_target", {
-            "pygame": pygame, "ui_layout": self.layout, "game": self.game,
-            "player": player, "is_in_interaction_region": lambda *args: True,
-        })
+        targets = InteractionTargetManager(self.layout, self.game_ui, self.game)
         target_positions = {
             "near_behind": (99, 100), "straight_ahead": (180, 100),
             "near_diagonal": (135, 135), "outside_cone": (103, 104),
@@ -628,14 +626,24 @@ class Chapter2FlowTests(unittest.TestCase):
         for key, center in target_positions.items():
             rects[key] = pygame.Rect(0, 0, 10, 10)
             rects[key].center = center
-        self.assertEqual(get_target(rects, rects)["id"], "near_diagonal")
-        fallback = {key: rects[key] for key in ("near_behind", "outside_cone")}
-        self.assertEqual(get_target(rects, fallback)["id"], "near_behind")
-        self.assertIsNone(get_target(rects, {}))
+        regions = {key: rect.inflate(180, 180) for key, rect in rects.items()}
+        self.assertEqual(
+            targets.get_interaction_target(player, "T0", rects, regions, self.screen)["id"], "near_diagonal"
+        )
+        fallback = {key: regions[key] for key in ("near_behind", "outside_cone")}
+        self.assertEqual(
+            targets.get_interaction_target(player, "T0", rects, fallback, self.screen)["id"], "near_behind"
+        )
+        self.assertIsNone(targets.get_interaction_target(player, "T0", rects, {}, self.screen))
         player.direction = 3
-        self.assertEqual(get_target(rects, rects)["id"], "near_behind")
+        self.assertEqual(
+            targets.get_interaction_target(player, "T0", rects, regions, self.screen)["id"], "near_behind"
+        )
         rects["same_center"] = pygame.Rect(95, 95, 10, 10)
-        self.assertEqual(get_target(rects, rects)["id"], "same_center")
+        regions["same_center"] = rects["same_center"]
+        self.assertEqual(
+            targets.get_interaction_target(player, "T0", rects, regions, self.screen)["id"], "same_center"
+        )
 
     def test_interaction_rect_extends_twenty_base_pixels_from_collision_or_image(self):
         manager = MapManager(self.layout, self.game_ui, self.game)

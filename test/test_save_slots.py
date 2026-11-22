@@ -14,9 +14,11 @@ import pygame
 
 from controllers.save_controller import SaveController
 from controllers.settings_controller import SettingsController
-from game_states import PASSWORD, SPACE
+from game_states import DIALOGUE, PASSWORD, SPACE
 from managers.game_manager import GameManager
-import save_manager as saves
+from player import Player
+import managers.save_manager as saves
+from ui.dialogue_ui import DialogueController
 from ui.game_ui import GameUI
 from ui.save_ui import SaveUI
 from test.test_chapter2_flow import home_function
@@ -84,10 +86,7 @@ class SaveSlotTests(unittest.TestCase):
                 action = controller.handle_navigation("enter")
                 self.assertEqual(action, ("reset", 1))
                 self.assertTrue(self.legacy.is_file())
-                apply = home_function("apply_save_action", {
-                    "save_manager": saves, "save_controller": controller,
-                })
-                apply(action)
+                controller.execute_action(action)
                 self.assertFalse(self.legacy.exists())
                 self.assertFalse(saves.get_save_path(1).exists())
                 self.assertFalse(saves.get_thumbnail_path(1).exists())
@@ -96,6 +95,107 @@ class SaveSlotTests(unittest.TestCase):
                 controller.handle_navigation("enter")
                 self.assertEqual(controller.slots[1]["status"], "NO DATA")
                 self.assertEqual({path: path.read_bytes() for path in second}, second)
+
+    def test_execute_action_handles_new_overwrite_and_backend_errors(self):
+        saves.save_game(self.game, 2)
+        controller = SaveController(game=self.game)
+        start_new = Mock()
+        controller.open_slots("new")
+        controller.activate(2)
+        self.assertIn("可能覆蓋原有進度", controller.confirmation()[0])
+        controller.execute_action(controller.activate("yes"), start_new_game=start_new)
+        start_new.assert_called_once_with()
+        self.assertEqual((controller.active_save_slot, controller.mode), (2, None))
+
+        controller.open_ingame(None)
+        controller.activate(2)
+        self.assertIsNone(controller.activate("yes"))
+        self.assertEqual(controller.mode, "overwrite")
+        with patch.object(saves, "save_game") as backend:
+            controller.execute_action(controller.activate("yes"), screen_size=(800, 600))
+        backend.assert_called_once_with(self.game, 2, None, None, None, session={"screen_size": [800, 600]})
+        self.assertEqual(controller.mode, "saved")
+
+        for error in (OSError, ValueError, pygame.error):
+            with self.subTest(error=error), patch.object(saves, "save_game", side_effect=error):
+                controller.execute_action(("save", 2), screen_size=(800, 600))
+                self.assertEqual(controller.mode, "error")
+        with patch.object(saves, "reset_save", side_effect=OSError):
+            controller.execute_action(("reset", 2))
+        self.assertEqual((controller.mode, controller.active_save_slot), ("delete_error", 2))
+
+        saves.get_save_path(3).write_text("{", encoding="utf-8")
+        controller.open_slots("load")
+        restore = Mock()
+        controller.execute_action(("load", 3), restore_loaded_session=restore)
+        restore.assert_not_called()
+        self.assertEqual(controller.mode, "error")
+        controller.open_slots("load")
+        controller.activate(1)
+        start_new.reset_mock()
+        controller.execute_action(controller.activate("yes"), start_new_game=start_new)
+        start_new.assert_called_once_with()
+        self.assertEqual(controller.active_save_slot, 1)
+
+    def test_execute_action_round_trips_runtime_dialogue_and_window(self):
+        pygame.display.init()
+        self.addCleanup(pygame.quit)
+        screen = pygame.display.set_mode((800, 600))
+        player = Player(120, 200)
+        hotbar = SimpleNamespace(selected_slot=0, offset=0, selected_item=None)
+        dialogue = DialogueController()
+        story = Mock(dialogue_after_action="enter_selected_space", pending_target_space="A")
+        controller = SaveController(
+            game=self.game, player=player, hotbar_controller=hotbar,
+            dialogue_controller=dialogue, story_manager=story,
+        )
+        state = {
+            "pygame": pygame, "screen": screen, "screen_width": 800, "screen_height": 600,
+            "game": self.game, "player": player, "dialogue_controller": dialogue, "story_manager": story,
+            "reset_gameplay_ui": Mock(), "DIALOGUE": DIALOGUE, "SPACE": SPACE, "CHOICE": "choice",
+            "UI_GAME": "game", "ui_screen": "menu", "ui_overlay": "save",
+        }
+        home_function("get_4_3_window_size", state)
+        home_function("scale_player_for_window", state)
+        restore = home_function("restore_loaded_session", state)
+        for size, expected_size, game_state in (
+            ((1024, 768), (1024, 768), DIALOGUE),
+            ((1000, 600), (1000, 750), SPACE),
+        ):
+            with self.subTest(size=size):
+                self.game.game_state = game_state
+                dialogue.start("scene_04_choice_result", [{"text": "First"}, {"text": "Second"}])
+                dialogue.current_index = 1
+                dialogue.visible_characters = 3
+                original = pygame.Rect(120, 200, 40, 40)
+                player.rect = original.copy()
+                controller.open_ingame(None)
+                controller.activate(1)
+                action = controller.activate("yes")
+                if controller.mode == "overwrite":
+                    action = controller.activate("yes")
+                controller.execute_action(action, screen_size=size)
+                self.assertEqual(controller.mode, "saved")
+                dialogue.start("other", [{"text": "Other"}])
+                player.rect.topleft = (0, 0)
+                controller.open_slots("load")
+                controller.activate(1)
+                controller.execute_action(controller.activate("yes"), restore_loaded_session=restore)
+                self.assertEqual((state["ui_screen"], state["ui_overlay"]), ("game", None))
+                self.assertEqual(state["screen"].get_size(), expected_size)
+                self.assertEqual(state["last_player_space"], "T7")
+                self.assertEqual(self.game.game_state, game_state)
+                self.assertEqual(player.position, pygame.Vector2(player.rect.topleft))
+                if game_state == DIALOGUE:
+                    self.assertEqual(player.rect, original)
+                    self.assertEqual(
+                        (dialogue.dialogue_id, dialogue.current_index, dialogue.visible_characters),
+                        ("scene_04_choice_result", 1, 3),
+                    )
+                    self.assertEqual(story.dialogue_after_action, "enter_selected_space")
+                    self.assertEqual(story.pending_target_space, "A")
+                else:
+                    self.assertEqual(player.rect, pygame.Rect(120, 250, 40, 50))
 
     def setUp(self):
         directory = Path(gettempdir()) / f"i2p-save-test-{uuid4().hex}"
