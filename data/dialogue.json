@@ -1,35 +1,195 @@
 {
     "intro": [
         {
+            "speaker": "",
+            "text": "",
+            "background": "assets/序章/1.png",
+            "hide_dialogue_box": true
+        },
+        {
             "speaker": "黎琛",
-            "text": "我數過了。從我按下啟動鍵到現在，大概……四分鐘。"
+            "text": "我數過了。從我按下啟動鍵到現在，大概……四分鐘。",
+            "background": "assets/序章/2.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "黎琛",
+            "text": "四分鐘，夠一個人死一次，也夠一個宇宙死一次。",
+            "background": "assets/序章/2.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "",
+            "text": "共時性座標鎖定失敗——世界線偏離率：∞",
+            "background": "assets/序章/4.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "黎琛",
+            "text": "偏離率無限大……意思是所有方向都對，還是所有方向都錯？",
+            "background": "assets/序章/5.png",
+            "hide_dialogue_box": false
         },
         {
             "speaker": "黎念",
-            "text": "爸爸……你說過今天要來看我的，對吧？"
+            "text": "爸爸……你說過今天要來看我的，對吧？",
+            "background": "assets/序章/6.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "黎念",
+            "text": "護士姐姐說你又在加班。",
+            "background": "assets/序章/7.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "黎念",
+            "text": "沒關係。我數到一百你就會來。\n一、二、三……",
+            "background": "assets/序章/7.png",
+            "hide_dialogue_box": false
         },
         {
             "speaker": "黎琛",
-            "text": "我數到三。一、二、三。然後我按了那個鍵。"
+            "text": "……\n我數到三。一、二、三。\n然後我按了那個鍵。",
+            "background": "assets/序章/8.png",
+            "hide_dialogue_box": false
         },
         {
-            "speaker": "旁白",
-            "text": "實驗失控。黎琛再次醒來時，已經躺在一條熟悉的醫院走廊上。"
+            "speaker": "",
+            "text": "",
+            "background": "assets/序章/9.png",
+            "hide_dialogue_box": true
+        },
+        {
+            "speaker": "廣播",
+            "text": "黎工程師，醫院來電。黎念患者的生命維持系統出現波動，建議您——",
+            "background": "assets/序章/10.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "黎琛",
+            "text": "我知道。",
+            "background": "assets/序章/11.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "",
+            "text": "",
+            "background": "assets/序章/12.png",
+            "hide_dialogue_box": true
+        },
+        {
+            "speaker": "黎琛",
+            "text": "還有兩分鐘四十七秒。夠了。",
+            "background": "assets/序章/13.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "黎琛",
+            "text": "如果理論是對的……打開一條縫，拿到那個世界的藥劑樣本，回來注入——",
+            "background": "assets/序章/13.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "黎琛",
+            "text": "她還來得及。",
+            "background": "assets/序章/13.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "",
+            "text": "",
+            "background": "assets/序章/14.png",
+            "hide_dialogue_box": true
+        },
+        {
+            "speaker": "",
+            "text": "",
+            "background": "assets/序章/15.png",
+            "hide_dialogue_box": true
+        },
+        {
+            "speaker": "黎琛",
+            "text": "……什麼？",
+            "background": "assets/序章/16.png",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "",
+            "text": "",
+            "background": "assets/序章/17.png",
+            "hide_dialogue_box": true
+        },
+        {
+            "speaker": "黎琛",
+            "text": "我以為會痛。但沒有。只有……安靜。",
+            "background": null,
+            "background_mode": "black",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "",
+            "text": "",
+            "background": "assets/序章/18.jpg",
+            "hide_dialogue_box": true
         },
         {
             "speaker": "護士",
-            "text": "307房又漏液了！拿備用管路來！"
+            "text": "307房又漏液了！拿備用管路來！",
+            "background": "assets/序章/19.jpg",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "",
+            "text": "指縫夾著一張探病許可證。\n探視對象：黎念",
+            "background": "assets/序章/20.jpg",
+            "hide_dialogue_box": false
         },
         {
             "speaker": "黎琛",
-            "text": "307……她的病房。我認得這條走廊。但我不記得我是怎麼來的。"
+            "text": "307……她的病房。我認得這條走廊。\n但我不記得我是怎麼來的。",
+            "background": "assets/序章/21.jpg",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "黎琛",
+            "text": "……門沒鎖。",
+            "background": "assets/序章/22.jpg",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "",
+            "text": "",
+            "background": "assets/序章/23.jpg",
+            "hide_dialogue_box": true
+        },
+        {
+            "speaker": "",
+            "text": "黎念坐在床上——不是躺著。穿自己的衣服，腿上放著繪本。\n她抬頭。看著我。",
+            "background": "assets/序章/24.jpg",
+            "hide_dialogue_box": false
         },
         {
             "speaker": "黎念",
-            "text": "爸爸！你又加班到忘了時間？我數到一百你沒來，我就自己醒啦。"
+            "text": "爸爸！你又加班到忘了時間？\n我數到一百你沒來，我就自己醒啦。",
+            "background": "assets/序章/25.jpg",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "黎念",
+            "text": "爸爸……你說過今天要來看我的。",
+            "background": "assets/序章/26.jpg",
+            "hide_dialogue_box": false
+        },
+        {
+            "speaker": "黎念",
+            "text": "爸爸？",
+            "background": "assets/序章/27.jpg",
+            "hide_dialogue_box": false
         }
     ],
     "scene_04_choice": {
+        "background": "assets/序章/27.jpg",
         "prompt": "黎念從床上跳下來，伸手朝黎琛跑來。你要怎麼做？",
         "options": {
             "A": {

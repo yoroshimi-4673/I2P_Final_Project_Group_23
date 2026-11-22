@@ -512,12 +512,10 @@ def draw_dialogue_background(
 
         return
 
-    # 第一章選擇結果仍使用307病房
+    # 第一章各選項的結果對話使用純黑背景
     if dialogue_id == "scene_04_choice_result":
 
-        game_ui.draw_room_307(
-            surface
-        )
+        surface.fill((0, 0, 0))
 
         return
 
@@ -2205,12 +2203,14 @@ while running:
             # 場景背景與對話框分開依序繪製
             draw_dialogue_background(screen, mouse_pos, draw_player=not hide_player_this_frame)
 
-            draw_dialogue_box(
-                screen,
-                dialogue_controller,
-                game_ui.font_ui,
-                game_ui.font_ui
-            )
+            line = dialogue_controller.get_current_line() or {}  # 取得當前節點的對話框設定
+            if dialogue_controller.dialogue_id != "intro" or not line.get("hide_dialogue_box", False):
+                draw_dialogue_box(  # 純畫面序章節點略過對話框繪製
+                    screen,
+                    dialogue_controller,
+                    game_ui.font_ui,
+                    game_ui.font_ui
+                )
 
             if dialogue_controller.dialogue_id != "scene_14":
                 settings_button_rect = game_ui.draw_settings_button(screen, mouse_pos)
@@ -2222,9 +2222,9 @@ while running:
 
         elif game.game_state == CHOICE:
 
-            game_ui.draw_room_307(
-                screen
-            )
+            choice_data = story_manager.dialogues.get(choice_controller.choice_id, {})  # 讀取目前選擇場景的版面資料
+            if not game_ui.draw_background_asset(screen, choice_data.get("background")):
+                game_ui.draw_room_307(screen)  # 無背景素材時沿用病房畫面
 
             choice_rects = (
                 draw_choice_panel(
