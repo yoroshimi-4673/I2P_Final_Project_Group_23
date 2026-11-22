@@ -135,9 +135,9 @@
                     "interaction_padding": 40
                 },
                 "floor_rift_A": {
-                    "x": 80,
+                    "x": 145,
                     "y": 420,
-                    "width": 160,
+                    "width": 30,
                     "height": 70,
                     "asset": "assets/素材庫/第一章/空間A/portal.png",
                     "label": "地板裂隙",
@@ -170,6 +170,7 @@
             },
             "collision_zones": {
                 "bed_body": {
+                    "interaction_object": "bed",
                     "x": 70,
                     "y": 280,
                     "width": 90,
@@ -177,6 +178,7 @@
                     "kind": "furniture"
                 },
                 "mirror_body": {
+                    "interaction_object": "mirror",
                     "x": 610,
                     "y": 160,
                     "width": 80,
@@ -184,6 +186,7 @@
                     "kind": "furniture"
                 },
                 "wardrobe_body": {
+                    "interaction_object": "wardrobe_rift",
                     "x": 580,
                     "y": 360,
                     "width": 90,
@@ -320,6 +323,7 @@
             },
             "collision_zones": {
                 "workbench_body": {
+                    "interaction_object": "workbench",
                     "x": 76,
                     "y": 205,
                     "width": 97,
@@ -327,6 +331,7 @@
                     "kind": "furniture"
                 },
                 "calendar_body": {
+                    "interaction_object": "calendar",
                     "x": 410,
                     "y": 45,
                     "width": 50,
@@ -655,6 +660,7 @@
             },
             "collision_zones": {
                 "ch2_terminal_body": {
+                    "interaction_object": "ch2_terminal",
                     "x": 320,
                     "y": 236,
                     "width": 160,
@@ -916,6 +922,7 @@
             "entry_spawns": {},
             "collision_zones": {
                 "t0_desk_body": {
+                    "interaction_object": "t0_desk",
                     "x": 138,
                     "y": 237,
                     "width": 109,
@@ -923,6 +930,7 @@
                     "kind": "furniture"
                 },
                 "t0_safe_body": {
+                    "interaction_object": "t0_child_safe",
                     "x": 300,
                     "y": 209,
                     "width": 69,
@@ -930,6 +938,7 @@
                     "kind": "furniture"
                 },
                 "t0_bed_body": {
+                    "interaction_object": "t0_bed",
                     "x": 407,
                     "y": 205,
                     "width": 79,
@@ -937,6 +946,7 @@
                     "kind": "furniture"
                 },
                 "t0_bedside_table_body": {
+                    "interaction_object": "t0_bedside_drawer",
                     "x": 510,
                     "y": 221,
                     "width": 55,
@@ -944,6 +954,7 @@
                     "kind": "furniture"
                 },
                 "t0_wardrobe_body": {
+                    "interaction_object": "t0_wardrobe",
                     "x": 604,
                     "y": 157,
                     "width": 95,
@@ -1185,6 +1196,7 @@
             "entry_spawns": {},
             "collision_zones": {
                 "t7_desk_body": {
+                    "interaction_object": "t7_desk",
                     "x": 138,
                     "y": 237,
                     "width": 109,
@@ -1192,6 +1204,7 @@
                     "kind": "furniture"
                 },
                 "t7_safe_body": {
+                    "interaction_object": "t7_safe",
                     "x": 300,
                     "y": 209,
                     "width": 69,
@@ -1199,6 +1212,7 @@
                     "kind": "furniture"
                 },
                 "t7_bed_body": {
+                    "interaction_object": "t7_broken_bed",
                     "x": 407,
                     "y": 205,
                     "width": 79,
@@ -1206,6 +1220,7 @@
                     "kind": "furniture"
                 },
                 "t7_bedside_table_body": {
+                    "interaction_object": "t7_bedside_table",
                     "x": 510,
                     "y": 221,
                     "width": 55,
@@ -1213,6 +1228,7 @@
                     "kind": "furniture"
                 },
                 "t7_wardrobe_body": {
+                    "interaction_object": "t7_wardrobe",
                     "x": 604,
                     "y": 157,
                     "width": 95,
@@ -1502,6 +1518,7 @@
             "entry_spawns": {},
             "collision_zones": {
                 "t3_desk_body": {
+                    "interaction_object": "t3_desk",
                     "x": 138,
                     "y": 237,
                     "width": 109,
@@ -1509,6 +1526,7 @@
                     "kind": "furniture"
                 },
                 "t3_safe_body": {
+                    "interaction_object": "t3_safe",
                     "x": 300,
                     "y": 209,
                     "width": 69,
@@ -1516,6 +1534,7 @@
                     "kind": "furniture"
                 },
                 "t3_bed_body": {
+                    "interaction_object": "t3_bed",
                     "x": 407,
                     "y": 205,
                     "width": 79,
@@ -1523,6 +1542,7 @@
                     "kind": "furniture"
                 },
                 "t3_bedside_table_body": {
+                    "interaction_object": "t3_bedside_table",
                     "x": 510,
                     "y": 221,
                     "width": 55,
@@ -1530,6 +1550,7 @@
                     "kind": "furniture"
                 },
                 "t3_wardrobe_body": {
+                    "interaction_object": "t3_wardrobe",
                     "x": 604,
                     "y": 157,
                     "width": 95,

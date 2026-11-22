@@ -53,6 +53,7 @@ class Scene14Tests(unittest.TestCase):
                 self.assertEqual(runtime["interaction_rects"]["door_d"], f.game_ui.scale_rect(screen, door))
                 player = Player(0, 0, width=f.game_ui.scale_x(screen, 60), height=f.game_ui.scale_y(screen, 75))
                 player.rect.center = (f.game_ui.scale_x(screen, 605), f.game_ui.scale_y(screen, 270))
+                player.direction = 1
                 self.assertTrue(player.is_inside_walkable_polygon(runtime["walkable_polygon"]))
                 namespace = {
                     "pygame": pygame, "ui_layout": f.layout, "game": f.game,
