@@ -29,7 +29,7 @@
     },
     "t0_bedside_drawer": {
         "chapter": 2,
-        "ui_mode": "password",
+        "ui_mode": "dial_password",
         "input_type": "digits",
         "length": 3,
         "answer": "121",
@@ -90,7 +90,7 @@
     },
     "t0_child_safe": {
         "chapter": 2,
-        "ui_mode": "password",
+        "ui_mode": "dial_password",
         "input_type": "digits",
         "length": 2,
         "answer": "21",
@@ -118,7 +118,7 @@
     },
     "t7_desk_drawer": {
         "chapter": 2,
-        "ui_mode": "password",
+        "ui_mode": "dial_password",
         "input_type": "digits",
         "length": 3,
         "answer": "307",
@@ -182,7 +182,7 @@
     },
     "t3_time_capsule": {
         "chapter": 2,
-        "ui_mode": "password",
+        "ui_mode": "dial_password",
         "input_type": "digits",
         "length": 4,
         "answer": "0347",

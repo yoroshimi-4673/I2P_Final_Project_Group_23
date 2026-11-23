@@ -105,7 +105,7 @@ class DeveloperModeTests(unittest.TestCase):
         self.assertTrue(self.game.has_event("t3_time_capsule_found"))
         self.assertFalse(self.game.has_event("t3_capsule_opened"))
         self.fixture.interaction.open_object("t3_time_capsule")
-        self.assertEqual(self.fixture.ui.mode, "password")
+        self.assertEqual(self.fixture.ui.mode, "dial_password")
         self.fixture.ui.close()
         self.apply("chapter2_t3_before_carving", space="T3", state=SPACE)
         self.assertTrue({"t3_knife", "past_fragment", "t3_note"} <= set(self.game.inventory))

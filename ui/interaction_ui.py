@@ -39,6 +39,7 @@ class InteractionUI:
         self.photo_side = "front"
 
         self.notification = None
+        self.dial_digit_images = {}
 
     # ========================================================
     # State
@@ -571,7 +572,9 @@ class InteractionUI:
         self,
         screen,
         width=460,
-        height=300
+        height=300,
+        *,
+        show_panel=True
     ):
         """繪製互動Popup共同底板。"""
 
@@ -619,20 +622,9 @@ class InteractionUI:
             height
         )
 
-        pygame.draw.rect(
-            screen,
-            (42, 44, 56),
-            rect,
-            border_radius=12
-        )
-
-        pygame.draw.rect(
-            screen,
-            (220, 220, 230),
-            rect,
-            width=2,
-            border_radius=12
-        )
+        if show_panel:
+            pygame.draw.rect(screen, (42, 44, 56), rect, border_radius=12)
+            pygame.draw.rect(screen, (220, 220, 230), rect, width=2, border_radius=12)
 
         return rect
 
@@ -708,6 +700,7 @@ class InteractionUI:
             "inspectable": self.draw_inspectable,
             "rift": self.draw_rift,
             "password": self.draw_password,
+            "dial_password": self.draw_dial_password,
             "sequence": self.draw_sequence,
             "exit_confirmation": self.draw_exit_confirmation,
             "diary_drag": self.draw_diary_drag,
@@ -1323,6 +1316,77 @@ class InteractionUI:
 
         hint = self.game_ui.font_small.render("Esc 返回", True, (210, 210, 220))
         screen.blit(hint, hint.get_rect(center=(modal.centerx, modal.bottom - 25)))
+        return buttons
+
+    def dial_password_controls(self, screen):
+        layout = self.game_ui.ui_layout["chapter2_password_locks"][self.puzzle_controller.current_puzzle_id]
+        regions = {}
+        for index, slot in enumerate(layout["digit_slots"]):
+            rect = self.game_ui.scale_rect(screen, slot)
+            half = rect.height // 2
+            regions[index, 1] = pygame.Rect(rect.x, rect.y, rect.width, half)
+            regions[index, -1] = pygame.Rect(rect.x, rect.y + half, rect.width, rect.height - half)
+        return {
+            "_dial_regions": regions,
+            "confirm": self.game_ui.scale_rect(screen, layout["confirm_button"]),
+            "back": self.game_ui.scale_rect(screen, layout["back_button"]),
+        }
+
+    def get_dial_digit_images(self, asset):
+        if asset not in self.dial_digit_images:
+            sheet = self.game_ui.load_image(asset)
+            if sheet is None:
+                return []
+            sprites = self.game_ui.ui_layout["chapter2_password_digit_sprites"]
+            reference_width, reference_height = sprites["reference_size"]
+            scale_x = sheet.get_width() / reference_width
+            scale_y = sheet.get_height() / reference_height
+            digits = []
+            for x, y, width, height in sprites["rects"]:
+                left, top = round(x * scale_x), round(y * scale_y)
+                right, bottom = round((x + width) * scale_x), round((y + height) * scale_y)
+                digits.append(sheet.subsurface((left, top, right - left, bottom - top)))
+            self.dial_digit_images[asset] = digits
+        return self.dial_digit_images[asset]
+
+    def draw_dial_password(self, screen, mouse_pos):
+        layout = self.game_ui.ui_layout["chapter2_password_locks"][self.puzzle_controller.current_puzzle_id]
+        self.draw_modal_base(screen, show_panel=False)
+        lock = self.game_ui.load_image(layout["asset"])
+        lock_rect = self.game_ui.scale_rect(screen, layout["lock_rect"])
+        if lock is not None:
+            screen.blit(pygame.transform.smoothscale(lock, lock_rect.size), lock_rect)
+
+        buttons = self.dial_password_controls(screen)
+        regions = buttons["_dial_regions"]
+        for rect in regions.values():
+            if rect.collidepoint(mouse_pos):
+                highlight = pygame.Surface(rect.size, pygame.SRCALPHA)
+                highlight.fill((255, 240, 200, 32))
+                screen.blit(highlight, rect)
+
+        sprites = self.get_dial_digit_images(layout["number_asset"])
+        if sprites:
+            for index, digit in enumerate(self.puzzle_controller.dial_digits):
+                slot = regions[index, 1].union(regions[index, -1])
+                sprite = sprites[digit]
+                height = max(1, round(slot.height * 0.38))
+                width = max(1, round(height * sprite.get_width() / sprite.get_height()))
+                glyph = pygame.transform.smoothscale(sprite, (width, height))
+                screen.blit(glyph, glyph.get_rect(center=slot.center))
+
+        for key, label in (("confirm", "確認"), ("back", "返回")):
+            rect = buttons[key]
+            self.game_ui.draw_button(screen, label, rect, rect.collidepoint(mouse_pos))
+        position = self.game_ui.scale_rect(screen, layout["message_position"])
+        message = (self.result or {}).get("message", "")
+        attempts = self.puzzle_controller.remaining_attempts
+        if not message and attempts is not None:
+            message = f"剩餘嘗試次數：{attempts}"
+        if message:
+            self.draw_multiline_text(
+                screen, message, position.x, position.y, position.width, font=self.game_ui.font_small
+            )
         return buttons
 
     def draw_password(
@@ -2575,7 +2639,8 @@ class InteractionUI:
         modal = self.draw_modal_base(
             screen,
             width=730,
-            height=530
+            height=530,
+            show_panel=False
         )
 
         title = self.game_ui.font_large.render(

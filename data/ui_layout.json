@@ -1,4 +1,266 @@
 {
+    "chapter2_password_digit_sprites": {
+        "reference_size": [
+            2172,
+            724
+        ],
+        "rects": [
+            [
+                83,
+                247,
+                173,
+                238
+            ],
+            [
+                318,
+                247,
+                113,
+                238
+            ],
+            [
+                487,
+                247,
+                162,
+                238
+            ],
+            [
+                694,
+                247,
+                166,
+                238
+            ],
+            [
+                896,
+                247,
+                176,
+                238
+            ],
+            [
+                1115,
+                247,
+                162,
+                238
+            ],
+            [
+                1313,
+                247,
+                176,
+                238
+            ],
+            [
+                1526,
+                247,
+                155,
+                238
+            ],
+            [
+                1724,
+                247,
+                172,
+                238
+            ],
+            [
+                1930,
+                247,
+                167,
+                238
+            ]
+        ]
+    },
+    "chapter2_password_locks": {
+        "t0_bedside_drawer": {
+            "asset": "assets/素材庫/第二章/T+0/lock.PNG",
+            "number_asset": "assets/素材庫/第二章/T+0/number.PNG",
+            "lock_rect": {
+                "x": 100,
+                "y": 50,
+                "width": 600,
+                "height": 400
+            },
+            "digit_slots": [
+                {
+                    "x": 278,
+                    "y": 200,
+                    "width": 62,
+                    "height": 115
+                },
+                {
+                    "x": 372,
+                    "y": 200,
+                    "width": 62,
+                    "height": 115
+                },
+                {
+                    "x": 465,
+                    "y": 200,
+                    "width": 62,
+                    "height": 115
+                }
+            ],
+            "confirm_button": {
+                "x": 250,
+                "y": 469,
+                "width": 140,
+                "height": 40
+            },
+            "back_button": {
+                "x": 410,
+                "y": 469,
+                "width": 140,
+                "height": 40
+            },
+            "message_position": {
+                "x": 180,
+                "y": 518,
+                "width": 440,
+                "height": 44
+            }
+        },
+        "t0_child_safe": {
+            "asset": "assets/素材庫/第二章/T+0/numberlock.PNG",
+            "number_asset": "assets/素材庫/第二章/T+0/number.PNG",
+            "lock_rect": {
+                "x": 136,
+                "y": 55,
+                "width": 528,
+                "height": 390
+            },
+            "digit_slots": [
+                {
+                    "x": 342,
+                    "y": 234,
+                    "width": 56,
+                    "height": 78
+                },
+                {
+                    "x": 402,
+                    "y": 234,
+                    "width": 56,
+                    "height": 78
+                }
+            ],
+            "confirm_button": {
+                "x": 250,
+                "y": 469,
+                "width": 140,
+                "height": 40
+            },
+            "back_button": {
+                "x": 410,
+                "y": 469,
+                "width": 140,
+                "height": 40
+            },
+            "message_position": {
+                "x": 180,
+                "y": 518,
+                "width": 440,
+                "height": 44
+            }
+        },
+        "t7_desk_drawer": {
+            "asset": "assets/素材庫/第二章/T+7/lock.png",
+            "number_asset": "assets/素材庫/第二章/T+7/number.PNG",
+            "lock_rect": {
+                "x": 110,
+                "y": 85,
+                "width": 580,
+                "height": 329
+            },
+            "digit_slots": [
+                {
+                    "x": 200,
+                    "y": 139,
+                    "width": 115,
+                    "height": 215
+                },
+                {
+                    "x": 349,
+                    "y": 139,
+                    "width": 115,
+                    "height": 215
+                },
+                {
+                    "x": 497,
+                    "y": 139,
+                    "width": 115,
+                    "height": 215
+                }
+            ],
+            "confirm_button": {
+                "x": 250,
+                "y": 469,
+                "width": 140,
+                "height": 40
+            },
+            "back_button": {
+                "x": 410,
+                "y": 469,
+                "width": 140,
+                "height": 40
+            },
+            "message_position": {
+                "x": 180,
+                "y": 518,
+                "width": 440,
+                "height": 44
+            }
+        },
+        "t3_time_capsule": {
+            "asset": "assets/素材庫/第二章/T-3/locker_UI.png",
+            "number_asset": "assets/素材庫/第二章/T-3/number.PNG",
+            "lock_rect": {
+                "x": 105,
+                "y": 56,
+                "width": 590,
+                "height": 388
+            },
+            "digit_slots": [
+                {
+                    "x": 278,
+                    "y": 266,
+                    "width": 51,
+                    "height": 78
+                },
+                {
+                    "x": 343,
+                    "y": 266,
+                    "width": 51,
+                    "height": 78
+                },
+                {
+                    "x": 408,
+                    "y": 266,
+                    "width": 51,
+                    "height": 78
+                },
+                {
+                    "x": 473,
+                    "y": 266,
+                    "width": 51,
+                    "height": 78
+                }
+            ],
+            "confirm_button": {
+                "x": 250,
+                "y": 469,
+                "width": 140,
+                "height": 40
+            },
+            "back_button": {
+                "x": 410,
+                "y": 469,
+                "width": 140,
+                "height": 40
+            },
+            "message_position": {
+                "x": 180,
+                "y": 518,
+                "width": 440,
+                "height": 44
+            }
+        }
+    },
     "base_resolution": {
         "width": 800,
         "height": 600

@@ -568,6 +568,8 @@ class InteractionController:
     def get_interaction_rect_buttons(self, buttons):
         """只保留Interaction UI中可取得Rect的控制項。"""
 
+        if self.interaction_ui.mode == "dial_password":
+            return {}
         return {
             control_id: rect
             for control_id, rect in buttons.items()
@@ -788,11 +790,20 @@ class InteractionController:
             rect.center
         )
 
+    def close_dial_password(self):
+        self.interaction_ui.close()
+        self.reset_interaction_focus()
+
     def handle_key(self, event):
 
         """處理所有Interaction UI共用鍵盤操作。"""
 
         if not self.interaction_ui.is_open():
+            return
+
+        if self.interaction_ui.mode == "dial_password":
+            if event.key == pygame.K_ESCAPE:
+                self.close_dial_password()
             return
 
         if self.interaction_ui.mode == "circuit":
@@ -929,6 +940,18 @@ class InteractionController:
             return
 
         mode = self.interaction_ui.mode
+
+        if mode == "dial_password":
+            if buttons["confirm"].collidepoint(mouse_pos):
+                self.submit_puzzle()
+            elif buttons["back"].collidepoint(mouse_pos):
+                self.close_dial_password()
+            else:
+                for (index, step), rect in buttons["_dial_regions"].items():
+                    if rect.collidepoint(mouse_pos):
+                        self.puzzle_controller.turn_password_dial(index, step)
+                        break
+            return
 
         if mode == "circuit":
             reset = buttons.get("reset")

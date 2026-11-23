@@ -297,8 +297,11 @@ class PuzzleTests(unittest.TestCase):
                     self.game.add_item(item)
                 ui, interaction, _ = self.make_ui()
                 interaction.open_object("t0_bedside_drawer")
-                self.controller.append_input("121")
-                interaction.submit_puzzle()
+                buttons = ui.dial_password_controls(self.screen)
+                for index, turns in enumerate((1, 2, 1)):
+                    for _ in range(turns):
+                        interaction.handle_click(buttons, buttons["_dial_regions"][index, 1].center)
+                self.click(ui, interaction, "confirm")
                 self.assertEqual(ui.mode, "message")
                 self.assertEqual(ui.result["message"], "抽屜打開了。")
                 self.click(ui, interaction, "ok")
@@ -340,6 +343,7 @@ class PuzzleTests(unittest.TestCase):
 
     def test_unlimited_ui_omits_attempts_and_uses_configured_length(self):
         puzzle_id = "t0_bedside_drawer"
+        self.puzzles[puzzle_id]["ui_mode"] = "password"
         self.puzzles[puzzle_id].pop("max_attempts", None)
         self.puzzles[puzzle_id]["length"] = 4
         ui, interaction, _ = self.make_ui()

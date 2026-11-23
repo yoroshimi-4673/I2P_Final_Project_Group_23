@@ -1321,6 +1321,15 @@ while running:
         ):
             polygon_editor_controller.handle_mouse_motion(event.pos, screen)
 
+        elif (
+            event.type == pygame.MOUSEBUTTONDOWN
+            and event.button == 1
+            and ui_overlay is None
+            and ui_screen == UI_GAME
+            and interaction_ui.mode == "dial_password"
+        ):
+            interaction_controller.handle_click(interaction_ui.dial_password_controls(screen), event.pos)
+
         elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             if polygon_editor_controller.active:
                 polygon_editor_controller.add_point_from_screen(event.pos, screen)
