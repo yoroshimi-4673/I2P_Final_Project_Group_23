@@ -56,9 +56,9 @@ from ui.interaction_ui import InteractionUI
 pygame.init()
 pygame.key.stop_text_input()
 
-DEBUG_COLLISION = False  # 正式遊玩預設隱藏碰撞校正圖層
-POLYGON_EDITOR_ENABLED = False  # Enable mouse and keyboard polygon editing
-DEVELOPER_MODE_ENABLED = False
+DEBUG_COLLISION = True  # 正式遊玩預設隱藏碰撞校正圖層
+POLYGON_EDITOR_ENABLED = True  # Enable mouse and keyboard polygon editing
+DEVELOPER_MODE_ENABLED = True
 BASE_DIR = Path(__file__).resolve().parent  # 取得目前專案根目錄位置
 
 LEVELS_PATH = (
