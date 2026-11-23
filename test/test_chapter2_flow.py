@@ -77,6 +77,68 @@ class Chapter2FlowTests(unittest.TestCase):
         # pending Rect 不在此測試猜測，直接呼叫 E 所用入口
         self.interaction.open_object(object_id)
 
+    def test_corridor_arrows_follow_unlock_events_until_scene_13(self):
+        self.game.enter_space("CH2_CORRIDOR")
+        doors = [
+            ("t0_unlocked", (200, 257)),
+            ("t7_unlocked", (200, 453)),
+            ("t3_unlocked", (200, 90)),
+        ]
+        screen = Mock(wraps=self.screen)
+        self.game_ui.draw_chapter2_guide_arrows(screen, self.game)
+        screen.blit.assert_not_called()
+        for count, (event, _) in enumerate(doors, start=1):
+            with self.subTest(event=event):
+                self.game.complete_event(event)
+                screen.blit.reset_mock()
+                self.game_ui.draw_chapter2_guide_arrows(screen, self.game)
+                rects = [call.args[1] for call in screen.blit.call_args_list]
+                self.assertEqual(rects, [
+                    pygame.Rect(*position, 80, 40) for _, position in doors[:count]
+                ])
+
+        self.game.enter_space("T3")
+        screen.blit.reset_mock()
+        self.game_ui.draw_chapter2_guide_arrows(screen, self.game)
+        screen.blit.assert_not_called()
+
+        self.game.enter_space("CH2_CORRIDOR")
+        self.game.complete_event("scene_13_started")
+        self.game_ui.draw_chapter2_guide_arrows(screen, self.game)
+        screen.blit.assert_not_called()
+
+        # 場景十三解鎖後只顯示通往 D 的箭頭
+        self.game.complete_event("space_d_unlocked")
+        self.game_ui.draw_chapter2_guide_arrows(screen, self.game)
+        screen.blit.assert_called_once()
+        self.assertEqual(screen.blit.call_args.args[1], pygame.Rect(520, 257, 80, 40))
+
+        self.game.enter_space("T0")
+        screen.blit.reset_mock()
+        self.game_ui.draw_chapter2_guide_arrows(screen, self.game)
+        screen.blit.assert_not_called()
+
+    def test_corridor_arrow_restores_from_save_and_scales_with_window(self):
+        self.game.enter_space("CH2_CORRIDOR")
+        self.game.complete_event("t0_unlocked")
+        self.game.complete_event("scene_10_entered_once")
+        restored = GameManager()
+        # 用記憶體中的存檔驗證事件復原
+        with patch.object(save_manager, "_write_slot") as write:
+            save_manager.save_game(self.game, 2)
+        saved_data = json.loads(json.dumps(write.call_args.args[1]))
+        with patch.object(save_manager, "_read_slot", return_value=saved_data):
+            self.assertTrue(save_manager.load_game(restored, 2))
+
+        self.assertEqual(restored.current_space, "CH2_CORRIDOR")
+        screen = Mock(wraps=pygame.Surface((1200, 900)))
+        self.game_ui.draw_chapter2_guide_arrows(screen, restored)
+        screen.blit.assert_called_once()
+        image, rect = screen.blit.call_args.args
+        self.assertEqual(rect.size, (120, 60))
+        self.assertEqual(image.get_size(), (120, 60))
+        self.assertEqual(image.get_at((0, 0)).a, 0)
+
     def click(self, control):
         buttons = self.ui.draw(self.screen, (0, 0))
         self.assertIn(control, buttons)

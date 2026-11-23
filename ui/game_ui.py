@@ -944,6 +944,19 @@ class GameUI:
     # Exploration
     # ========================================================
 
+    def draw_chapter2_guide_arrows(self, screen, game):
+        if game.current_space != "CH2_CORRIDOR":
+            return
+
+        corridor = self.ui_layout["spaces"]["CH2_CORRIDOR"]
+        for arrow in corridor.get("guide_arrows", {}).values():
+            hidden_event = arrow.get("hidden_after_event")
+            if hidden_event and game.has_event(hidden_event):  # 依各房門設定檢查隱藏事件
+                continue
+            # 依存檔既有的解鎖事件決定顯示
+            if game.has_event(arrow["required_event"]):
+                self.draw_asset(screen, arrow["asset"], self.scale_rect(screen, arrow))
+
     def draw_space(
         self,
         screen,
@@ -1130,6 +1143,7 @@ class GameUI:
 
             self.draw_decoration(screen, decoration, rect)
 
+        self.draw_chapter2_guide_arrows(screen, game)  # 場景素材完成後疊上房門箭頭
         return object_rects
 
 

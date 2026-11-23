@@ -464,6 +464,43 @@
                 "asset": "assets/素材庫/第二章/白色通道/the_hall.png",
                 "label": "第二章／白色通道"
             },
+            "guide_arrows": {
+                "door_t0": {
+                    "x": 200,
+                    "y": 257,
+                    "width": 80,
+                    "height": 40,
+                    "asset": "assets/素材庫/第二章/白色通道/guide_arrow.png",
+                    "required_event": "t0_unlocked",
+                    "hidden_after_event": "scene_13_started"
+                },
+                "door_t7": {
+                    "x": 200,
+                    "y": 453,
+                    "width": 80,
+                    "height": 40,
+                    "asset": "assets/素材庫/第二章/白色通道/guide_arrow.png",
+                    "required_event": "t7_unlocked",
+                    "hidden_after_event": "scene_13_started"
+                },
+                "door_t3": {
+                    "x": 200,
+                    "y": 90,
+                    "width": 80,
+                    "height": 40,
+                    "asset": "assets/素材庫/第二章/白色通道/guide_arrow.png",
+                    "required_event": "t3_unlocked",
+                    "hidden_after_event": "scene_13_started"
+                },
+                "door_d": {
+                    "x": 520,
+                    "y": 257,
+                    "width": 80,
+                    "height": 40,
+                    "asset": "assets/素材庫/第二章/白色通道/guide_arrow_d.png",
+                    "required_event": "space_d_unlocked"
+                }
+            },
             "player": {
                 "x": 360,
                 "y": 250,
