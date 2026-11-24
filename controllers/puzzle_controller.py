@@ -289,7 +289,7 @@ class PuzzleController:
             powered_tiles = self.calculate_circuit_powered_tiles()
         return self.get_circuit_tile_position("end") in powered_tiles
 
-    def rotate_circuit_tile(self, row, col):
+    def rotate_circuit_tile(self, row, col, *, defer_success=False):
         """順時針旋轉一格，並檢查是否已接通電路。"""
         if self.ui_mode != "circuit":
             return {"status": "not_circuit"}
@@ -306,6 +306,8 @@ class PuzzleController:
         tile["rotation"] = (tile["rotation"] + 1) % 4
         powered = self.calculate_circuit_powered_tiles()
         if self.is_circuit_complete(powered):
+            if defer_success:
+                return {"status": "success_dialogue", "puzzle_id": self.current_puzzle_id}
             self.last_result = self.puzzle_manager.apply_success(self.current_puzzle_id)
             return self.last_result
 
@@ -390,11 +392,13 @@ class PuzzleController:
         return self.password_dial_states[self.current_puzzle_id]
 
     def turn_password_dial(self, index, step):
+        if self.ui_mode != "dial_password" or self.puzzle_manager.is_solved(self.current_puzzle_id):
+            return
         digits = self.dial_digits
         digits[index] = (digits[index] + step) % 10
 
 
-    def submit(self):
+    def submit(self, *, defer_success=False):
         """提交目前Puzzle輸入內容。"""
 
         if (self.last_result or {}).get("status") == "final_failure_pending":
@@ -439,7 +443,8 @@ class PuzzleController:
             self.puzzle_manager
             .submit_answer(
                 self.current_puzzle_id,
-                answer
+                answer,
+                defer_success=defer_success
             )
         )
 

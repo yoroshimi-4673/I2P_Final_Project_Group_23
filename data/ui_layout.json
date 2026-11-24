@@ -581,6 +581,10 @@
                 "rift_C_B": {
                     "x": 450,
                     "y": 130
+                },
+                "first_choice_b": {
+                    "center": [210, 337],
+                    "direction": 3
                 }
             },
             "collision_zones": {
@@ -717,6 +721,10 @@
                 "ceiling_rift": {
                     "x": 480,
                     "y": 280
+                },
+                "first_choice_c": {
+                    "center": [210, 337],
+                    "direction": 3
                 }
             },
             "collision_zones": {}

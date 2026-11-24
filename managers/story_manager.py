@@ -242,14 +242,13 @@ class StoryManager:
     def start_dialogue(
         self,
         dialogue_id,
-        after_action=None
+        after_action=None,
+        *,
+        lines=None
     ):
         """播放指定Dialogue並保存結束後流程。"""
 
-        dialogue_lines = self.dialogues.get(
-            dialogue_id,
-            []
-        )
+        dialogue_lines = self.dialogues.get(dialogue_id, []) if lines is None else lines
 
         self.dialogue_controller.start(
             dialogue_id,
@@ -735,6 +734,12 @@ class StoryManager:
         return unlocked
 
 
+    @property
+    def pending_puzzle_id(self):
+        if self.dialogue_after_action == "complete_puzzle":
+            return self.dialogue_controller.dialogue_id
+        return None
+
     def finish_dialogue_action(self):
         """依照Dialogue用途處理後續遊戲流程。"""
 
@@ -742,6 +747,10 @@ class StoryManager:
 
         # 執行前先清除避免重複觸發
         self.dialogue_after_action = None
+
+        if action == "complete_puzzle":
+            self.game.game_state = SPACE
+            return action
 
         if action == "start_first_choice":
 
@@ -762,8 +771,8 @@ class StoryManager:
 
             # 完成切換後清除暫存目標空間
             self.pending_target_space = None
-            if target == "A":
-                return "first_choice_a"  # 只在序章選入空間甲時回傳入口
+            if target in ("A", "B", "C"):
+                return f"first_choice_{target.lower()}"
 
         elif action == "finish_photo_story":
 

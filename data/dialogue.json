@@ -2,9 +2,9 @@
     "intro": [
         {
             "speaker": "",
-            "text": "",
+            "text": "......",
             "background": "assets/序章/1.png",
-            "hide_dialogue_box": true
+            "hide_dialogue_box": false
         },
         {
             "speaker": "黎琛",
@@ -19,7 +19,7 @@
             "hide_dialogue_box": false
         },
         {
-            "speaker": "",
+            "speaker": "終端機",
             "text": "共時性座標鎖定失敗——世界線偏離率：∞",
             "background": "assets/序章/4.png",
             "hide_dialogue_box": false

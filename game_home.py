@@ -56,9 +56,9 @@ from ui.interaction_ui import InteractionUI
 pygame.init()
 pygame.key.stop_text_input()
 
-DEBUG_COLLISION = True  # 正式遊玩預設隱藏碰撞校正圖層
-POLYGON_EDITOR_ENABLED = True  # Enable mouse and keyboard polygon editing
-DEVELOPER_MODE_ENABLED = True
+DEBUG_COLLISION = False  # 正式遊玩預設隱藏碰撞校正圖層
+POLYGON_EDITOR_ENABLED = False  # Enable mouse and keyboard polygon editing
+DEVELOPER_MODE_ENABLED = False
 BASE_DIR = Path(__file__).resolve().parent  # 取得目前專案根目錄位置
 
 LEVELS_PATH = (
@@ -246,7 +246,9 @@ player = Player(
     sprite_path=BASE_DIR / "assets" / "素材庫" / "角色" / "main_character.png",
     visual_scale = 1.5
 )
-navigation_controller = NavigationController(pathfinding_manager, player, game)
+navigation_controller = NavigationController(
+    pathfinding_manager, player, game, interaction_target_manager, interaction_controller
+)
 
 # 儲存目前玩家持續按住的移動按鍵
 pressed_keys = set()
@@ -353,7 +355,7 @@ def handle_hotbar_click(hotbar_data, mouse_pos):
     for index, rect in enumerate(hotbar_data["slots"]):
         if rect.collidepoint(mouse_pos):
             if hotbar_controller.select_slot(index, hotbar_data["visible_items"]):
-                player.cancel_mouse_movement()
+                navigation_controller.cancel()
             return True  # 空格也攔截點擊避免觸發移動
 
     left = hotbar_data["left"]
@@ -366,8 +368,35 @@ def handle_hotbar_click(hotbar_data, mouse_pos):
         return False
 
     if moved:
-        player.cancel_mouse_movement()
+        navigation_controller.cancel()
     return True
+
+
+def can_navigate_scene():
+    return (
+        ui_screen == UI_GAME
+        and game.game_state == SPACE
+        and ui_overlay is None
+        and not interaction_ui.is_open()
+        and not polygon_editor_controller.active
+    )
+
+
+def handle_exploration_click(
+    position, surface, obstacles, walkable_polygon, object_rects, interaction_rects,
+    hotbar_data, hide_player_this_frame,
+):
+    if hide_player_this_frame or not can_navigate_scene():
+        return
+    # 第二章道具欄可能蓋住房門，優先接收點擊
+    hotbar_first = game.chapter >= 2 or not any(
+        rect.collidepoint(position) for rect in object_rects.values()
+    )
+    if hotbar_first and handle_hotbar_click(hotbar_data, position):
+        return
+    navigation_controller.navigate_to_click(
+        position, surface, obstacles, walkable_polygon, object_rects, interaction_rects
+    )
 
 
 def place_player_on_space_change(
@@ -391,7 +420,11 @@ def place_player_on_space_change(
 
 
 def draw_t7_power_outage_overlay(surface):
-    if game.current_space == "T7" and not game.has_event("t7_circuit_completed"):
+    if (
+        game.current_space == "T7"
+        and not game.has_event("t7_circuit_completed")
+        and story_manager.pending_puzzle_id != "t7_circuit"
+    ):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 204))
         surface.blit(overlay, (0, 0))
@@ -760,8 +793,11 @@ def advance_current_dialogue():
 def finish_dialogue_and_open_ready_puzzle():
     """對話結束後開啟已準備好的謎題介面。"""
 
+    pending_puzzle_id = story_manager.pending_puzzle_id
     action = story_manager.finish_dialogue_action()
-    if action == "first_choice_a":
+    if action == "complete_puzzle":
+        interaction_controller.finish_puzzle_success_dialogue(pending_puzzle_id)
+    if action in ("first_choice_a", "first_choice_b", "first_choice_c"):
         interaction_controller.pending_entry_rift = action  # 沿用一次性的入口出生配置
     if (
         action == "open_t7_circuit"
@@ -792,7 +828,7 @@ def reset_gameplay_ui():
     puzzle_controller.anchor_selected_fragment = None
     codex_ui.close_item()
     pressed_keys.clear()
-    player.cancel_mouse_movement()
+    navigation_controller.cancel()
     interaction_controller.pending_entry_rift = None
     interaction_controller.pending_entry_object = None
 
@@ -813,7 +849,7 @@ def toggle_developer_menu():
     settings_controller.stop_volume_drag()
     polygon_editor_controller.close()
     pressed_keys.clear()
-    player.cancel_mouse_movement()
+    navigation_controller.cancel()
     developer_buttons = {}
     ui_overlay = "developer"
 
@@ -883,7 +919,7 @@ def resize_game_window(width, height):
         scale_player_for_window(old_size, size)
     screen_width, screen_height = size
     if old_size != size:
-        player.cancel_mouse_movement()  # 清除縮放前的滑鼠導航座標
+        navigation_controller.cancel()  # 清除縮放前的滑鼠導航座標
 
 
 def restore_loaded_session(session):
@@ -1202,7 +1238,7 @@ while running:
         pygame.mouse.get_pos()
     )
 
-    mouse_clicked = False
+    click_pos = None
 
     # 記錄本幀是否按下E鍵要求互動
     interact_pressed = False
@@ -1244,7 +1280,7 @@ while running:
         if event.type == pygame.KEYDOWN and event.key == pygame.K_F8:
             if DEVELOPER_MODE_ENABLED:
                 toggle_developer_menu()
-                mouse_clicked = False
+                click_pos = None
                 interact_pressed = False
             continue
         if developer_controller.is_open and event.type not in (pygame.QUIT, pygame.VIDEORESIZE):
@@ -1334,7 +1370,7 @@ while running:
             if polygon_editor_controller.active:
                 polygon_editor_controller.add_point_from_screen(event.pos, screen)
             else:
-                mouse_clicked = True
+                click_pos = event.pos
 
         elif (
             event.type == pygame.MOUSEBUTTONDOWN
@@ -1402,7 +1438,7 @@ while running:
                 if event.key == pygame.K_F2:
                     if polygon_editor_controller.toggle(game.current_space):
                         pressed_keys.clear()
-                        player.cancel_mouse_movement()
+                        navigation_controller.cancel()
                     continue
 
                 if polygon_editor_controller.active:
@@ -1426,6 +1462,7 @@ while running:
                 pressed_keys.add(
                     event.key
                 )
+                navigation_controller.cancel()
 
             # ------------------------------------------------
             # Settings優先
@@ -1623,6 +1660,7 @@ while running:
 
             # 視窗失焦時清除殘留的移動按鍵
             pressed_keys.clear()
+            navigation_controller.cancel()
 
 
     # ========================================================
@@ -1645,17 +1683,12 @@ while running:
         interaction_controller.finish_interaction_sequence()
 
     # 非正常探索狀態時清除殘留移動按鍵
-    if not (
-        ui_screen == UI_GAME
-        and game.game_state == SPACE
-        and ui_overlay is None
-        and not interaction_ui.is_open()
-    ):
+    if not can_navigate_scene():
 
         pressed_keys.clear()
 
         # 離開自由探索時取消滑鼠自動移動
-        player.cancel_mouse_movement()
+        navigation_controller.cancel()
 
 
     # ========================================================
@@ -1675,6 +1708,7 @@ while running:
             screen, interaction_controller, pressed_keys,
         )
         if hide_player_this_frame:
+            navigation_controller.cancel()
             last_player_space = game.current_space  # 記錄已放置角色的目前空間
 
     if ui_screen == UI_MENU:
@@ -1804,12 +1838,7 @@ while running:
             )
 
             # 只有正常探索狀態才能控制玩家移動
-            if (
-                ui_overlay is None
-                and not interaction_ui.is_open()
-                and not polygon_editor_controller.active
-                and not hide_player_this_frame  # 放置角色當幀暫停移動與互動
-            ):
+            if can_navigate_scene() and not hide_player_this_frame:
 
                 # E鍵與畫面提示使用同一套互動判定
                 if interact_pressed:
@@ -1822,7 +1851,7 @@ while running:
 
                     if nearest_target is not None:
 
-                        player.cancel_mouse_movement()
+                        navigation_controller.cancel()
 
                         # 每次重新開啟Interaction都從預設控制項開始
                         interaction_controller.reset_interaction_focus()
@@ -1833,16 +1862,19 @@ while running:
                             ]
                         )
 
-                # Interaction尚未開啟時才更新角色移動
-                if not interaction_ui.is_open():
+                # 本幀有新點擊時先保留給點擊處理，避免觸發已被替換的目標
+                if can_navigate_scene() and (
+                    click_pos is None or navigation_controller.pending_interaction is None
+                ):
 
-                    player.update(
+                    navigation_controller.update_player(
                         dt,
                         pressed_keys,
                         obstacles,
-                        screen_width,
-                        screen_height,
-                        walkable_polygon
+                        walkable_polygon,
+                        screen,
+                        object_rects,
+                        interaction_rects,
                     )
                     # 偵測玩家移動（鍵盤 WASD 或滑鼠點擊移動），完成階段 1 教學
                     keys = pygame.key.get_pressed()
@@ -1861,7 +1893,7 @@ while running:
                 pressed_keys.clear()
 
                 # Overlay開啟時停止所有自動移動
-                player.cancel_mouse_movement()
+                navigation_controller.cancel()
 
             # 滑鼠自動移動時顯示虛線與終點標記
             if not hide_player_this_frame:
@@ -2054,7 +2086,8 @@ while running:
     # Mouse Click
     # ========================================================
 
-    if mouse_clicked:
+    if click_pos is not None:
+        mouse_pos = click_pos
 
         # ----------------------------------------------------
         # Settings Overlay
@@ -2256,63 +2289,11 @@ while running:
             # Space
             # =================================================
 
-            elif game.game_state == SPACE and not hide_player_this_frame:
-
-                # 道具欄覆蓋房門時優先接收點擊
-                click_handled = game.chapter >= 2 and handle_hotbar_click(hotbar_data, mouse_pos)
-                scene_objects = () if click_handled else object_rects.items()
-
-                # ---------------------------------------------
-                # Scene Object
-                # ---------------------------------------------
-
-                for (
-                    object_id,
-                    rect
-                ) in scene_objects:
-
-                    if rect.collidepoint(
-                        mouse_pos
-                    ):
-
-                        target = {
-                            "id": object_id,
-                            "rect": rect,
-                            "interaction_rect": (
-                                interaction_rects.get(
-                                    object_id,
-                                    rect
-                                )
-                            )
-                        }
-
-                        # 點物件只負責靠近，不再自動開啟UI
-                        navigation_controller.navigate_to_click(
-                            mouse_pos, screen, obstacles, walkable_polygon, target
-                        )
-
-                        click_handled = True
-
-                        break
-
-
-                # ---------------------------------------------
-                # Hotbar
-                # ---------------------------------------------
-
-                if not click_handled and game.chapter < 2:
-                    click_handled = handle_hotbar_click(hotbar_data, mouse_pos)
-
-                # ---------------------------------------------
-                # Empty Ground
-                # ---------------------------------------------
-
-                if not click_handled:
-
-                    # 點空地時設定一般滑鼠移動目標
-                    navigation_controller.navigate_to_click(
-                        mouse_pos, screen, obstacles, walkable_polygon
-                    )
+            elif game.game_state == SPACE:
+                handle_exploration_click(
+                    mouse_pos, screen, obstacles, walkable_polygon, object_rects, interaction_rects,
+                    hotbar_data, hide_player_this_frame,
+                )
 
 
             # =================================================

@@ -609,13 +609,14 @@ class Player:
             center = start + direction * (distance * step / steps)
             if not self.is_footprint_walkable(center, obstacles, walkable_polygon):
                 self.cancel_mouse_movement()
-                return
+                return False
             self.position = center - offset
             self.rect.center = (round(center.x), round(center.y))
             if self.interaction_target is not None and self.can_interact(self.interaction_target):
                 self.cancel_mouse_movement()
-                return
+                return True
         self.get_mouse_direction()  # 到達轉折點後準備下一段路線
+        return True
 
     def update(
         self,
@@ -673,11 +674,12 @@ class Player:
         self.update_animation(dt, direction)  # 動畫共用鍵盤與滑鼠計算出的方向
 
         if self.mouse_target is not None:
-            self.follow_path(direction, self.speed * dt, obstacles, walkable_polygon)
+            path_clear = self.follow_path(direction, self.speed * dt, obstacles, walkable_polygon)
             if not pygame.Rect(0, 0, screen_width, screen_height).contains(self.rect):
                 self.keep_inside_bounds(screen_width, screen_height)
                 self.cancel_mouse_movement()
-            return
+                return False
+            return path_clear
 
         move_x = (
             direction.x
