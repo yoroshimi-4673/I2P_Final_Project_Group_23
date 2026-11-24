@@ -129,11 +129,11 @@ class PuzzleTests(unittest.TestCase):
 
     def round_trip_save(self):
         # 使用記憶體檔案驗證真實存讀流程避免碰玩家存檔
-        with patch("save_manager._write_slot") as write:
+        with patch("managers.save_manager._write_slot") as write:
             save_manager.save_game(self.game, 1)
             serialized = json.dumps(write.call_args.args[1])
         self.game.reset_game()
-        with patch("save_manager._read_slot", return_value=json.loads(serialized)):
+        with patch("managers.save_manager._read_slot", return_value=json.loads(serialized)):
             self.assertTrue(save_manager.load_game(self.game, 1))
         return json.loads(serialized)
 
@@ -152,7 +152,7 @@ class PuzzleTests(unittest.TestCase):
             "solved_puzzles": ["password_panel"],
             "puzzle_attempts": {"password_panel": 2}
         }
-        with patch("save_manager._read_slot", return_value=old_save):
+        with patch("managers.save_manager._read_slot", return_value=old_save):
             self.assertTrue(save_manager.load_game(self.game, 1))
         self.assertEqual(self.game.solved_puzzles, [self.puzzle_id])
         self.assertEqual(self.game.puzzle_attempts, {self.puzzle_id: 2})

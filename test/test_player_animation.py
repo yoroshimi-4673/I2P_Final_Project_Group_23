@@ -27,9 +27,10 @@ class PlayerAnimationTests(unittest.TestCase):
 
     def test_original_frames_and_idle(self):
         self.assertEqual(set(self.player.animations), {0, 1, 2, 3})
+        sheet_width, sheet_height = pygame.image.load(SPRITE).get_size()
+        frame_size = (sheet_width // 4, sheet_height // 4)
         for frames in self.player.animations.values():
-            self.assertEqual(len(frames), 3)
-            self.assertTrue(all(frame.get_size() == (16, 17) for frame in frames))
+            self.assertEqual([frame.get_size() for frame in frames], [frame_size] * 4)
         self.assertEqual((self.player.direction, self.player.frame_index), (0, 0))
 
     def test_direction_mapping_diagonal_and_stop(self):
@@ -45,11 +46,11 @@ class PlayerAnimationTests(unittest.TestCase):
         self.player.update_animation(0.05, direction)
         self.assertEqual(self.player.frame_index, 1)
         self.player.update_animation(0.10, direction)
-        self.assertEqual(self.player.frame_index, 2)
+        self.assertEqual(self.player.frame_index, 3)
         self.player.update_animation(0.15, direction)
         self.assertEqual(self.player.frame_index, 1)
         self.player.update_animation(0.45, direction)
-        self.assertEqual(self.player.frame_index, 2)
+        self.assertEqual(self.player.frame_index, 3)
         self.player.update_animation(0.1, pygame.Vector2())
         self.assertEqual((self.player.frame_index, self.player.animation_timer), (0, 0))
         self.assertFalse(self.player.is_moving)
@@ -74,18 +75,20 @@ class PlayerAnimationTests(unittest.TestCase):
         with patch("player.pygame.image.load", return_value=pygame.Surface((5, 5))):
             self.assertFalse(player._load_sprite_sheet("invalid.png"))
 
-    def test_draw_fits_and_aligns_after_resize(self):
-        # 驗證繪製幾何與碰撞矩形獨立維持不變
+    def test_draw_scales_and_aligns_after_resize(self):
+        self.assertEqual(self.player.visual_scale, 1.5)
+        frame_width, frame_height = self.player.animations[0][0].get_size()
         for size in ((40, 40), (80, 100), (102, 128)):
-            self.player.rect.size = size
-            before = self.player.rect.copy()
-            screen = Mock()
-            self.player.draw(screen)
-            image, rect = screen.blit.call_args.args
-            self.assertEqual(rect.midbottom, before.midbottom)
-            self.assertLessEqual(image.get_width(), before.width)
-            self.assertLessEqual(image.get_height(), before.height)
-            self.assertEqual(self.player.rect, before)
+            with self.subTest(size=size):
+                self.player.rect.size = size
+                before = self.player.rect.copy()
+                screen = Mock()
+                self.player.draw(screen)
+                image, rect = screen.blit.call_args.args
+                scale = min(before.width / frame_width, before.height / frame_height) * 1.5
+                self.assertEqual(image.get_size(), (round(frame_width * scale), round(frame_height * scale)))
+                self.assertEqual(rect.midbottom, before.midbottom)
+                self.assertEqual(self.player.rect, before)
 
 
 if __name__ == "__main__":

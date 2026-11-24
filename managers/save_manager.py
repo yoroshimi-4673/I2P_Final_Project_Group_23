@@ -85,14 +85,15 @@ def _read_slot(path):
 
 def _metadata(data, slot, saved_at, thumbnail=None):
     space = data.get("current_space")
+    data_dir = BASE_DIR.parent / "data"
     try:
-        levels = json.loads((BASE_DIR / "data" / "levels.json").read_text(encoding="utf-8"))
+        levels = json.loads((data_dir / "levels.json").read_text(encoding="utf-8"))
     except (OSError, ValueError):
         levels = {}
     space_name = levels.get(space, {}).get("name")
     if space and not space_name:
         try:
-            layout = json.loads((BASE_DIR / "data" / "ui_layout.json").read_text(encoding="utf-8"))
+            layout = json.loads((data_dir / "ui_layout.json").read_text(encoding="utf-8"))
             space_name = layout["spaces"].get(space, {}).get("background", {}).get("label")
         except (OSError, ValueError):
             pass
