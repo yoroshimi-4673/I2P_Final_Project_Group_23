@@ -13,7 +13,14 @@ from ui.dialogue_ui import (
     draw_choice_panel
 )
 
-from game_manager import GameManager
+from managers.game_manager import GameManager
+from managers.map_manager import MapManager
+from managers.story_manager import StoryManager
+
+from player import Player #匯入角色移動模組
+
+from controllers.interaction_controller import InteractionController
+from controllers.hotbar_controller import HotbarController
 
 from game_states import (
     DIALOGUE,
@@ -28,18 +35,13 @@ from ui.game_ui import GameUI
 
 from ui.interaction_ui import InteractionUI
 
-from interaction_manager import (
-    finish_photo_story_dialogue,
-    leave_puzzle,
-    search_object
-)
-
 
 # ============================================================
 # 初始化
 # ============================================================
 
 pygame.init()
+pygame.key.stop_text_input()
 
 BASE_DIR = Path(__file__).resolve().parent  # 取得目前專案根目錄位置
 
@@ -106,7 +108,6 @@ codex_data = load_json(
     CODEX_PATH
 )
 
-
 # ============================================================
 # Pygame Window
 # ============================================================
@@ -150,11 +151,25 @@ game_ui = GameUI(
     objects
 )
 
+# 集中管理Space版面、碰撞、互動範圍與出生點
+map_manager = MapManager(
+    ui_layout,
+    game_ui
+)
+
 dialogue_controller = DialogueController(
     typing_speed=35
 )
 
 choice_controller = ChoiceController()
+
+# 集中管理第一章劇情流程與Dialogue後續動作
+story_manager = StoryManager(
+    game,
+    dialogue_controller,
+    choice_controller,
+    dialogues
+)
 
 interaction_ui = InteractionUI(
     game_ui,
@@ -168,6 +183,268 @@ codex_ui = CodexUI(
     codex_data,
     objects
 )
+
+interaction_controller = InteractionController(
+    interaction_ui,
+    story_manager,
+    game
+)
+
+hotbar_controller = HotbarController(
+    game,
+    game_ui,
+    interaction_ui,
+    interaction_controller
+)
+
+# ============================================================
+# Player
+# ============================================================
+
+# 建立正式遊戲使用的玩家物件
+player = Player(
+    x=100,
+    y=100,
+    width=40,
+    height=40,
+    speed=300
+)
+
+# 儲存目前玩家持續按住的移動按鍵
+pressed_keys = set()
+
+# 記錄Player目前已套用出生點的空間
+last_player_space = None
+
+def draw_dashed_line(
+    surface,
+    color,
+    start_pos,
+    end_pos,
+    width=2,
+    dash_length=12,
+    space_length=14
+):
+    """繪製滑鼠導航使用的虛線路徑。"""
+
+    start = pygame.Vector2(
+        start_pos
+    )
+
+    end = pygame.Vector2(
+        end_pos
+    )
+
+    difference = end - start
+    distance = difference.length()
+
+    if distance == 0:
+        return
+
+    direction = difference.normalize()
+    current_distance = 0.0
+
+    while current_distance < distance:
+
+        dash_start = (
+            start
+            + direction
+            * current_distance
+        )
+
+        dash_end_distance = min(
+            current_distance
+            + dash_length,
+            distance
+        )
+
+        dash_end = (
+            start
+            + direction
+            * dash_end_distance
+        )
+
+        pygame.draw.line(
+            surface,
+            color,
+            dash_start,
+            dash_end,
+            width
+        )
+
+        current_distance += (
+            dash_length
+            + space_length
+        )
+
+
+def draw_player_navigation_guide(
+    surface
+):
+    """顯示滑鼠自動移動的虛線與終點標記。"""
+
+    if player.mouse_target is None:
+        return
+
+    target_color = (
+        255,
+        215,
+        0
+    )
+
+    player_center = (
+        player.rect.center
+    )
+
+    target_center = (
+        round(
+            player.mouse_target.x
+        ),
+        round(
+            player.mouse_target.y
+        )
+    )
+
+    draw_dashed_line(
+        surface,
+        target_color,
+        player_center,
+        target_center,
+        width=2,
+        dash_length=12,
+        space_length=14
+    )
+
+    # 使用空心圓標示角色真正導航終點
+    pygame.draw.circle(
+        surface,
+        target_color,
+        target_center,
+        15,
+        width=2
+    )
+
+
+def get_nearest_interaction_target(
+    object_rects,
+    interaction_rects
+):
+    """找出目前互動範圍內距離玩家最近的物件。"""
+
+    nearest_target = None
+    nearest_distance = None
+
+    player_center = pygame.Vector2(
+        player.rect.center
+    )
+
+    for object_id, interaction_rect in (
+        interaction_rects.items()
+    ):
+
+        # 玩家未進入範圍時不能使用E互動
+        if not player.rect.colliderect(
+            interaction_rect
+        ):
+            continue
+
+        object_rect = object_rects.get(
+            object_id
+        )
+
+        if object_rect is None:
+            continue
+
+        object_center = pygame.Vector2(
+            object_rect.center
+        )
+
+        distance = (
+            object_center
+            - player_center
+        ).length_squared()
+
+        if (
+            nearest_distance is None
+            or distance < nearest_distance
+        ):
+
+            nearest_distance = distance
+
+            nearest_target = {
+                "id": object_id,
+                "rect": object_rect,
+                "interaction_rect": (
+                    interaction_rect
+                )
+            }
+
+    return nearest_target
+
+
+def draw_interaction_prompt(
+    surface,
+    target
+):
+    """在可互動物件旁顯示E鍵提示。"""
+
+    if target is None:
+        return
+
+    object_id = target[
+        "id"
+    ]
+
+    object_name = objects.get(
+        object_id,
+        {}
+    ).get(
+        "name",
+        object_id
+    )
+
+    prompt_surface = (
+        game_ui.font_small.render(
+            f"[E] 互動：{object_name}",
+            True,
+            (255, 245, 180)
+        )
+    )
+
+    prompt_x = (
+        player.rect.centerx
+        - prompt_surface.get_width()
+        // 2
+    )
+
+    prompt_y = (
+        player.rect.top
+        - prompt_surface.get_height()
+        - 10
+    )
+
+    prompt_x = max(
+        8,
+        min(
+            prompt_x,
+            surface.get_width()
+            - prompt_surface.get_width()
+            - 8
+        )
+    )
+
+    prompt_y = max(
+        8,
+        prompt_y
+    )
+
+    surface.blit(
+        prompt_surface,
+        (
+            prompt_x,
+            prompt_y
+        )
+    )
 
 
 # ============================================================
@@ -206,282 +483,37 @@ current_look_index = 0
 
 dragging_volume = False
 
-
-# ============================================================
-# Hotbar
-# ============================================================
-
-selected_slot = 0
-
-selected_item = None
-
-hotbar_offset = 0
-
-
-# ============================================================
-# Dialogue Flow
-# ============================================================
-
-pending_target_space = None  # Choice結果播放後要前往的空間
-
-dialogue_after_action = None  # Dialogue結束後要執行的流程
-
-chapter_end_text = (
-    "你只解開了一把鎖。"
-    "但你還沒解開自己。"
-)
-
-
 # ============================================================
 # Game Flow
 # ============================================================
 
 def start_new_game():
-    """建立全新的第一章遊戲流程。"""
+    """重設UI暫存狀態並交由StoryManager開始新遊戲。"""
 
     global ui_screen
     global ui_overlay
 
-    global selected_slot
-    global selected_item
-    global hotbar_offset
-
-    global pending_target_space
-    global dialogue_after_action
-
-    game.reset_game()
+    global last_player_space
 
     interaction_ui.close()
-
     codex_ui.close_item()
 
-    selected_slot = 0
-    selected_item = None
-    hotbar_offset = 0
+    # 新遊戲開始時清除殘留移動按鍵
+    pressed_keys.clear()
 
-    dialogue_controller.start(
-        "intro",
-        dialogues.get(
-            "intro",
-            []
-        )
-    )
+    # 下一次進入Space時重新套用出生位置
+    last_player_space = None
 
-    game.game_state = DIALOGUE
+    # 新遊戲不保留上一局的裂隙入口資料
+    interaction_controller.pending_entry_rift = None
+
+    hotbar_controller.reset()
+
+    # 第一章劇情內容與流程交由StoryManager管理
+    story_manager.start_new_game()
 
     ui_screen = UI_GAME
-
     ui_overlay = None
-
-    pending_target_space = None
-
-    dialogue_after_action = (
-        "start_first_choice"
-    )
-
-
-def start_first_choice():
-    """開始307房第一次A/B/C選擇。"""
-
-    game.current_scene = (
-        "scene_04_choice"
-    )
-
-    game.game_state = CHOICE
-
-    choice_controller.start(
-        "scene_04_choice",
-        dialogues[
-            "scene_04_choice"
-        ]
-    )
-
-
-def start_choice_result(
-    selected_option
-):
-    """播放玩家選擇之後的結果文字。"""
-
-    global pending_target_space
-    global dialogue_after_action
-
-    pending_target_space = (
-        selected_option.get(
-            "target_space"
-        )
-    )
-
-    result_text = (
-        selected_option.get(
-            "result_text",
-            ""
-        )
-    )
-
-    dialogue_controller.start(
-        "scene_04_choice_result",
-        [
-            {
-                "speaker": "",
-                "text": result_text
-            }
-        ]
-    )
-
-    game.game_state = DIALOGUE
-
-    dialogue_after_action = (
-        "enter_selected_space"
-    )
-
-
-def start_photo_story(
-    photo_result
-):
-    """照片背面事件後播放劇情Dialogue。"""
-
-    global dialogue_after_action
-
-    dialogue_lines = []
-
-    # 第一段黎琛台詞
-    dialogue_lines.append(
-        {
-            "speaker": "黎琛",
-            "text": "空間D……還有？"
-        }
-    )
-
-    # 旁白
-    dialogue_lines.append(
-        {
-            "speaker": "",
-            "text": (
-                "牆上顯示器突然亮起。"
-            )
-        }
-    )
-
-    system_message = photo_result.get(
-        "system_message",
-        {}
-    )
-
-    values = system_message.get(
-        "values",
-        {}
-    )
-
-    system_text = (
-        "【收斂率更新】\n"
-        f"空間A：{values.get('A', 81)}%\n"
-        f"空間B：{values.get('B', 55)}%\n"
-        f"空間C：{values.get('C', 37)}%"
-    )
-
-    dialogue_lines.append(
-        {
-            "speaker": "",
-            "text": system_text
-        }
-    )
-
-    dialogue_lines.append(
-        {
-            "speaker": "黎琛",
-            "text": (
-                "收斂率在漲……"
-                "這個房間在消失。"
-                "我得走。"
-            )
-        }
-    )
-
-    dialogue_controller.start(
-        "photo_back_story",
-        dialogue_lines
-    )
-
-    game.game_state = DIALOGUE
-
-    dialogue_after_action = (
-        "finish_photo_story"
-    )
-
-
-def start_chapter_end(
-    ending_result
-):
-    """出口門進入後播放第一章結尾Dialogue。"""
-
-    global dialogue_after_action
-    global chapter_end_text
-
-    ending_dialogue = (
-        ending_result.get(
-            "dialogue",
-            []
-        )
-    )
-
-    chapter_end_text = (
-        ending_result.get(
-            "ending_text",
-            chapter_end_text
-        )
-    )
-
-    dialogue_controller.start(
-        "chapter_1_end",
-        ending_dialogue
-    )
-
-    # enter_door()已經將狀態改為SUCCESS，
-    # 這裡暫時切回DIALOGUE播放結尾內容。
-    game.game_state = DIALOGUE
-
-    dialogue_after_action = (
-        "show_chapter_end"
-    )
-
-
-def finish_dialogue_action():
-    """依照Dialogue用途處理後續遊戲流程。"""
-
-    global dialogue_after_action
-    global pending_target_space
-
-    action = dialogue_after_action
-
-    dialogue_after_action = None
-
-    if action == "start_first_choice":
-
-        start_first_choice()
-
-    elif action == "enter_selected_space":
-
-        if pending_target_space is not None:
-
-            game.current_scene = (
-                "exploration"
-            )
-
-            game.enter_space(
-                pending_target_space
-            )
-
-        pending_target_space = None
-
-    elif action == "finish_photo_story":
-
-        finish_photo_story_dialogue(
-            game
-        )
-
-    elif action == "show_chapter_end":
-
-        game.game_state = SUCCESS
 
 
 # ============================================================
@@ -537,117 +569,9 @@ def handle_choice_key(event):
 
     if selected_option is not None:
 
-        start_choice_result(
+        story_manager.start_choice_result(
             selected_option
         )
-
-
-# ============================================================
-# Container Child
-# ============================================================
-
-def open_container_child(
-    child_id
-):
-    """
-    開啟Container子物件。
-
-    已搜尋過的Searchable不再顯示是/否，
-    而是直接顯示empty_text。
-    """
-
-    child = objects[
-        child_id
-    ]
-
-    if child[
-        "type"
-    ] == "searchable":
-
-        item_id = child.get(
-            "item"
-        )
-
-        if (
-            item_id is not None
-            and game.has_discovered_item(
-                item_id
-            )
-        ):
-
-            interaction_ui.push_current()
-
-            interaction_ui.current_object_id = (
-                child_id
-            )
-
-            interaction_ui.result = (
-                search_object(
-                    game,
-                    child_id,
-                    objects
-                )
-            )
-
-            interaction_ui.mode = (
-                "message"
-            )
-
-            return
-
-    interaction_ui.open_child(
-        child_id
-    )
-
-
-# ============================================================
-# Hotbar
-# ============================================================
-
-def get_selected_hotbar_item():
-    """取得目前Hotbar真正選中的item_id。"""
-
-    visible_items = (
-        game_ui.get_visible_inventory(
-            game,
-            hotbar_offset
-        )
-    )
-
-    if (
-        selected_slot < 0
-        or selected_slot
-        >= len(visible_items)
-    ):
-
-        return None
-
-    return visible_items[
-        selected_slot
-    ]
-
-
-def open_hotbar_item(
-    item_id
-):
-    """從Hotbar開啟物品詳細內容。"""
-
-    if item_id is None:
-        return
-
-    if item_id == "photo_1":
-
-        interaction_ui.open_photo(
-            item_id,
-            mode="inventory"
-        )
-
-        return
-
-    interaction_ui.open_object(
-        item_id
-    )
-
 
 # ============================================================
 # Codex Navigation
@@ -954,416 +878,14 @@ def draw_chapter_end(
 
     return buttons
 
-
 # ============================================================
 # Interaction Keyboard
 # ============================================================
-
-def handle_interaction_key(
-    event
-):
-    """處理Interaction UI的鍵盤輸入。"""
-
-    if not interaction_ui.is_open():
-
-        return
-
-    # --------------------------------------------------------
-    # Password
-    # --------------------------------------------------------
-
-    if interaction_ui.mode == "password":
-
-        if (
-            pygame.K_0
-            <= event.key
-            <= pygame.K_9
-        ):
-
-            digit = (
-                event.key
-                - pygame.K_0
-            )
-
-            interaction_ui.add_password_digit(
-                digit
-            )
-
-        elif event.key == pygame.K_BACKSPACE:
-
-            interaction_ui.remove_password_digit()
-
-        elif event.key == pygame.K_RETURN:
-
-            interaction_ui.submit_password()
-
-            if (
-                interaction_ui.result
-                is not None
-                and interaction_ui.result.get(
-                    "status"
-                )
-                == "game_over"
-            ):
-
-                interaction_ui.close()
-
-        elif event.key == pygame.K_ESCAPE:
-
-            leave_puzzle(
-                game
-            )
-
-            interaction_ui.close()
-
-        return
-
-    # --------------------------------------------------------
-    # General Interaction Escape
-    # --------------------------------------------------------
-
-    if event.key == pygame.K_ESCAPE:
-
-        if interaction_ui.parent_stack:
-
-            interaction_ui.go_back()
-
-        else:
-
-            interaction_ui.close()
 
 
 # ============================================================
 # Interaction Mouse
 # ============================================================
-
-def handle_interaction_click(
-    buttons,
-    mouse_pos
-):
-    """處理所有Interaction Popup滑鼠操作。"""
-
-    if not interaction_ui.is_open():
-
-        return
-
-    mode = interaction_ui.mode
-
-    # ========================================================
-    # Container
-    # ========================================================
-
-    if mode == "container":
-
-        if (
-            "close" in buttons
-            and buttons[
-                "close"
-            ].collidepoint(
-                mouse_pos
-            )
-        ):
-
-            interaction_ui.close()
-
-            return
-
-        for (
-            child_id,
-            rect
-        ) in buttons.items():
-
-            if child_id == "close":
-
-                continue
-
-            if rect.collidepoint(
-                mouse_pos
-            ):
-
-                open_container_child(
-                    child_id
-                )
-
-                return
-
-    # ========================================================
-    # Searchable
-    # ========================================================
-
-    elif mode == "searchable":
-
-        if buttons[
-            "yes"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            interaction_ui.confirm_search()
-
-        elif buttons[
-            "no"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            interaction_ui.go_back()
-
-    # ========================================================
-    # Inspectable
-    # ========================================================
-
-    elif mode == "inspectable":
-
-        if buttons[
-            "back"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            interaction_ui.go_back()
-
-    # ========================================================
-    # Rift
-    # ========================================================
-
-    elif mode == "rift":
-
-        if buttons[
-            "enter"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            if (
-                interaction_ui.result[
-                    "status"
-                ]
-                == "rift_available"
-            ):
-
-                interaction_ui.confirm_rift()
-
-        elif buttons[
-            "cancel"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            interaction_ui.close()
-
-    # ========================================================
-    # Password
-    # ========================================================
-
-    elif mode == "password":
-
-        for digit in (
-            "0", "1", "2", "3", "4",
-            "5", "6", "7", "8", "9"
-        ):
-
-            if (
-                digit in buttons
-                and buttons[
-                    digit
-                ].collidepoint(
-                    mouse_pos
-                )
-            ):
-
-                interaction_ui.add_password_digit(
-                    digit
-                )
-
-                return
-
-        if buttons[
-            "clear"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            interaction_ui.clear_password()
-
-        elif buttons[
-            "submit"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            interaction_ui.submit_password()
-
-            if (
-                interaction_ui.result
-                is not None
-                and interaction_ui.result.get(
-                    "status"
-                )
-                == "game_over"
-            ):
-
-                interaction_ui.close()
-
-        elif buttons[
-            "back"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            leave_puzzle(
-                game
-            )
-
-            interaction_ui.close()
-
-    # ========================================================
-    # Photo
-    # ========================================================
-
-    elif mode == "photo":
-
-        if buttons[
-            "front"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            interaction_ui.view_photo_front()
-
-        elif buttons[
-            "back"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            result = (
-                interaction_ui
-                .view_photo_back()
-            )
-
-            if (
-                result.get(
-                    "status"
-                )
-                == "photo_story_triggered"
-            ):
-
-                interaction_ui.close()
-
-                start_photo_story(
-                    result
-                )
-
-        elif (
-            buttons[
-                "allow_close"
-            ]
-            and buttons[
-                "close"
-            ].collidepoint(
-                mouse_pos
-            )
-        ):
-
-            interaction_ui.close()
-
-    # ========================================================
-    # Door
-    # ========================================================
-
-    elif mode == "door":
-
-        if (
-            "enter" in buttons
-            and buttons[
-                "enter"
-            ].collidepoint(
-                mouse_pos
-            )
-        ):
-
-            result = (
-                interaction_ui
-                .confirm_door()
-            )
-
-            if (
-                result.get(
-                    "status"
-                )
-                == "chapter_end"
-            ):
-
-                interaction_ui.close()
-
-                start_chapter_end(
-                    result
-                )
-
-        elif (
-            "cancel" in buttons
-            and buttons[
-                "cancel"
-            ].collidepoint(
-                mouse_pos
-            )
-        ):
-
-            interaction_ui.close()
-
-        elif (
-            "close" in buttons
-            and buttons[
-                "close"
-            ].collidepoint(
-                mouse_pos
-            )
-        ):
-
-            interaction_ui.close()
-
-    # ========================================================
-    # Item
-    # ========================================================
-
-    elif mode == "item":
-
-        if buttons[
-            "close"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            interaction_ui.close()
-
-    # ========================================================
-    # Item Notification
-    # ========================================================
-
-    elif mode == "item_notification":
-
-        if buttons[
-            "ok"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            interaction_ui.go_back()
-
-    # ========================================================
-    # Message
-    # ========================================================
-
-    elif mode == "message":
-
-        if buttons[
-            "ok"
-        ].collidepoint(
-            mouse_pos
-        ):
-
-            interaction_ui.go_back()
 
 
 # ============================================================
@@ -1385,12 +907,19 @@ while running:
 
     mouse_clicked = False
 
+    # 記錄本幀是否按下E鍵要求互動
+    interact_pressed = False
+
     # 每一幀重新建立目前畫面Hitbox資料
     menu_buttons = {}
 
     settings_buttons = {}
 
     object_rects = {}
+
+    collision_rects = {}
+
+    interaction_rects = {}
 
     choice_rects = []
 
@@ -1442,6 +971,12 @@ while running:
                 pygame.RESIZABLE
             )
 
+            # 視窗縮放後重新套用Space出生座標比例
+            last_player_space = None
+
+            # 縮放後取消舊的滑鼠目標座標
+            player.cancel_mouse_movement()
+
 
         # ====================================================
         # Mouse
@@ -1489,38 +1024,33 @@ while running:
                 and not interaction_ui.is_open()
             ):
 
-                visible_items = (
-                    game_ui
-                    .get_visible_inventory(
-                        game,
-                        hotbar_offset
-                    )
+                hotbar_controller.handle_wheel(
+                    event
                 )
-
-                if visible_items:
-
-                    if event.y > 0:
-
-                        selected_slot = max(
-                            0,
-                            selected_slot - 1
-                        )
-
-                    elif event.y < 0:
-
-                        selected_slot = min(
-                            len(
-                                visible_items
-                            ) - 1,
-                            selected_slot + 1
-                        )
-
 
         # ====================================================
         # Keyboard
         # ====================================================
 
         elif event.type == pygame.KEYDOWN:
+
+            # 正常探索時才記錄WASD移動按鍵
+            if (
+                ui_screen == UI_GAME
+                and game.game_state == SPACE
+                and ui_overlay is None
+                and not interaction_ui.is_open()
+                and event.key in (
+                    pygame.K_w,
+                    pygame.K_a,
+                    pygame.K_s,
+                    pygame.K_d
+                )
+            ):
+
+                pressed_keys.add(
+                    event.key
+                )
 
             # ------------------------------------------------
             # Settings優先
@@ -1563,7 +1093,7 @@ while running:
                 and interaction_ui.is_open()
             ):
 
-                handle_interaction_key(
+                interaction_controller.handle_key(
                     event
                 )
 
@@ -1595,7 +1125,7 @@ while running:
                         == "dialogue_finished"
                     ):
 
-                        finish_dialogue_action()
+                        story_manager.finish_dialogue_action()
 
                 continue
 
@@ -1631,71 +1161,23 @@ while running:
 
                     ui_overlay = "settings"
 
-                elif event.key == pygame.K_LEFT:
+                elif event.key == pygame.K_e:
 
-                    selected_slot = max(
-                        0,
-                        selected_slot - 1
-                    )
+                    # E鍵會在本幀Space資料建立後尋找最近物件
+                    interact_pressed = True
 
-                elif event.key == pygame.K_RIGHT:
-
-                    visible_items = (
-                        game_ui
-                        .get_visible_inventory(
-                            game,
-                            hotbar_offset
-                        )
-                    )
-
-                    if visible_items:
-
-                        selected_slot = min(
-                            len(
-                                visible_items
-                            ) - 1,
-                            selected_slot + 1
-                        )
-
-                elif (
-                    pygame.K_1
-                    <= event.key
-                    <= pygame.K_5
+                elif event.key in (
+                    pygame.K_LEFT,
+                    pygame.K_RIGHT,
+                    pygame.K_1,
+                    pygame.K_2,
+                    pygame.K_3,
+                    pygame.K_4,
+                    pygame.K_5,
+                    pygame.K_RETURN
                 ):
-
-                    index = (
-                        event.key
-                        - pygame.K_1
-                    )
-
-                    visible_items = (
-                        game_ui
-                        .get_visible_inventory(
-                            game,
-                            hotbar_offset
-                        )
-                    )
-
-                    if index < len(
-                        visible_items
-                    ):
-
-                        selected_slot = index
-
-                        selected_item = (
-                            visible_items[
-                                index
-                            ]
-                        )
-
-                elif event.key == pygame.K_RETURN:
-
-                    selected_item = (
-                        get_selected_hotbar_item()
-                    )
-
-                    open_hotbar_item(
-                        selected_item
+                    hotbar_controller.handle_key(
+                        event
                     )
 
                 continue
@@ -1735,6 +1217,36 @@ while running:
                 continue
 
 
+
+        # ====================================================
+        # Keyboard Release
+        # ====================================================
+
+        elif event.type == pygame.KEYUP:
+
+            # WASD放開時移除玩家移動狀態
+            if event.key in (
+                pygame.K_w,
+                pygame.K_a,
+                pygame.K_s,
+                pygame.K_d
+            ):
+
+                pressed_keys.discard(
+                    event.key
+                )
+
+
+        # ====================================================
+        # Window Focus
+        # ====================================================
+
+        elif event.type == pygame.WINDOWFOCUSLOST:
+
+            # 視窗失焦時清除殘留的移動按鍵
+            pressed_keys.clear()
+
+
     # ========================================================
     # Update
     # ========================================================
@@ -1749,6 +1261,19 @@ while running:
         dialogue_controller.update(
             dt
         )
+
+    # 非正常探索狀態時清除殘留移動按鍵
+    if not (
+        ui_screen == UI_GAME
+        and game.game_state == SPACE
+        and ui_overlay is None
+        and not interaction_ui.is_open()
+    ):
+
+        pressed_keys.clear()
+
+        # 離開自由探索時取消滑鼠自動移動
+        player.cancel_mouse_movement()
 
 
     # ========================================================
@@ -1911,16 +1436,137 @@ while running:
 
         elif game.game_state == SPACE:
 
-            object_rects = (
-                game_ui.draw_space(
+            # 第一次進入新Space時套用該空間出生點
+            if game.current_space != last_player_space:
+
+                map_manager.place_player(
+                    player,
+                    game.current_space,
                     screen,
-                    game,
-                    mouse_pos,
-                    looks[
-                        current_look_index
-                    ]
+                    interaction_controller.pending_entry_rift
+                )
+
+                last_player_space = (
+                    game.current_space
+                )
+
+                # 出生點套用完成後清除一次性入口資訊
+                interaction_controller.pending_entry_rift = None
+
+                pressed_keys.clear()
+
+            # GameUI只負責繪製，目前不再提供物理資料
+            game_ui.draw_space(
+                screen,
+                game,
+                mouse_pos,
+                looks[
+                    current_look_index
+                ]
+            )
+
+            # MapManager集中建立探索模式需要的Rect資料
+            space_data = (
+                map_manager.build_space_runtime_data(
+                    game.current_space,
+                    screen
                 )
             )
+
+            object_rects = space_data[
+                "object_rects"
+            ]
+
+            collision_rects = space_data[
+                "collision_rects"
+            ]
+
+            interaction_rects = space_data[
+                "interaction_rects"
+            ]
+
+            obstacles = list(
+                collision_rects.values()
+            )
+
+            # 只有正常探索狀態才能控制玩家移動
+            if (
+                ui_overlay is None
+                and not interaction_ui.is_open()
+            ):
+
+                # E鍵只和目前範圍內最近的物件互動
+                if interact_pressed:
+
+                    nearest_target = (
+                        get_nearest_interaction_target(
+                            object_rects,
+                            interaction_rects
+                        )
+                    )
+
+                    if nearest_target is not None:
+
+                        player.cancel_mouse_movement()
+
+                        # 每次重新開啟Interaction都從預設控制項開始
+                        interaction_controller.reset_interaction_focus()
+
+                        interaction_ui.open_object(
+                            nearest_target[
+                                "id"
+                            ]
+                        )
+
+                # Interaction尚未開啟時才更新角色移動
+                if not interaction_ui.is_open():
+
+                    player.update(
+                        dt,
+                        pressed_keys,
+                        obstacles,
+                        screen_width,
+                        screen_height
+                    )
+
+            # 其他介面開啟時立即停止持續移動
+            else:
+
+                pressed_keys.clear()
+
+                # Overlay開啟時停止所有自動移動
+                player.cancel_mouse_movement()
+
+            # 滑鼠自動移動時顯示虛線與終點標記
+            draw_player_navigation_guide(
+                screen
+            )
+
+            # 繪製正式Player取代舊有Placeholder
+            player.draw(
+                screen,
+                looks[
+                    current_look_index
+                ]
+            )
+
+            # 找出目前E鍵會作用的最近互動物件
+            nearby_target = (
+                get_nearest_interaction_target(
+                    object_rects,
+                    interaction_rects
+                )
+            )
+
+            if (
+                ui_overlay is None
+                and not interaction_ui.is_open()
+            ):
+
+                draw_interaction_prompt(
+                    screen,
+                    nearby_target
+                )
 
             settings_button_rect = (
                 game_ui
@@ -1934,8 +1580,8 @@ while running:
                 game_ui.draw_hotbar(
                     screen,
                     game,
-                    selected_slot,
-                    hotbar_offset,
+                    hotbar_controller.selected_slot,
+                    hotbar_controller.offset,
                     mouse_pos
                 )
             )
@@ -1965,8 +1611,8 @@ while running:
                 game_ui.draw_hotbar(
                     screen,
                     game,
-                    selected_slot,
-                    hotbar_offset,
+                    hotbar_controller.selected_slot,
+                    hotbar_controller.offset,
                     mouse_pos
                 )
             )
@@ -2013,6 +1659,26 @@ while running:
                     mouse_pos
                 )
             )
+
+            # 保存本幀控制項供下一幀鍵盤操作使用
+            interaction_controller.last_buttons = dict(
+                interaction_buttons
+            )
+
+            # 滑鼠hover同步所有Interaction鍵盤焦點
+            interaction_controller.update_interaction_hover_focus(
+                interaction_buttons,
+                mouse_pos
+            )
+
+            # 顯示方向鍵與Enter目前作用的控制項
+            interaction_controller.draw_focus(
+                screen,
+                interaction_buttons
+            )
+
+        else:
+            interaction_controller.last_buttons = {}
 
 
     # ========================================================
@@ -2261,7 +1927,7 @@ while running:
 
             if interaction_ui.is_open():
 
-                handle_interaction_click(
+                interaction_controller.handle_click(
                     interaction_buttons,
                     mouse_pos
                 )
@@ -2301,7 +1967,7 @@ while running:
                     == "dialogue_finished"
                 ):
 
-                    finish_dialogue_action()
+                    story_manager.finish_dialogue_action()
 
 
             # =================================================
@@ -2322,7 +1988,7 @@ while running:
                         )
                     ):
 
-                        start_choice_result(
+                        story_manager.start_choice_result(
                             option
                         )
 
@@ -2335,7 +2001,7 @@ while running:
 
             elif game.game_state == SPACE:
 
-                object_clicked = False
+                click_handled = False
 
                 # ---------------------------------------------
                 # Scene Object
@@ -2350,11 +2016,23 @@ while running:
                         mouse_pos
                     ):
 
-                        interaction_ui.open_object(
-                            object_id
+                        target = {
+                            "id": object_id,
+                            "rect": rect,
+                            "interaction_rect": (
+                                interaction_rects.get(
+                                    object_id,
+                                    rect
+                                )
+                            )
+                        }
+
+                        # 點物件只負責靠近，不再自動開啟UI
+                        player.set_interaction_target(
+                            target
                         )
 
-                        object_clicked = True
+                        click_handled = True
 
                         break
 
@@ -2364,7 +2042,7 @@ while running:
                 # ---------------------------------------------
 
                 if (
-                    not object_clicked
+                    not click_handled
                     and hotbar_data
                     is not None
                 ):
@@ -2381,6 +2059,7 @@ while running:
                         ]
                     )
 
+                    # Hotbar區域本身優先攔截地面移動
                     for (
                         index,
                         rect
@@ -2388,38 +2067,22 @@ while running:
                         slot_rects
                     ):
 
-                        if (
-                            rect.collidepoint(
-                                mouse_pos
-                            )
-                            and index
-                            < len(
-                                visible_items
-                            )
+                        if rect.collidepoint(
+                            mouse_pos
                         ):
 
-                            selected_slot = (
-                                index
-                            )
+                            click_handled = True
 
-                            selected_item = (
-                                visible_items[
-                                    index
-                                ]
-                            )
-
-                            open_hotbar_item(
-                                selected_item
-                            )
-
-                            object_clicked = (
-                                True
-                            )
+                            if hotbar_controller.select_slot(
+                                index,
+                                visible_items
+                            ):
+                                player.cancel_mouse_movement()
 
                             break
 
 
-                    if not object_clicked:
+                    if not click_handled:
 
                         arrow_left = (
                             hotbar_data[
@@ -2442,14 +2105,6 @@ while running:
                             )
                         )
 
-                        max_offset = max(
-                            0,
-                            len(
-                                game.inventory
-                            )
-                            - visible_slots
-                        )
-
                         if (
                             arrow_left
                             is not None
@@ -2459,12 +2114,10 @@ while running:
                             )
                         ):
 
-                            hotbar_offset = max(
-                                0,
-                                hotbar_offset - 1
-                            )
+                            hotbar_controller.move_page_left()
+                            click_handled = True
 
-                            selected_slot = 0
+                            player.cancel_mouse_movement()
 
 
                         elif (
@@ -2476,12 +2129,22 @@ while running:
                             )
                         ):
 
-                            hotbar_offset = min(
-                                max_offset,
-                                hotbar_offset + 1
-                            )
+                            hotbar_controller.move_page_right(visible_slots)
+                            click_handled = True
 
-                            selected_slot = 0
+                            player.cancel_mouse_movement()
+
+
+                # ---------------------------------------------
+                # Empty Ground
+                # ---------------------------------------------
+
+                if not click_handled:
+
+                    # 點空地時設定一般滑鼠移動目標
+                    player.set_mouse_target(
+                        mouse_pos
+                    )
 
 
             # =================================================

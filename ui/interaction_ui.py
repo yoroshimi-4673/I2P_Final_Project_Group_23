@@ -124,7 +124,7 @@ class InteractionUI:
     ):
         """依物件type決定要開啟哪一種UI。"""
 
-        from interaction_manager import (
+        from managers.interaction_manager import (
             get_container_info,
             inspect_object,
             get_rift_info,
@@ -283,7 +283,7 @@ class InteractionUI:
 
         elif child_type == "inspectable":
 
-            from interaction_manager import (
+            from managers.interaction_manager import (
                 inspect_object
             )
 
@@ -321,7 +321,7 @@ class InteractionUI:
     def confirm_search(self):
         """正式執行Searchable搜尋。"""
 
-        from interaction_manager import (
+        from managers.interaction_manager import (
             search_object
         )
 
@@ -360,7 +360,7 @@ class InteractionUI:
     def confirm_rift(self):
         """玩家確認後正式切換空間。"""
 
-        from interaction_manager import (
+        from managers.interaction_manager import (
             enter_rift
         )
 
@@ -419,7 +419,7 @@ class InteractionUI:
     def submit_password(self):
         """送出目前密碼。"""
 
-        from interaction_manager import (
+        from managers.interaction_manager import (
             submit_password
         )
 
@@ -500,7 +500,7 @@ class InteractionUI:
     def view_photo_back(self):
         """切換照片背面並處理Story事件。"""
 
-        from interaction_manager import (
+        from managers.interaction_manager import (
             view_photo_back
         )
 
@@ -525,7 +525,7 @@ class InteractionUI:
     def confirm_door(self):
         """確認進入出口門。"""
 
-        from interaction_manager import (
+        from managers.interaction_manager import (
             enter_door
         )
 
