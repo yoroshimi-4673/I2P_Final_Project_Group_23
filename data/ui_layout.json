@@ -1,0 +1,222 @@
+{
+    "base_resolution": {
+        "width": 800,
+        "height": 600
+    },
+
+    "scenes": {
+        "room_307": {
+            "background": {
+                "asset": null,
+                "label": "307病房 Background Placeholder"
+            },
+
+            "characters": {
+                "li_chen": {
+                    "x": 220,
+                    "y": 180,
+                    "width": 120,
+                    "height": 220,
+                    "label": "黎琛 Placeholder"
+                },
+
+                "li_nian": {
+                    "x": 470,
+                    "y": 190,
+                    "width": 110,
+                    "height": 210,
+                    "label": "黎念 Placeholder"
+                }
+            },
+
+            "objects": {
+                "hospital_bed": {
+                    "x": 500,
+                    "y": 300,
+                    "width": 180,
+                    "height": 100,
+                    "label": "病床 Placeholder"
+                }
+            }
+        }
+    },
+
+    "spaces": {
+        "A": {
+            "background": {
+                "asset": null,
+                "label": "Space A / 病房 Placeholder"
+            },
+
+            "player": {
+                "x": 350,
+                "y": 300,
+                "width": 80,
+                "height": 100,
+                "label": "黎琛 Placeholder"
+            },
+
+            "objects": {
+                "bed": {
+                    "x": 70,
+                    "y": 280,
+                    "width": 180,
+                    "height": 110,
+                    "label": "病床 Placeholder"
+                },
+
+                "mirror": {
+                    "x": 600,
+                    "y": 150,
+                    "width": 100,
+                    "height": 180,
+                    "label": "鏡子 Placeholder"
+                },
+
+                "floor_rift_A": {
+                    "x": 80,
+                    "y": 420,
+                    "width": 160,
+                    "height": 70,
+                    "label": "地板裂隙 Placeholder"
+                },
+
+                "wardrobe_rift": {
+                    "x": 560,
+                    "y": 360,
+                    "width": 150,
+                    "height": 120,
+                    "label": "衣櫃裂隙 Placeholder"
+                }
+            }
+        },
+
+        "B": {
+            "background": {
+                "asset": null,
+                "label": "Space B / 工作區 Placeholder"
+            },
+
+            "player": {
+                "x": 350,
+                "y": 300,
+                "width": 80,
+                "height": 100,
+                "label": "黎琛 Placeholder"
+            },
+
+            "objects": {
+                "workbench": {
+                    "x": 80,
+                    "y": 270,
+                    "width": 200,
+                    "height": 120,
+                    "label": "工作檯 Placeholder"
+                },
+
+                "calendar": {
+                    "x": 570,
+                    "y": 130,
+                    "width": 110,
+                    "height": 160,
+                    "label": "日曆 Placeholder"
+                },
+
+                "floor_rift_B": {
+                    "x": 100,
+                    "y": 430,
+                    "width": 150,
+                    "height": 70,
+                    "label": "地板裂隙 Placeholder"
+                },
+
+                "ceiling_rift": {
+                    "x": 540,
+                    "y": 70,
+                    "width": 170,
+                    "height": 80,
+                    "label": "通風管裂隙 Placeholder"
+                }
+            }
+        },
+
+        "C": {
+            "background": {
+                "asset": null,
+                "label": "Space C / 純白房間 Placeholder"
+            },
+
+            "player": {
+                "x": 350,
+                "y": 320,
+                "width": 80,
+                "height": 100,
+                "label": "黎琛 Placeholder"
+            },
+
+            "objects": {
+                "password_panel": {
+                    "x": 315,
+                    "y": 170,
+                    "width": 170,
+                    "height": 100,
+                    "label": "六位數密碼鎖 Placeholder"
+                },
+
+                "rift_C_A": {
+                    "x": 80,
+                    "y": 250,
+                    "width": 150,
+                    "height": 120,
+                    "label": "裂隙 α Placeholder"
+                },
+
+                "rift_C_B": {
+                    "x": 570,
+                    "y": 250,
+                    "width": 150,
+                    "height": 120,
+                    "label": "裂隙 β Placeholder"
+                },
+
+                "exit_door": {
+                    "x": 320,
+                    "y": 40,
+                    "width": 160,
+                    "height": 120,
+                    "label": "出口門 Placeholder"
+                }
+            }
+        }
+    },
+
+    "hud": {
+        "settings_button": {
+            "x": 20,
+            "y": 20,
+            "width": 90,
+            "height": 40
+        },
+
+        "space_info": {
+            "x": 20,
+            "y": 75,
+            "width": 220,
+            "height": 90
+        }
+    },
+
+    "hotbar": {
+        "visible_slots": 5,
+        "slot_size": 55,
+        "slot_padding": 8,
+        "bottom_margin": 30,
+        "show_arrows": true,
+        "newest_item_on_left": true
+    },
+
+    "popup": {
+        "default_width": 460,
+        "default_height": 300
+    }
+}
