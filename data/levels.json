@@ -1,1 +1,34 @@
-{}
+{
+    "A": {
+        "name": "空間A",
+        "convergence_rate": 73,
+        "warning": "錨點不穩定",
+        "objects": [
+            "bed",
+            "wardrobe_rift",
+            "floor_rift_A",
+            "mirror"
+        ]
+    },
+
+    "B": {
+        "name": "空間B",
+        "convergence_rate": 41,
+        "objects": [
+            "workbench",
+            "calendar",
+            "floor_rift_B",
+            "ceiling_rift"
+        ]
+    },
+
+    "C": {
+        "name": "空間C",
+        "objects": [
+            "password_panel",
+            "rift_C_A",
+            "rift_C_B",
+            "exit_door"
+        ]
+    }
+}

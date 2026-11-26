@@ -1,0 +1,19 @@
+{
+    "li_chen": {
+        "name": "黎琛",
+        "role": "player",
+        "description": "遊戲主角"
+    },
+
+    "li_nian": {
+        "name": "梨念",
+        "role": "npc",
+        "description": "主角的女兒"
+    },
+
+    "nurse": {
+        "name": "護士",
+        "role": "npc",
+        "description": "醫院中的護士角色"
+    }
+}
