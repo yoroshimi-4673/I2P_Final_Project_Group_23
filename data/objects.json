@@ -22,6 +22,7 @@
         "name": "碎片1",
         "type": "item",
         "description": "巴掌大的金屬碎片。上面有女兒的圖畫：一家人，其中一個火柴人右手3指、左手7指。",
+        "ui_asset": "assets/素材庫/第一章/空間A/paper_1.png",
         "collectable": true
     },
 
@@ -71,6 +72,7 @@
         "name": "碎片2",
         "type": "item",
         "description": "破碎的紙條。上面只剩一句仍能辨認的文字：「……開與關的語言……」",
+        "ui_asset": "assets/素材庫/第一章/空間B/paper_2.png",
         "collectable": true
     },
 
@@ -112,6 +114,7 @@
         "type": "item",
         "description": "黎琛和女兒在公園鞦韆上。兩人都笑著。背景陽光明媚。",
         "back_text": "這不是你的記憶。這是空間D的。",
+        "ui_asset": "assets/素材庫/第一章/空間C/photo.png",
         "collectable": true
     },
 

@@ -41,41 +41,36 @@ class Player:
     ):
         """依照目前按住的按鍵取得移動方向。"""
 
-        # 建立本幀玩家移動方向向量
         direction = pygame.Vector2(
             0,
             0
         )
 
-        # 左方向鍵或A被按住時向左移動
         if (
             pygame.K_LEFT in pressed_keys
             or pygame.K_a in pressed_keys
         ):
             direction.x -= 1
 
-        # 右方向鍵或D被按住時向右移動
         if (
             pygame.K_RIGHT in pressed_keys
             or pygame.K_d in pressed_keys
         ):
             direction.x += 1
 
-        # 上方向鍵或W被按住時向上移動
         if (
             pygame.K_UP in pressed_keys
             or pygame.K_w in pressed_keys
         ):
             direction.y -= 1
 
-        # 下方向鍵或S被按住時向下移動
         if (
             pygame.K_DOWN in pressed_keys
             or pygame.K_s in pressed_keys
         ):
             direction.y += 1
 
-        # 正規化方向向量避免斜向速度過快
+        # 正規化避免斜向移動速度比較快
         if direction.length_squared() > 0:
             direction = direction.normalize()
 
@@ -87,7 +82,6 @@ class Player:
     ):
         """設定一般地面點擊後的移動目標。"""
 
-        # 將點擊座標保存成浮點向量
         self.mouse_target = pygame.Vector2(
             target_position
         )
@@ -116,7 +110,6 @@ class Player:
         half_width = self.rect.width / 2
         half_height = self.rect.height / 2
 
-        # 讓停靠點留在物件外側避免角色壓進碰撞區
         margin = 2
 
         min_y = (
@@ -139,7 +132,6 @@ class Player:
             - half_width
         )
 
-        # 互動範圍較小時改用物件中心避免上下限反轉
         if min_y > max_y:
             min_y = max_y = object_rect.centery
 
@@ -162,7 +154,7 @@ class Player:
             )
         )
 
-        # 建立物件四個方向可能使用的停靠點
+        # 建立物件四個方向可能使用的停靠位置
         candidates = [
             pygame.Vector2(
                 object_rect.left
@@ -190,7 +182,7 @@ class Player:
             )
         ]
 
-        # 選擇距離玩家目前位置最近的停靠點
+        # 選擇距離目前玩家最近的停靠位置
         return min(
             candidates,
             key=lambda point: (
@@ -205,17 +197,14 @@ class Player:
     ):
         """設定需要自動靠近的互動物件。"""
 
-        # 如果已經在範圍內就不再自動移動
         if self.can_interact(
             target
         ):
             self.cancel_mouse_movement()
             return
 
-        # 保存完整物件資料供移動期間使用
         self.interaction_target = target
 
-        # 導航終點改成角色真正會停靠的位置
         self.mouse_target = (
             self.get_interaction_stop_point(
                 target
@@ -249,7 +238,6 @@ class Player:
                 0
             )
 
-        # 使用玩家中心計算朝目標的方向
         player_center = pygame.Vector2(
             self.rect.center
         )
@@ -259,7 +247,7 @@ class Player:
             - player_center
         )
 
-        # 接近一般目標時視為已經抵達
+        # 接近目標時視為已經抵達
         if difference.length() < 4:
             self.cancel_mouse_movement()
 
@@ -270,85 +258,276 @@ class Player:
 
         return difference.normalize()
 
+    # ========================================================
+    # Polygon碰撞
+    # ========================================================
+
+    def get_feet_points(self):
+        """取得角色腳底三個Polygon碰撞取樣點。"""
+
+        inset = max(
+            2,
+            self.rect.width // 6
+        )
+
+        feet_y = self.rect.bottom - 2
+
+        return [
+            (
+                self.rect.left + inset,
+                feet_y
+            ),
+            (
+                self.rect.centerx,
+                feet_y
+            ),
+            (
+                self.rect.right - inset,
+                feet_y
+            )
+        ]
+
+    def point_on_segment(
+        self,
+        point,
+        start,
+        end,
+        tolerance=0.001
+    ):
+        """判斷點是否位於Polygon邊線上。"""
+
+        px, py = point
+        ax, ay = start
+        bx, by = end
+
+        # 利用叉積判斷三點是否近似共線
+        cross = (
+            (px - ax) * (by - ay)
+            - (py - ay) * (bx - ax)
+        )
+
+        if abs(cross) > tolerance:
+            return False
+
+        # 共線後再確認點是否落在線段範圍內
+        return (
+            min(ax, bx) - tolerance
+            <= px
+            <= max(ax, bx) + tolerance
+            and min(ay, by) - tolerance
+            <= py
+            <= max(ay, by) + tolerance
+        )
+
+    def point_in_polygon(
+        self,
+        point,
+        polygon
+    ):
+        """使用射線法判斷一個點是否位於Polygon內。"""
+
+        # 沒有有效Polygon時視為不限制移動
+        if (
+            polygon is None
+            or len(polygon) < 3
+        ):
+            return True
+
+        # 點剛好在線段上時也視為合法位置
+        for index in range(
+            len(polygon)
+        ):
+            start = polygon[
+                index
+            ]
+
+            end = polygon[
+                (index + 1)
+                % len(polygon)
+            ]
+
+            if self.point_on_segment(
+                point,
+                start,
+                end
+            ):
+                return True
+
+        px, py = point
+
+        inside = False
+
+        previous_index = (
+            len(polygon) - 1
+        )
+
+        # 射線法統計水平射線穿越邊界次數
+        for index in range(
+            len(polygon)
+        ):
+            x1, y1 = polygon[
+                index
+            ]
+
+            x2, y2 = polygon[
+                previous_index
+            ]
+
+            crosses_y = (
+                (y1 > py)
+                != (y2 > py)
+            )
+
+            if crosses_y:
+
+                intersect_x = (
+                    (x2 - x1)
+                    * (py - y1)
+                    / (y2 - y1)
+                    + x1
+                )
+
+                if px < intersect_x:
+                    inside = not inside
+
+            previous_index = index
+
+        return inside
+
+    def is_inside_walkable_polygon(
+        self,
+        walkable_polygon
+    ):
+        """確認角色腳底仍完整位於可行走Polygon內。"""
+
+        if (
+            walkable_polygon is None
+            or len(walkable_polygon) < 3
+        ):
+            return True
+
+        # 左、中、右腳底都必須留在可行走區
+        return all(
+            self.point_in_polygon(
+                point,
+                walkable_polygon
+            )
+            for point in self.get_feet_points()
+        )
+
+    # ========================================================
+    # Movement
+    # ========================================================
+
     def move_x(
         self,
         move_x,
-        obstacles
+        obstacles,
+        walkable_polygon=None
     ):
-        """處理玩家水平方向移動與碰撞。"""
+        """處理水平移動、家具Rect與Polygon邊界。"""
 
-        # 更新玩家精確水平位置
+        old_x = (
+            self.position.x
+        )
+
+        # 先嘗試水平移動到新位置
         self.position.x += move_x
 
-        # 將浮點位置同步到玩家矩形
         self.rect.x = round(
             self.position.x
         )
 
-        # 逐一檢查所有不可通過物件
+        # 檢查家具等Rect碰撞
         for obstacle in obstacles:
 
-            # 判斷玩家是否與障礙物發生碰撞
             if self.rect.colliderect(
                 obstacle
             ):
 
-                # 向右移動時貼齊障礙物左側
                 if move_x > 0:
+
                     self.rect.right = (
                         obstacle.left
                     )
 
-                # 向左移動時貼齊障礙物右側
                 elif move_x < 0:
+
                     self.rect.left = (
                         obstacle.right
                     )
 
-                # 碰撞修正後同步浮點水平位置
                 self.position.x = (
                     self.rect.x
                 )
 
+        # 若腳底離開Polygon則撤銷水平移動
+        if not self.is_inside_walkable_polygon(
+            walkable_polygon
+        ):
+
+            self.position.x = (
+                old_x
+            )
+
+            self.rect.x = round(
+                old_x
+            )
+
     def move_y(
         self,
         move_y,
-        obstacles
+        obstacles,
+        walkable_polygon=None
     ):
-        """處理玩家垂直方向移動與碰撞。"""
+        """處理垂直移動、家具Rect與Polygon邊界。"""
 
-        # 更新玩家精確垂直位置
+        old_y = (
+            self.position.y
+        )
+
+        # 先嘗試垂直移動到新位置
         self.position.y += move_y
 
-        # 將浮點位置同步到玩家矩形
         self.rect.y = round(
             self.position.y
         )
 
-        # 逐一檢查所有不可通過物件
+        # 檢查家具等Rect碰撞
         for obstacle in obstacles:
 
-            # 判斷玩家是否與障礙物發生碰撞
             if self.rect.colliderect(
                 obstacle
             ):
 
-                # 向下移動時貼齊障礙物上側
                 if move_y > 0:
+
                     self.rect.bottom = (
                         obstacle.top
                     )
 
-                # 向上移動時貼齊障礙物下側
                 elif move_y < 0:
+
                     self.rect.top = (
                         obstacle.bottom
                     )
 
-                # 碰撞修正後同步浮點垂直位置
                 self.position.y = (
                     self.rect.y
                 )
+
+        # 若腳底離開Polygon則撤銷垂直移動
+        if not self.is_inside_walkable_polygon(
+            walkable_polygon
+        ):
+
+            self.position.y = (
+                old_y
+            )
+
+            self.rect.y = round(
+                old_y
+            )
 
     def keep_inside_bounds(
         self,
@@ -357,7 +536,6 @@ class Player:
     ):
         """限制玩家不能離開目前畫面範圍。"""
 
-        # 限制玩家水平位置在畫面範圍內
         self.position.x = max(
             0,
             min(
@@ -367,7 +545,6 @@ class Player:
             )
         )
 
-        # 限制玩家垂直位置在畫面範圍內
         self.position.y = max(
             0,
             min(
@@ -377,7 +554,6 @@ class Player:
             )
         )
 
-        # 將修正後位置同步回玩家矩形
         self.rect.x = round(
             self.position.x
         )
@@ -392,30 +568,37 @@ class Player:
         pressed_keys,
         obstacles,
         screen_width,
-        screen_height
+        screen_height,
+        walkable_polygon=None
     ):
-        """更新玩家鍵盤或滑鼠移動與碰撞狀態。"""
+        """更新玩家移動、家具碰撞與Polygon地圖邊界。"""
 
-        # 鍵盤輸入優先於任何滑鼠自動移動
         keyboard_direction = (
             self.get_keyboard_direction(
                 pressed_keys
             )
         )
 
-        if keyboard_direction.length_squared() > 0:
+        # 鍵盤操作優先於滑鼠自動移動
+        if (
+            keyboard_direction
+            .length_squared()
+            > 0
+        ):
 
-            # 手動操作時取消滑鼠自動移動
             self.cancel_mouse_movement()
 
-            direction = keyboard_direction
+            direction = (
+                keyboard_direction
+            )
 
         else:
 
-            # 無鍵盤輸入時才依滑鼠目標移動
-            direction = self.get_mouse_direction()
+            direction = (
+                self.get_mouse_direction()
+            )
 
-        # 已進入物件互動範圍就停止自動靠近
+        # 已進入互動範圍時停止自動靠近
         if (
             self.interaction_target
             is not None
@@ -431,33 +614,32 @@ class Player:
                 0
             )
 
-        # 計算本幀水平移動距離
         move_x = (
             direction.x
             * self.speed
             * dt
         )
 
-        # 計算本幀垂直移動距離
         move_y = (
             direction.y
             * self.speed
             * dt
         )
 
-        # 先處理水平方向移動與碰撞
+        # X、Y分開處理才能沿Polygon邊界滑動
         self.move_x(
             move_x,
-            obstacles
+            obstacles,
+            walkable_polygon
         )
 
-        # 再處理垂直方向移動與碰撞
         self.move_y(
             move_y,
-            obstacles
+            obstacles,
+            walkable_polygon
         )
 
-        # 最後限制玩家不能超出畫面
+        # 畫面邊界仍保留最後一道安全限制
         self.keep_inside_bounds(
             screen_width,
             screen_height

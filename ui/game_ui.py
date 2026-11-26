@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pygame
 
 
@@ -8,6 +10,12 @@ class GameUI:
         self.ui_layout = ui_layout
         self.levels = levels
         self.objects = objects
+
+        self.project_root = (
+            Path(__file__).resolve().parent.parent
+        )  # 取得專案根目錄供圖片路徑使用
+
+        self.image_cache = {}  # 快取已載入圖片避免每幀重讀
 
         self.base_width = ui_layout["base_resolution"]["width"]
         self.base_height = ui_layout["base_resolution"]["height"]
@@ -81,6 +89,234 @@ class GameUI:
                 layout_data["height"]
             )
         )
+
+
+    def load_image(
+        self,
+        asset_path
+    ):
+        """載入圖片並快取原始Surface。"""
+
+        if not asset_path:
+            return None
+
+        if asset_path in self.image_cache:
+            return self.image_cache[
+                asset_path
+            ]
+
+        full_path = (
+            self.project_root
+            / asset_path
+        )
+
+        if not full_path.exists():
+            print(
+                f"[GameUI] 找不到圖片：{full_path}"
+            )
+            self.image_cache[asset_path] = None
+            return None
+
+        try:
+            image = pygame.image.load(
+                str(full_path)
+            ).convert_alpha()
+        except (pygame.error, OSError):
+            self.image_cache[asset_path] = None
+            return None
+
+        self.image_cache[
+            asset_path
+        ] = image
+
+        return image
+
+
+    def draw_item_asset(self, screen, item_id, rect, padding=4):
+        """共用道具圖片繪製並保留原始比例。"""
+
+        asset_path = self.objects.get(item_id, {}).get("ui_asset")
+        if not asset_path:
+            return False
+
+        image = self.load_image(asset_path)  # 沿用既有圖片快取避免重讀
+        target = pygame.Rect(rect).inflate(-2 * padding, -2 * padding)
+        if image is None or target.width <= 0 or target.height <= 0:
+            return False
+
+        ratio = min(target.width / image.get_width(), target.height / image.get_height())
+        size = (
+            max(1, min(target.width, round(image.get_width() * ratio))),
+            max(1, min(target.height, round(image.get_height() * ratio)))
+        )
+        scaled = pygame.transform.scale(image, size)  # 使用最近鄰縮放保留像素邊緣
+        screen.blit(scaled, scaled.get_rect(center=target.center))
+        return True
+
+
+    def scale_image_to_fit(
+        self,
+        image,
+        rect
+    ):
+        """保持原始比例縮放至指定區域。"""
+
+        image_width = image.get_width()
+        image_height = image.get_height()
+
+        if (
+            image_width <= 0
+            or image_height <= 0
+        ):
+            return image
+
+        scale = min(
+            rect.width / image_width,
+            rect.height / image_height
+        )
+
+        new_width = max(
+            1,
+            round(image_width * scale)
+        )
+
+        new_height = max(
+            1,
+            round(image_height * scale)
+        )
+
+        return pygame.transform.smoothscale(
+            image,
+            (
+                new_width,
+                new_height
+            )
+        )
+
+
+    def draw_asset(
+        self,
+        screen,
+        asset_path,
+        rect
+    ):
+        """保持比例將素材畫進指定區域。"""
+
+        image = self.load_image(
+            asset_path
+        )
+
+        if image is None:
+            return False
+
+        scaled_image = (
+            self.scale_image_to_fit(
+                image,
+                rect
+            )
+        )
+
+        image_rect = scaled_image.get_rect(
+            center=rect.center
+        )
+
+        screen.blit(
+            scaled_image,
+            image_rect
+        )
+
+        return True
+
+
+    def draw_background_asset(
+        self,
+        screen,
+        asset_path
+    ):
+        """將背景圖片完整鋪滿目前畫面。"""
+
+        image = self.load_image(
+            asset_path
+        )
+
+        if image is None:
+            return False
+
+        scaled_image = (
+            pygame.transform.smoothscale(
+                image,
+                screen.get_size()
+            )
+        )
+
+        screen.blit(
+            scaled_image,
+            (0, 0)
+        )
+
+        return True
+
+
+    def draw_debug_collision(
+        self,
+        screen,
+        walkable_polygon,
+        collision_rects
+    ):
+        """顯示Polygon與家具Rect供校正碰撞。"""
+
+        if len(walkable_polygon) >= 3:
+            pygame.draw.polygon(
+                screen,
+                (255, 220, 0),
+                walkable_polygon,
+                width=3
+            )
+
+            for index, point in enumerate(
+                walkable_polygon
+            ):
+                pygame.draw.circle(
+                    screen,
+                    (255, 220, 0),
+                    point,
+                    5
+                )
+
+                label = self.font_small.render(
+                    str(index),
+                    True,
+                    (255, 245, 150)
+                )
+
+                screen.blit(
+                    label,
+                    (
+                        point[0] + 7,
+                        point[1] - 8
+                    )
+                )
+
+        for zone_id, rect in (
+            collision_rects.items()
+        ):
+            pygame.draw.rect(
+                screen,
+                (255, 70, 70),
+                rect,
+                width=2
+            )
+
+            label = self.font_small.render(
+                zone_id,
+                True,
+                (255, 120, 120)
+            )
+
+            screen.blit(
+                label,
+                (rect.x + 3, rect.y + 3)
+            )
 
 
     # ========================================================
@@ -556,6 +792,13 @@ class GameUI:
         if current_level is None:
             return
 
+        # 依照片劇情事件顯示更新收斂率
+        if game.has_event("photo_back_seen"):
+            updated_rates = {"A": 81, "B": 55, "C": 37}
+            if game.current_space in updated_rates:
+                current_level = dict(current_level)
+                current_level["convergence_rate"] = updated_rates[game.current_space]
+
         hud_data = self.ui_layout[
             "hud"
         ]["space_info"]
@@ -651,7 +894,7 @@ class GameUI:
         mouse_pos,
         player_color
     ):
-        """繪製A/B/C探索Placeholder。"""
+        """繪製目前探索空間與正式圖片素材。"""
 
         current_space = game.current_space
 
@@ -665,63 +908,62 @@ class GameUI:
             screen.fill(
                 (30, 30, 35)
             )
-
             return {}
-
-        if current_space == "C":
-            screen.fill(
-                (218, 218, 215)
-            )
-
-            text_color = (
-                40,
-                40,
-                45
-            )
-
-        else:
-            screen.fill(
-                (50, 53, 62)
-            )
-
-            text_color = (
-                225,
-                225,
-                230
-            )
 
         background = space_layout.get(
             "background",
             {}
         )
 
-        label = background.get(
-            "label",
-            f"Space {current_space}"
+        background_asset = background.get(
+            "asset"
         )
 
-        label_surface = self.font_large.render(
-            label,
-            True,
-            text_color
-        )
-
-        screen.blit(
-            label_surface,
-            label_surface.get_rect(
-                center=(
-                    screen.get_width() // 2,
-                    40
-                )
+        background_drawn = (
+            self.draw_background_asset(
+                screen,
+                background_asset
             )
         )
+
+        if not background_drawn:
+            if current_space == "C":
+                screen.fill(
+                    (218, 218, 215)
+                )
+                text_color = (40, 40, 45)
+            else:
+                screen.fill(
+                    (50, 53, 62)
+                )
+                text_color = (225, 225, 230)
+
+            label = background.get(
+                "label",
+                f"Space {current_space}"
+            )
+
+            label_surface = self.font_large.render(
+                label,
+                True,
+                text_color
+            )
+
+            screen.blit(
+                label_surface,
+                label_surface.get_rect(
+                    center=(
+                        screen.get_width() // 2,
+                        40
+                    )
+                )
+            )
 
         player_data = space_layout.get(
             "player"
         )
 
         if player_data is not None:
-
             player_rect = self.scale_rect(
                 screen,
                 player_data
@@ -746,7 +988,6 @@ class GameUI:
             "objects",
             {}
         ).items():
-
             rect = self.scale_rect(
                 screen,
                 object_layout
@@ -756,29 +997,48 @@ class GameUI:
                 mouse_pos
             )
 
-            color = (
-                (120, 125, 145)
-                if hovered
-                else
-                (78, 82, 95)
+            asset_drawn = self.draw_asset(
+                screen,
+                object_layout.get(
+                    "asset"
+                ),
+                rect
             )
 
-            self.draw_placeholder_rect(
-                screen,
-                rect,
-                object_layout.get(
-                    "label",
-                    object_id
-                ),
-                color=color
+            if not asset_drawn:
+                color = (
+                    (120, 125, 145)
+                    if hovered
+                    else
+                    (78, 82, 95)
+                )
+
+                self.draw_placeholder_rect(
+                    screen,
+                    rect,
+                    object_layout.get(
+                        "label",
+                        object_id
+                    ),
+                    color=color
+                )
+
+            overlay_asset = object_layout.get(
+                "overlay_asset"
             )
+
+            if overlay_asset:
+                self.draw_asset(
+                    screen,
+                    overlay_asset,
+                    rect
+                )
 
             object_rects[
                 object_id
             ] = rect
 
             if hovered:
-
                 object_name = self.objects.get(
                     object_id,
                     {}
@@ -801,15 +1061,9 @@ class GameUI:
                         rect.centerx
                         - name_surface.get_width()
                         // 2,
-
                         rect.y - 22
                     )
                 )
-
-        self.draw_space_hud(
-            screen,
-            game
-        )
 
         return object_rects
 
@@ -998,20 +1252,21 @@ class GameUI:
                     item_id
                 )
 
-                text_surface = (
-                    self.font_small.render(
-                        item_name[:4],
-                        True,
-                        (245, 245, 245)
+                if not self.draw_item_asset(screen, item_id, rect, padding=8):
+                    text_surface = (
+                        self.font_small.render(
+                            item_name[:4],
+                            True,
+                            (245, 245, 245)
+                        )
                     )
-                )
 
-                screen.blit(
-                    text_surface,
-                    text_surface.get_rect(
-                        center=rect.center
+                    screen.blit(
+                        text_surface,
+                        text_surface.get_rect(
+                            center=rect.center
+                        )
                     )
-                )
 
                 number_surface = (
                     self.font_small.render(
