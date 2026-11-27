@@ -59,7 +59,7 @@ class PathfindingManager:
         return True
 
     def find_path(self, space_id, screen, player, target, obstacles, walkable_polygon,
-                  interaction_rect=None):
+                  interaction_rect=None, *, can_stop=None):
         """回傳從目前角色中心可實際走到的航點。"""
         obstacles = tuple(obstacles)
         polygon = tuple(tuple(point) for point in (walkable_polygon or ()))
@@ -109,7 +109,7 @@ class PathfindingManager:
                 return True
             sprite = player.rect.copy()
             sprite.center = point
-            return sprite.colliderect(interaction_rect)
+            return sprite.colliderect(interaction_rect) and (can_stop is None or can_stop(sprite))
 
         def segment_clear(start, end):
             if not position_is_walkable(start) or not position_is_walkable(end):
@@ -129,7 +129,7 @@ class PathfindingManager:
 
         start = player.rect.center
         target = (round(target[0]), round(target[1]))
-        if not position_is_walkable(start) or start == target:
+        if not position_is_walkable(start) or (start == target and can_stop_at(start)):
             return []
         start_node = self.find_nearest_walkable_node(
             start, step, grid_size,
