@@ -133,5 +133,5 @@ class Scene14Tests(unittest.TestCase):
             buttons = f.game_ui.draw_success_end(self.screen, (0, 0))
             self.assertEqual(set(buttons), {"settings", "menu"})
             self.assertEqual([call.args[1] for call in draw_button.call_args_list], ["設定", "回到主畫面"])
-            self.assertEqual(title.render.call_args.args[0], "結束資訊")
+            self.assertEqual(title.render.call_args.args[0], "To be continued")
             self.assertEqual(summary.render.call_args_list[0].args[0], "Chapter 2 已完成。")

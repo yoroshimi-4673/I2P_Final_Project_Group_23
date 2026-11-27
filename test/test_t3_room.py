@@ -165,11 +165,11 @@ class T3RoomTests(unittest.TestCase):
         self.f.click("t3_bed_board")
         self.f.finish()
         self.assertEqual(g.game_state, SPACE)
-        with patch("save_manager._write_slot") as write:
+        with patch("managers.save_manager._write_slot") as write:
             save_manager.save_game(g, 1)
             payload = json.loads(json.dumps(write.call_args.args[1]))
         restored = GameManager()
-        with patch("save_manager._read_slot", return_value=payload):
+        with patch("managers.save_manager._read_slot", return_value=payload):
             self.assertTrue(save_manager.load_game(restored, 1))
         self.f.build(restored)
         self.f.open("t3_desk")

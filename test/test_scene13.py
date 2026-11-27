@@ -122,7 +122,7 @@ class Scene13Tests(unittest.TestCase):
         f.open("ch2_terminal")
         self.drag("past_fragment", "past")
         f.puzzle.multi_input = {"past": "4", "present": "7", "future": "1"}
-        with patch("save_manager._write_slot") as write:
+        with patch("managers.save_manager._write_slot") as write:
             save_manager.save_game(f.game, 1)
             payload = json.dumps(write.call_args.args[1])
         saved = json.loads(payload)
@@ -130,14 +130,14 @@ class Scene13Tests(unittest.TestCase):
         self.assertNotIn("multi_input", saved)
         restored = GameManager()
         reference = restored.scene13_anchor_slots
-        with patch("save_manager._read_slot", return_value=json.loads(payload)):
+        with patch("managers.save_manager._read_slot", return_value=json.loads(payload)):
             self.assertTrue(save_manager.load_game(restored, 1))
         self.assertIs(restored.scene13_anchor_slots, reference)
         f.build(restored)
         self.assertEqual(f.puzzle.anchor_slots["past"], "past_fragment")
         self.assertEqual(f.puzzle.multi_input, {})
         del saved["scene13_anchor_slots"]
-        with patch("save_manager._read_slot", return_value=saved):
+        with patch("managers.save_manager._read_slot", return_value=saved):
             self.assertTrue(save_manager.load_game(restored, 1))
         self.assertEqual(f.puzzle.anchor_slots, {"past": None, "present": None, "future": None})
         restored.scene13_anchor_slots["past"] = "past_fragment"
