@@ -771,8 +771,8 @@ class StoryManager:
 
             # 完成切換後清除暫存目標空間
             self.pending_target_space = None
-            if target == "A":
-                return "first_choice_a"  # 只在序章選入空間甲時回傳入口
+            if target in ("A", "B", "C"):
+                return f"first_choice_{target.lower()}"
 
         elif action == "finish_photo_story":
 
