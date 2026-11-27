@@ -294,6 +294,8 @@ class InteractionController:
                 self.puzzle_controller
                 .ui_mode
             )
+            if self.interaction_ui.mode == "diary_drag":
+                self.interaction_ui.diary_spread_index = 0
 
         else:
 
@@ -780,7 +782,14 @@ class InteractionController:
             if event.key == pygame.K_BACKSPACE:
                 self.puzzle_controller.remove_input()
                 return
-
+        # 陪伴日記拖放介面支援左右方向鍵直接翻頁
+        if self.interaction_ui.mode == "diary_drag":
+            if event.key == pygame.K_LEFT:
+                self.interaction_ui.diary_spread_index = max(0, self.interaction_ui.diary_spread_index - 1)
+                return
+            if event.key == pygame.K_RIGHT:
+                self.interaction_ui.diary_spread_index = min(2, self.interaction_ui.diary_spread_index + 1)
+                return
         # 四方向鍵統一移動目前Interaction焦點
         if event.key in (
             pygame.K_UP,
@@ -1010,6 +1019,25 @@ class InteractionController:
             if "_drag_rects" not in buttons:
                 return
 
+            # 翻頁按鈕 (< / >)
+            if (
+                "diary_prev_page" in buttons
+                and buttons["diary_prev_page"].collidepoint(mouse_pos)
+            ):
+                self.interaction_ui.diary_spread_index = max(
+                    0, self.interaction_ui.diary_spread_index - 1
+                )
+                return
+
+            if (
+                "diary_next_page" in buttons
+                and buttons["diary_next_page"].collidepoint(mouse_pos)
+            ):
+                self.interaction_ui.diary_spread_index = min(
+                    2, self.interaction_ui.diary_spread_index + 1
+                )
+                return
+
             drag_rects = buttons.get(
                 "_drag_rects",
                 {}
@@ -1053,6 +1081,7 @@ class InteractionController:
             ):
 
                 self.puzzle_controller.reset_diary_drag_state()
+                self.interaction_ui.diary_spread_index = 0
 
                 self.interaction_ui.result = {
                     "status": "input_required",

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pygame
 
 from ui.dialogue_ui import wrap_text
@@ -40,6 +42,11 @@ class InteractionUI:
 
         self.notification = None
 
+        self.diary_spread_index = 0
+
+        self._diary_raw_images = {}
+
+        self._diary_images_loaded = False
 
     # ========================================================
     # State
@@ -2122,538 +2129,222 @@ class InteractionUI:
         }
 
 
+    def _ensure_diary_images(self):
+        """延遲載入陪伴日記所需素材（路徑：assets/素材庫/第二章/T+0/日記内容）。"""
+        if self._diary_images_loaded:
+            return
+        self._diary_images_loaded = True
+
+        base_dir = Path(__file__).resolve().parent.parent
+        diary_dir = base_dir / "assets" / "素材庫" / "第二章" / "T+0" / "日記内容"
+
+        filenames = [
+            "1.png",
+            "2.png",
+            "3.png",
+            "4.png",
+            "5.png",
+            "empty_diary.png",
+        ]
+        for fname in filenames:
+            path = diary_dir / fname
+            if path.exists():
+                try:
+                    self._diary_raw_images[fname] = pygame.image.load(str(path)).convert_alpha()
+                except Exception:
+                    self._diary_raw_images[fname] = None
+            else:
+                self._diary_raw_images[fname] = None
+
+    def _get_scaled_diary_surface(self, fname, max_size):
+        """依目標區域等比例縮放日記圖片，避免長寬壓縮變形。"""
+        raw = self._diary_raw_images.get(fname)
+        if raw is None:
+            return None
+        orig_w, orig_h = raw.get_size()
+        max_w, max_h = max_size
+        if orig_w <= 0 or orig_h <= 0 or max_w <= 0 or max_h <= 0:
+            return None
+        ratio = min(max_w / orig_w, max_h / orig_h)
+        new_size = (max(1, int(orig_w * ratio)), max(1, int(orig_h * ratio)))
+        return pygame.transform.smoothscale(raw, new_size)
+
     def draw_diary_drag(
         self,
         screen,
         mouse_pos
     ):
-        """繪製陪伴日記拖放謎題。"""
+        """繪製雙頁翻頁版陪伴日記拖放謎題（沿用主程式槽位與判定）。"""
+        self._ensure_diary_images()
 
         overlay = pygame.Surface(
             screen.get_size(),
             pygame.SRCALPHA
         )
+        overlay.fill((20, 20, 25, 235))
+        screen.blit(overlay, (0, 0))
 
-        overlay.fill(
-            (20, 20, 25, 235)
+        width, height = screen.get_size()
+
+        # 標題（不顯示頁數）
+        title = self.game_ui.font_large.render(
+            "《陪伴日記》",
+            True,
+            (245, 245, 245)
         )
-
-        screen.blit(
-            overlay,
-            (0, 0)
-        )
-
-        width, height = (
-            screen.get_size()
-        )
-
-        title = (
-            self.game_ui.font_large.render(
-                "《陪伴日記》",
-                True,
-                (245, 245, 245)
-            )
-        )
-
         screen.blit(
             title,
             title.get_rect(
-                center=(
-                    width // 2,
-                    self.game_ui.scale_y(
-                        screen,
-                        75
-                    )
-                )
+                center=(width // 2, self.game_ui.scale_y(screen, 42))
             )
         )
 
-        # Base座標沿用diary_drag.py prototype
-        fixed_layout = {
-            "page_1": {
-                "x": 155,
-                "y": 140,
-                "width": 130,
-                "height": 70,
-                "label": "Page 1"
-            },
-            "page_3": {
-                "x": 515,
-                "y": 140,
-                "width": 130,
-                "height": 70,
-                "label": "Page 3"
-            },
-            "page_6": {
-                "x": 515,
-                "y": 245,
-                "width": 130,
-                "height": 70,
-                "label": "Page 6"
-            }
+        # 畫面 0 -> 1.png (右半放 2.png / page_2)
+        # 畫面 1 -> 3.png (右半放 4.png / page_4)
+        # 畫面 2 -> empty_diary.png (左半放 5.png / page_5)
+        spread_configs = [
+            {"bg": "1.png",           "slot_id": "page_2", "side": "right"},
+            {"bg": "3.png",           "slot_id": "page_4", "side": "right"},
+            {"bg": "empty_diary.png", "slot_id": "page_5", "side": "left"},
+        ]
+        self.diary_spread_index = max(0, min(self.diary_spread_index, len(spread_configs) - 1))
+        current_cfg = spread_configs[self.diary_spread_index]
+        active_slot_id = current_cfg["slot_id"]
+
+        # 雙頁底圖區域
+        max_book_rect = self.game_ui.scale_rect(
+            screen,
+            {"x": 140, "y": 78, "width": 520, "height": 300}
+        )
+        bg_surf = self._get_scaled_diary_surface(current_cfg["bg"], max_book_rect.size)
+        if bg_surf is not None:
+            book_rect = bg_surf.get_rect(center=max_book_rect.center)
+            screen.blit(bg_surf, book_rect.topleft)
+        else:
+            book_rect = max_book_rect
+            pygame.draw.rect(screen, (62, 56, 52), book_rect, border_radius=10)
+
+        # 計算目前畫面的左半或右半感應區（無放置框線與提示文字）
+        half_w = book_rect.width // 2
+        if current_cfg["side"] == "left":
+            target_slot_rect = pygame.Rect(book_rect.left, book_rect.top, half_w, book_rect.height)
+        else:
+            target_slot_rect = pygame.Rect(book_rect.left + half_w, book_rect.top, book_rect.width - half_w, book_rect.height)
+
+        buttons = {
+            "diary_slot:" + active_slot_id: target_slot_rect
         }
 
-        slot_layout = {
-            "page_2": {
-                "x": 335,
-                "y": 140,
-                "width": 130,
-                "height": 70
-            },
-            "page_4": {
-                "x": 155,
-                "y": 245,
-                "width": 130,
-                "height": 70
-            },
-            "page_5": {
-                "x": 335,
-                "y": 245,
-                "width": 130,
-                "height": 70
-            }
-        }
+        # 左右翻頁按鈕 (< / >)
+        prev_rect = self.game_ui.scale_rect(screen, {"x": 82, "y": 203, "width": 42, "height": 50})
+        next_rect = self.game_ui.scale_rect(screen, {"x": 676, "y": 203, "width": 42, "height": 50})
+        self.game_ui.draw_button(
+            screen, "<", prev_rect,
+            prev_rect.collidepoint(mouse_pos),
+            enabled=(self.diary_spread_index > 0)
+        )
+        self.game_ui.draw_button(
+            screen, ">", next_rect,
+            next_rect.collidepoint(mouse_pos),
+            enabled=(self.diary_spread_index < len(spread_configs) - 1)
+        )
+        buttons["diary_prev_page"] = prev_rect
+        buttons["diary_next_page"] = next_rect
 
+        # 下方待選碎片列座標
+        page_to_file = {
+            "t0_diary_page_2": "2.png",
+            "t0_diary_page_4": "4.png",
+            "t0_diary_page_5": "5.png",
+        }
         home_layout = {
-            "t0_diary_page_2": {
-                "x": 155,
-                "y": 410,
-                "width": 130,
-                "height": 70
-            },
-            "t0_diary_page_4": {
-                "x": 335,
-                "y": 410,
-                "width": 130,
-                "height": 70
-            },
-            "t0_diary_page_5": {
-                "x": 515,
-                "y": 410,
-                "width": 130,
-                "height": 70
-            }
+            "t0_diary_page_2": {"x": 180, "y": 405, "width": 85, "height": 95},
+            "t0_diary_page_4": {"x": 357, "y": 405, "width": 85, "height": 95},
+            "t0_diary_page_5": {"x": 535, "y": 405, "width": 85, "height": 95},
         }
 
-        buttons = {}
+        available_pages = self.puzzle_controller.get_available_diary_pages()
         drag_rects = {}
+        placed_page_in_current_spread = self.puzzle_controller.diary_slots.get(active_slot_id)
+        dragging_page = self.puzzle_controller.diary_dragging_page
 
-        # 固定頁1/3/6
-        for data in fixed_layout.values():
-
-            rect = (
-                self.game_ui.scale_rect(
-                    screen,
-                    data
-                )
-            )
-
-            pygame.draw.rect(
-                screen,
-                (55, 60, 70),
-                rect,
-                border_radius=6
-            )
-
-            pygame.draw.rect(
-                screen,
-                (200, 200, 200),
-                rect,
-                width=2,
-                border_radius=6
-            )
-
-            text = (
-                self.game_ui.font_ui.render(
-                    data["label"],
-                    True,
-                    (240, 240, 240)
-                )
-            )
-
-            screen.blit(
-                text,
-                text.get_rect(
-                    center=rect.center
-                )
-            )
-
-        # 空槽
-        for slot_id, data in (
-            slot_layout.items()
-        ):
-
-            rect = (
-                self.game_ui.scale_rect(
-                    screen,
-                    data
-                )
-            )
-
-            pygame.draw.rect(
-                screen,
-                (40, 42, 48),
-                rect,
-                border_radius=6
-            )
-
-            pygame.draw.rect(
-                screen,
-                (140, 140, 150),
-                rect,
-                width=2,
-                border_radius=6
-            )
-
-            occupant = (
-                self.puzzle_controller
-                .diary_slots[
-                    slot_id
-                ]
-            )
-
-            if occupant is None:
-
-                text = (
-                    self.game_ui.font_small
-                    .render(
-                        "[空槽]",
-                        True,
-                        (150, 150, 160)
-                    )
-                )
-
-                screen.blit(
-                    text,
-                    text.get_rect(
-                        center=rect.center
-                    )
-                )
-
-            buttons[
-                "diary_slot:"
-                + slot_id
-            ] = rect
-
-        available_pages = (
-            self.puzzle_controller
-            .get_available_diary_pages()
-        )
-
-        # 先建立每一頁目前應該顯示的位置
         for page_id in available_pages:
-
-            current_slot = None
-
-            for slot_id, occupant in (
-                self.puzzle_controller
-                .diary_slots.items()
-            ):
-
-                if occupant == page_id:
-
-                    current_slot = (
-                        slot_id
-                    )
-
+            placed_slot = None
+            for s_id, occ in self.puzzle_controller.diary_slots.items():
+                if occ == page_id:
+                    placed_slot = s_id
                     break
 
-            if current_slot is not None:
+            if page_id == dragging_page:
+                rect = target_slot_rect.copy()
+                drag_pos = self.puzzle_controller.diary_page_positions.get(page_id)
+                if drag_pos is not None:
+                    rect.topleft = drag_pos
+                drag_rects[page_id] = rect
 
-                rect = (
-                    buttons[
-                        "diary_slot:"
-                        + current_slot
-                    ].copy()
-                )
+            elif placed_slot == active_slot_id:
+                drag_rects[page_id] = target_slot_rect.copy()
 
-            else:
+            elif placed_slot is None:
+                rect = self.game_ui.scale_rect(screen, home_layout[page_id])
+                drag_rects[page_id] = rect
 
-                rect = (
-                    self.game_ui.scale_rect(
-                        screen,
-                        home_layout[
-                            page_id
-                        ]
-                    )
-                )
-
-            # 正在拖曳時使用controller保存的位置
-            drag_position = (
-                self.puzzle_controller
-                .diary_page_positions
-                .get(
-                    page_id
-                )
-            )
-
-            if (
-                self.puzzle_controller
-                .diary_dragging_page
-                == page_id
-                and drag_position
-                is not None
-            ):
-
-                rect.topleft = (
-                    drag_position
-                )
-
-            drag_rects[
-                page_id
-            ] = rect
-
-        # 分隔線
-        pygame.draw.line(
-            screen,
-            (200, 200, 200),
-            (
-                self.game_ui.scale_x(
-                    screen,
-                    100
-                ),
-                self.game_ui.scale_y(
-                    screen,
-                    355
-                )
-            ),
-            (
-                self.game_ui.scale_x(
-                    screen,
-                    700
-                ),
-                self.game_ui.scale_y(
-                    screen,
-                    355
-                )
-            ),
-            width=2
-        )
-
-        # 非拖曳頁先畫
-        for page_id, rect in (
-            drag_rects.items()
-        ):
-
-            if (
-                page_id
-                == self.puzzle_controller
-                .diary_dragging_page
-            ):
+        # 繪製非拖曳中的碎片
+        for page_id, rect in drag_rects.items():
+            if page_id == dragging_page:
                 continue
 
-            pygame.draw.rect(
-                screen,
-                (75, 115, 165),
-                rect,
-                border_radius=6
-            )
+            fname = page_to_file.get(page_id)
+            if page_id == placed_page_in_current_spread:
+                piece_surf = self._get_scaled_diary_surface(fname, rect.size)
+                if piece_surf is not None:
+                    screen.blit(piece_surf, piece_surf.get_rect(center=rect.center))
+            else:
+                pygame.draw.rect(screen, (45, 48, 56), rect, border_radius=6)
+                pygame.draw.rect(screen, (180, 185, 198), rect, width=2, border_radius=6)
+                thumb_surf = self._get_scaled_diary_surface(fname, (rect.width - 10, rect.height - 10))
+                if thumb_surf is not None:
+                    screen.blit(thumb_surf, thumb_surf.get_rect(center=rect.center))
+                else:
+                    label = self.objects.get(page_id, {}).get("name", page_id)
+                    text = self.game_ui.font_small.render(label, True, (240, 240, 240))
+                    screen.blit(text, text.get_rect(center=rect.center))
 
-            pygame.draw.rect(
-                screen,
-                (240, 240, 240),
-                rect,
-                width=2,
-                border_radius=6
-            )
+            buttons["diary_page:" + page_id] = rect
 
-            label = (
-                self.objects.get(
-                    page_id,
-                    {}
-                ).get(
-                    "name",
-                    page_id
-                )
-            )
+        # 拖曳中的碎片最後畫
+        if dragging_page is not None and dragging_page in drag_rects:
+            rect = drag_rects[dragging_page]
+            fname = page_to_file.get(dragging_page)
+            drag_surf = self._get_scaled_diary_surface(fname, target_slot_rect.size)
+            if drag_surf is not None:
+                ghost = drag_surf.copy()
+                ghost.set_alpha(220)
+                screen.blit(ghost, ghost.get_rect(center=rect.center))
+            buttons["diary_page:" + dragging_page] = rect
 
-            text = (
-                self.game_ui.font_small
-                .render(
-                    label,
-                    True,
-                    (240, 240, 240)
-                )
-            )
+        # 右下角：確認、重設、退出按鈕
+        confirm_rect = self.game_ui.scale_rect(screen, {"x": 430, "y": 515, "width": 100, "height": 42})
+        reset_rect = self.game_ui.scale_rect(screen, {"x": 545, "y": 515, "width": 100, "height": 42})
+        exit_rect = self.game_ui.scale_rect(screen, {"x": 660, "y": 515, "width": 100, "height": 42})
 
-            screen.blit(
-                text,
-                text.get_rect(
-                    center=rect.center
-                )
-            )
+        self.game_ui.draw_button(screen, "確認", confirm_rect, confirm_rect.collidepoint(mouse_pos))
+        self.game_ui.draw_button(screen, "重設", reset_rect, reset_rect.collidepoint(mouse_pos))
+        self.game_ui.draw_button(screen, "退出", exit_rect, exit_rect.collidepoint(mouse_pos))
 
-            buttons[
-                "diary_page:"
-                + page_id
-            ] = rect
+        buttons["confirm"] = confirm_rect
+        buttons["reset"] = reset_rect
+        buttons["exit"] = exit_rect
+        buttons["_drag_rects"] = drag_rects
 
-        # 拖曳頁最後畫
-        dragging_page = (
-            self.puzzle_controller
-            .diary_dragging_page
-        )
-
-        if (
-            dragging_page is not None
-            and dragging_page in drag_rects
-        ):
-
-            rect = (
-                drag_rects[
-                    dragging_page
-                ]
-            )
-
-            pygame.draw.rect(
-                screen,
-                (105, 155, 215),
-                rect,
-                border_radius=6
-            )
-
-            pygame.draw.rect(
-                screen,
-                (240, 240, 240),
-                rect,
-                width=2,
-                border_radius=6
-            )
-
-            label = (
-                self.objects.get(
-                    dragging_page,
-                    {}
-                ).get(
-                    "name",
-                    dragging_page
-                )
-            )
-
-            text = (
-                self.game_ui.font_small
-                .render(
-                    label,
-                    True,
-                    (240, 240, 240)
-                )
-            )
-
-            screen.blit(
-                text,
-                text.get_rect(
-                    center=rect.center
-                )
-            )
-
-            buttons[
-                "diary_page:"
-                + dragging_page
-            ] = rect
-
-        confirm_rect = (
-            self.game_ui.scale_rect(
-                screen,
-                {
-                    "x": 430,
-                    "y": 515,
-                    "width": 100,
-                    "height": 42
-                }
-            )
-        )
-
-        reset_rect = (
-            self.game_ui.scale_rect(
-                screen,
-                {
-                    "x": 545,
-                    "y": 515,
-                    "width": 100,
-                    "height": 42
-                }
-            )
-        )
-
-        exit_rect = (
-            self.game_ui.scale_rect(
-                screen,
-                {
-                    "x": 660,
-                    "y": 515,
-                    "width": 100,
-                    "height": 42
-                }
-            )
-        )
-
-        self.game_ui.draw_button(
-            screen,
-            "確認",
-            confirm_rect,
-            confirm_rect.collidepoint(
-                mouse_pos
-            )
-        )
-
-        self.game_ui.draw_button(
-            screen,
-            "重設",
-            reset_rect,
-            reset_rect.collidepoint(
-                mouse_pos
-            )
-        )
-
-        self.game_ui.draw_button(
-            screen,
-            "退出",
-            exit_rect,
-            exit_rect.collidepoint(
-                mouse_pos
-            )
-        )
-
-        buttons["confirm"] = (
-            confirm_rect
-        )
-
-        buttons["reset"] = (
-            reset_rect
-        )
-
-        buttons["exit"] = (
-            exit_rect
-        )
-
-        buttons["_drag_rects"] = (
-            drag_rects
-        )
-
-        message = (
-            self.result or {}
-        ).get(
-            "message",
-            ""
-        )
-
+        message = (self.result or {}).get("message", "")
         if message:
-
             self.draw_multiline_text(
                 screen,
                 message,
-                self.game_ui.scale_x(
-                    screen,
-                    80
-                ),
-                self.game_ui.scale_y(
-                    screen,
-                    565
-                ),
-                self.game_ui.scale_x(
-                    screen,
-                    620
-                ),
+                self.game_ui.scale_x(screen, 80),
+                self.game_ui.scale_y(screen, 565),
+                self.game_ui.scale_x(screen, 620),
                 font=self.game_ui.font_small
             )
 
