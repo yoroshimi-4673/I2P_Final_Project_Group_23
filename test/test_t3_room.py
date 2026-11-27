@@ -246,7 +246,7 @@ class T3RoomTests(unittest.TestCase):
         from types import SimpleNamespace
         namespace = {
             "pygame": pygame, "game": g, "ui_layout": self.f.layout,
-            "player": SimpleNamespace(rect=pygame.Rect(350, 130, 20, 20)),
+            "player": SimpleNamespace(rect=pygame.Rect(350, 130, 20, 20), direction=0),
             "is_in_interaction_region": lambda *args: True
         }
         exec(compile(ast.Module(body=[function], type_ignores=[]), "game_home.py", "exec"), namespace)

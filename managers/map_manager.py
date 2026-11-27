@@ -133,9 +133,10 @@ class MapManager:
         self,
         space_id,
         screen,
-        object_rects=None
+        object_rects=None,
+        collision_rects=None,
     ):
-        """依物件位置與padding建立E鍵互動範圍。"""
+        """依碰撞、校正多邊形或物件本身大小建立互動範圍。"""
 
         if object_rects is None:
             object_rects = self.get_object_rects(
@@ -151,36 +152,29 @@ class MapManager:
             "objects",
             {}
         )
+        if collision_rects is None:
+            collision_rects = self.get_collision_rects(space_id, screen)
+        collision_by_object = {}
+        for zone_id, collision in collision_rects.items():
+            zone = space_layout["collision_zones"][zone_id]
+            object_id = zone.get("interaction_object") or zone.get("fit_object_asset")
+            if object_id in object_rects:
+                # 同個物件的多個碰撞區合併為外框
+                previous = collision_by_object.get(object_id)
+                collision_by_object[object_id] = collision if previous is None else previous.union(collision)
 
         interaction_rects = {}
+        padding_x = self.game_ui.scale_x(screen, 20)
+        padding_y = self.game_ui.scale_y(screen, 20)
 
         for object_id, rect in object_rects.items():
-            object_layout = object_layouts.get(
-                object_id,
-                {}
-            )
-
-            interaction_padding = object_layout.get(
-                "interaction_padding",
-                40
-            )
-
-            padding_x = self.game_ui.scale_x(
-                screen,
-                interaction_padding
-            )
-
-            padding_y = self.game_ui.scale_y(
-                screen,
-                interaction_padding
-            )
-
-            interaction_rects[object_id] = (
-                rect.inflate(
-                    padding_x * 2,
-                    padding_y * 2
-                )
-            )
+            collision = collision_by_object.get(object_id)
+            if collision is not None:
+                interaction_rects[object_id] = collision.inflate(2 * padding_x, 2 * padding_y)
+            elif len(object_layouts[object_id].get("interaction_polygon", ())) >= 3:
+                interaction_rects[object_id] = rect.copy()  # 保留人工校正多邊形的粗略外框
+            else:
+                interaction_rects[object_id] = rect.inflate(2 * padding_x, 2 * padding_y)
 
         return interaction_rects
 
@@ -205,7 +199,8 @@ class MapManager:
         interaction_rects = self.get_interaction_rects(
             space_id,
             screen,
-            object_rects
+            object_rects,
+            collision_rects,
         )
 
         return {

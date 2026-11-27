@@ -791,6 +791,42 @@ class Chapter2FlowTests(unittest.TestCase):
                 player.rect.center = (295, 153)
                 self.assertFalse(in_region(object_id, rect))
 
+    def test_interaction_prefers_front_and_falls_back_to_nearest(self):
+        self.game.enter_space("T0")
+        player = Player(0, 0)
+        player.rect.center = (100, 100)
+        player.direction = 1
+        get_target = home_function("get_nearest_interaction_target", {
+            "pygame": pygame, "ui_layout": self.layout, "game": self.game,
+            "player": player, "is_in_interaction_region": lambda *args: True,
+        })
+        target_positions = {
+            "near_behind": (99, 100), "straight_ahead": (180, 100),
+            "near_diagonal": (135, 135), "outside_cone": (103, 104),
+        }
+        rects = {}
+        for key, center in target_positions.items():
+            rects[key] = pygame.Rect(0, 0, 10, 10)
+            rects[key].center = center
+        self.assertEqual(get_target(rects, rects)["id"], "near_diagonal")
+        fallback = {key: rects[key] for key in ("near_behind", "outside_cone")}
+        self.assertEqual(get_target(rects, fallback)["id"], "near_behind")
+        self.assertIsNone(get_target(rects, {}))
+        player.direction = 3
+        self.assertEqual(get_target(rects, rects)["id"], "near_behind")
+        rects["same_center"] = pygame.Rect(95, 95, 10, 10)
+        self.assertEqual(get_target(rects, rects)["id"], "same_center")
+
+    def test_interaction_rect_extends_twenty_base_pixels_from_collision_or_image(self):
+        manager = MapManager(self.layout, self.game_ui, self.game)
+        runtime = manager.build_space_runtime_data("T0", self.screen)
+        for object_id, base in (
+            ("t0_child_safe", runtime["collision_rects"]["t0_safe_body"]),
+            ("t0_exit_door", runtime["object_rects"]["t0_exit_door"]),
+        ):
+            with self.subTest(object_id=object_id):
+                self.assertEqual(runtime["interaction_rects"][object_id], base.inflate(40, 40))
+
     def test_corridor_return_spawns_are_independent_of_door_positions(self):
         corridor = self.layout["spaces"]["CH2_CORRIDOR"]
         expected = {

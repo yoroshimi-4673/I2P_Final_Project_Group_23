@@ -54,7 +54,7 @@ class Scene13Tests(unittest.TestCase):
         after = manager.build_space_runtime_data("CH2_CORRIDOR", self.screen)
         self.assertEqual(after["object_rects"]["ch2_terminal"], pygame.Rect(300, 220, 200, 160))
         self.assertEqual(after["collision_rects"]["ch2_terminal_body"], pygame.Rect(320, 236, 160, 128))
-        self.assertEqual(after["interaction_rects"]["ch2_terminal"], pygame.Rect(250, 170, 300, 260))
+        self.assertEqual(after["interaction_rects"]["ch2_terminal"], pygame.Rect(300, 216, 200, 168))
         asset = f.layout["spaces"]["CH2_CORRIDOR"]["objects"]["ch2_terminal"]["asset"]
         self.assertIsNotNone(f.game_ui.load_image(asset))
         self.assertIn("door_d", f.layout["spaces"]["CH2_CORRIDOR"]["objects"])

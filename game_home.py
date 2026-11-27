@@ -424,14 +424,15 @@ def get_nearest_interaction_target(
     object_rects,
     interaction_rects
 ):
-    """找出目前互動範圍內距離玩家最近的物件。"""
+    """優先選最近的前方物件，否則選範圍內最近者。"""
 
     nearest_target = None
-    nearest_distance = None
+    nearest_priority = None
 
     player_center = pygame.Vector2(
         player.rect.center
     )
+    facing = pygame.Vector2(((0, 1), (1, 0), (0, -1), (-1, 0))[player.direction])
 
     for object_id, interaction_rect in (
         interaction_rects.items()
@@ -461,17 +462,18 @@ def get_nearest_interaction_target(
             object_rect.center
         )
 
-        distance = (
-            object_center
-            - player_center
-        ).length_squared()
+        offset = object_center - player_center
+        distance = offset.length_squared()
+        forward = facing.dot(offset)
+        in_front = forward >= 0 and 2 * forward * forward >= distance
+        priority = (not in_front, distance)  # 先比較是否在前方，再比較距離
 
         if (
-            nearest_distance is None
-            or distance < nearest_distance
+            nearest_priority is None
+            or priority < nearest_priority
         ):
 
-            nearest_distance = distance
+            nearest_priority = priority
 
             nearest_target = {
                 "id": object_id,
@@ -2378,6 +2380,8 @@ while running:
                     walkable_polygon,
                     collision_rects
                 )
+                for rect in interaction_rects.values():
+                    pygame.draw.rect(screen, (125, 190, 255), rect, width=1)  # 區分互動外框與實體碰撞範圍
 
             if (
                 polygon_editor_active
