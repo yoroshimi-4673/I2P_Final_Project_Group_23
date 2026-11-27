@@ -1170,10 +1170,13 @@ class InteractionUI:
             rect = self.game_ui.scale_rect(screen, {
                 "x": 90 + index * 220, "y": 500, "width": 180, "height": 48
             })
-            self.game_ui.draw_button(screen, self.objects[item_id]["name"], rect,
-                                     rect.collidepoint(mouse_pos))
-            if self.puzzle_controller.anchor_selected_fragment == item_id:
-                pygame.draw.rect(screen, (255, 220, 140), rect, 3, border_radius=5)
+            position = self.puzzle_controller.anchor_fragment_positions.get(item_id)
+            if position is not None:
+                rect.topleft = position  # 拖曳碎片依滑鼠位置即時繪製
+            pygame.draw.rect(screen, (65, 68, 85), rect, border_radius=5)
+            if not self.game_ui.draw_item_asset(screen, item_id, rect):
+                self.game_ui.draw_button(screen, self.objects[item_id]["name"], rect,
+                                         rect.collidepoint(mouse_pos))
             buttons["fragment:" + item_id] = rect
 
         close = self.game_ui.scale_rect(screen, {
@@ -1210,6 +1213,18 @@ class InteractionUI:
         """分別顯示三個時間年齡及共用數字輸入。"""
 
         self.draw_white_wall(screen)
+        if (self.puzzle_controller.last_result or {}).get("status") == "final_failure_pending":
+            # 白牆吞沒後先保留畫面等待玩家確認
+            overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
+            overlay.fill((20, 20, 25, 80))
+            screen.blit(overlay, (0, 0))
+            message = self.puzzle_controller.last_result.get("message", "白牆吞沒了整條走廊。")
+            self.draw_multiline_text(screen, message, self.game_ui.scale_x(screen, 100),
+                                     self.game_ui.scale_y(screen, 240),
+                                     self.game_ui.scale_x(screen, 600), color=(45, 45, 50))
+            rect = self.game_ui.scale_rect(screen, {"x": 320, "y": 380, "width": 160, "height": 60})
+            self.game_ui.draw_button(screen, "確定", rect, rect.collidepoint(mouse_pos))
+            return {"ack_failure": rect}
         overlay = pygame.Surface(screen.get_size(), pygame.SRCALPHA)
         overlay.fill((20, 20, 25, 150))
         screen.blit(overlay, (0, 0))

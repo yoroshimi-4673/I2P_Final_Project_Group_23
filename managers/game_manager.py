@@ -20,6 +20,7 @@ class GameManager:
         self.puzzle_attempts = {}  # 分別記錄每一個謎題剩餘的嘗試次數
 
         self.story_events = []  # 記錄目前已經發生的重要劇情事件
+        self.scene13_anchor_slots = {"past": None, "present": None, "future": None}  # 永久保存三枚時間碎片放置狀態
 
         self.chapter = 0  # 記錄玩家目前完成到哪一個遊戲章節
         self.game_over_reason = None  # 記錄玩家進入失敗狀態的具體原因
@@ -165,6 +166,7 @@ class GameManager:
         self.puzzle_attempts = {}
 
         self.story_events = []
+        self.scene13_anchor_slots = {"past": None, "present": None, "future": None}  # 新遊戲清空所有時間碎片凹槽
 
         self.chapter = 0
         self.game_over_reason = None

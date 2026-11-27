@@ -235,6 +235,16 @@
             "text": "……七、八、九、十……"
         }
     ],
+    "scene_13_entry": [
+        {
+            "speaker": "旁白",
+            "text": "走廊上，白牆只剩幾步的距離。"
+        },
+        {
+            "speaker": "黎琛",
+            "text": "空間在收縮"
+        }
+    ],
     "scene_13_terminal": [
         {
             "speaker": "終端機",

@@ -152,7 +152,7 @@ class DiaryDragTests(unittest.TestCase):
         self.assertEqual(self.f.ui.current_object_id, "t0_fixed_diary")
 
     def test_all_exits_confirmation_cancel_and_corresponding_door_spawn(self):
-        manager = MapManager(copy.deepcopy(self.f.layout), self.f.game_ui)
+        manager = MapManager(copy.deepcopy(self.f.layout), self.f.game_ui, self.f.game)
         for space, prefix in (("T0", "t0"), ("T7", "t7"), ("T3", "t3")):
             with self.subTest(space=space):
                 self.f.game.enter_space(space)

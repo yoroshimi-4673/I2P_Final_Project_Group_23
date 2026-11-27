@@ -622,6 +622,16 @@
                     "label": "T+7",
                     "render_mode": "background",
                     "interaction_padding": 0
+                },
+                "ch2_terminal": {
+                    "x": 300,
+                    "y": 220,
+                    "width": 200,
+                    "height": 160,
+                    "asset": "assets/素材庫/第二章/白色通道/controler.png",
+                    "label": "時間終端機",
+                    "interaction_padding": 50,
+                    "visible_after_event": "scene_13_started"
                 }
             },
             "entry_spawns": {
@@ -638,13 +648,17 @@
                     "y": 481
                 }
             },
-            "collision_zones": {},
+            "collision_zones": {
+                "ch2_terminal_body": {
+                    "x": 320,
+                    "y": 236,
+                    "width": 160,
+                    "height": 128,
+                    "kind": "furniture",
+                    "visible_after_event": "scene_13_started"
+                }
+            },
             "pending_objects": {
-                "ch2_terminal": {
-                    "label": "時間終端機",
-                    "render_mode": "background",
-                    "reason": "等待人工確認背景座標"
-                },
                 "door_d": {
                     "label": "D",
                     "render_mode": "background",

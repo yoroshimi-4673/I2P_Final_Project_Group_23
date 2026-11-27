@@ -128,7 +128,7 @@ class T3RoomTests(unittest.TestCase):
     def test_world_layout_assets_and_first_npc_frame(self):
         gui = self.f.game_ui
         room = self.f.layout["spaces"]["T3"]
-        manager = MapManager(copy.deepcopy(self.f.layout), gui)
+        manager = MapManager(copy.deepcopy(self.f.layout), gui, self.f.game)
         for size in ((800, 600), (640, 480), (1280, 720)):
             surface = pygame.Surface(size)
             runtime = manager.build_space_runtime_data("T3", surface)
@@ -169,7 +169,7 @@ class T3RoomTests(unittest.TestCase):
     def test_capsule_is_hidden_until_window_interaction(self):
         gui = self.f.game_ui
         g = self.f.game
-        manager = MapManager(copy.deepcopy(self.f.layout), gui)
+        manager = MapManager(copy.deepcopy(self.f.layout), gui, self.f.game)
         runtime = manager.build_space_runtime_data("T3", self.screen)
         source = ast.parse((flow.ROOT / "game_home.py").read_text(encoding="utf-8"))
         function = next(node for node in source.body if isinstance(node, ast.FunctionDef)
@@ -181,7 +181,8 @@ class T3RoomTests(unittest.TestCase):
             "is_in_interaction_region": lambda *args: True
         }
         exec(compile(ast.Module(body=[function], type_ignores=[]), "game_home.py", "exec"), namespace)
-        rects = {"t3_time_capsule": runtime["object_rects"]["t3_time_capsule"]}
+        self.assertNotIn("t3_time_capsule", runtime["object_rects"])
+        rects = {"t3_time_capsule": gui.scale_rect(self.screen, self.f.layout["spaces"]["T3"]["objects"]["t3_time_capsule"])}
         get_target = namespace["get_nearest_interaction_target"]
         self.assertIsNone(get_target(rects, rects))
         self.assertNotIn("t3_time_capsule", gui.draw_space(self.screen, g, (350, 130)))
