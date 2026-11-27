@@ -1198,6 +1198,14 @@ def apply_save_action(action):
     if operation == "load":
         save_controller.complete("load", load_saved_game(slot))
         return
+    if operation == "reset":
+        try:
+            save_manager.reset_save(slot)
+        except OSError:
+            save_controller.complete("reset", False)
+        else:
+            save_controller.complete("reset", True)
+        return
     if operation == "new":
         save_controller.active_save_slot = slot
         save_controller.close()
@@ -1713,7 +1721,7 @@ while running:
         elif event.type == pygame.KEYDOWN:
 
             if ui_overlay == "save":
-                key = MENU_NAVIGATION_KEYS.get(event.key)
+                key = "reset" if event.key == pygame.K_r else MENU_NAVIGATION_KEYS.get(event.key)
                 if key is not None:
                     apply_save_action(save_controller.handle_navigation(key))
                 continue
@@ -2540,7 +2548,7 @@ while running:
         if ui_overlay == "save":
             for control, rect in save_buttons.items():
                 if rect.collidepoint(mouse_pos):
-                    apply_save_action(save_controller.activate(control))
+                    apply_save_action(save_controller.handle_click(control))
                     break
 
         elif ui_overlay == "settings":

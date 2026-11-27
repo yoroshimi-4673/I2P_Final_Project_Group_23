@@ -498,3 +498,11 @@ def load_game(
 def delete_save(slot):
     get_save_path(slot).unlink(missing_ok=True)
     get_thumbnail_path(slot).unlink(missing_ok=True)
+
+
+def reset_save(slot):
+    path = get_save_path(slot)
+    get_thumbnail_path(slot).unlink(missing_ok=True)
+    if slot == 1:
+        LEGACY_SAVE_PATH.unlink(missing_ok=True)
+    path.unlink(missing_ok=True)

@@ -14,6 +14,7 @@ class SaveController:
         self.mode = None
         self.operation = None
         self.selected_slot = None
+        self.delete_click_slot = None
         self.focused_slot = VALID_SAVE_SLOTS[0]
         self.focused_action = None
         self.slots = {}
@@ -43,28 +44,38 @@ class SaveController:
     def show(self, mode):
         self.mode = mode
         choices = self.action_choices()
-        self.focused_action = choices[0][0] if choices else None
+        self.focused_action = "cancel" if mode in ("delete_confirm_1", "delete_confirm_2") else (
+            choices[0][0] if choices else None
+        )
 
     def action_choices(self):
         if self.mode == "start":
             return self.START_ACTIONS
-        if self.mode in ("return", "confirm", "overwrite", "saved", "error"):
+        if self.mode in ("return", "confirm", "overwrite", "saved", "error",
+                         "delete_confirm_1", "delete_confirm_2", "deleted", "delete_error"):
             return self.confirmation()[1]
         return ()
 
     def handle_navigation(self, key):
+        if key == "reset" and self.mode == "slots" and self.operation == "load":
+            self.selected_slot = None
+            self.delete_click_slot = None
+            self.show("delete_select")
+            return None
         if key == "escape":
             return self.back()
+        selecting_slot = self.mode in ("slots", "delete_select")
         if key == "enter":
-            return self.activate(self.focused_slot if self.mode == "slots" else self.focused_action)
+            return self.activate(self.focused_slot if selecting_slot else self.focused_action)
 
-        if self.mode == "slots" and key in ("up", "down"):
+        if selecting_slot and key in ("up", "down"):
+            self.delete_click_slot = None
             index = VALID_SAVE_SLOTS.index(self.focused_slot)
             step = 1 if key == "down" else -1
             self.focused_slot = VALID_SAVE_SLOTS[(index + step) % len(VALID_SAVE_SLOTS)]
         elif (
             (self.mode == "start" and key in ("up", "down"))
-            or (self.mode not in ("slots", "start") and key in ("left", "right"))
+            or (not selecting_slot and self.mode != "start" and key in ("left", "right"))
         ):
             controls = [control for control, _ in self.action_choices()]
             if controls:
@@ -73,6 +84,12 @@ class SaveController:
         return None
 
     def complete(self, operation, success):
+        if operation == "reset":
+            if success and self.selected_slot == self.active_save_slot:
+                self.active_save_slot = None
+            self.message = f"SLOT {self.selected_slot} 已刪除。" if success else "無法刪除存檔，請重試。"
+            self.show("deleted" if success else "delete_error")
+            return
         if success:
             self.active_save_slot = self.selected_slot
         if success and operation == "load":
@@ -81,7 +98,28 @@ class SaveController:
             self.message = "存檔完成。" if success else "無法完成存讀檔，請重試。"
             self.show("saved" if success else "error")
 
+    def handle_click(self, control):
+        if self.mode == "delete_select" and control in self.slots:
+            self.focused_slot = control
+            if self.delete_click_slot != control:
+                self.delete_click_slot = control
+                return None
+        return self.activate(control)
+
     def activate(self, control):
+        if self.mode == "delete_select" and control in self.slots:
+            if self.slots[control]["status"] != "NO DATA":
+                self.focused_slot = control
+                self.selected_slot = control
+                self.show("delete_confirm_1")
+            return None
+        if self.mode == "delete_confirm_1" and control == "delete":
+            self.show("delete_confirm_2")
+            return None
+        if self.mode == "delete_confirm_2" and control == "delete":
+            return "reset", self.selected_slot
+        if self.mode in ("deleted", "delete_error") and control == "yes":
+            return self.back()
         if self.mode == "start" and control in ("new", "load"):
             self.open_slots(control)
         elif self.mode == "return" and control == "save":
@@ -110,16 +148,27 @@ class SaveController:
                 return "load", slot
         elif self.mode == "saved" and control == "yes":
             return ("menu" if self.return_after_save else "game"), None
-        elif control in ("back", "no"):
+        elif control in ("back", "no", "cancel"):
             return self.back()
         elif self.mode == "error" and control == "yes":
             self.open_slots(self.operation, self.selected_slot)
         return None
 
     def back(self):
-        if self.mode == "saved":
+        if self.mode == "delete_confirm_2":
+            self.show("delete_confirm_1")
+        elif self.mode == "delete_confirm_1":
+            self.selected_slot = None
+            self.delete_click_slot = None
+            self.show("delete_select")
+        elif self.mode in ("delete_select", "deleted", "delete_error"):
+            slot = self.focused_slot
+            self.selected_slot = None
+            self.delete_click_slot = None
+            self.open_slots("load", slot)
+        elif self.mode == "saved":
             return ("menu" if self.return_after_save else "game"), None
-        if self.mode in ("confirm", "overwrite", "error"):
+        elif self.mode in ("confirm", "overwrite", "error"):
             self.open_slots(self.operation, self.selected_slot)
         elif self.mode == "slots" and self.operation != "save":
             operation = self.operation
@@ -132,11 +181,15 @@ class SaveController:
         return None
 
     def confirmation(self):
+        if self.mode == "delete_confirm_1":
+            return f"確定要刪除 SLOT {self.selected_slot} 嗎？", (("delete", "刪除"), ("cancel", "取消"))
+        if self.mode == "delete_confirm_2":
+            return "你真的確定要刪除嗎？請注意此操作無法復原。", (("delete", "確定刪除"), ("cancel", "取消"))
         if self.mode == "return":
             return "是否要在返回主畫面前存檔？", (("save", "存檔後返回"), ("discard", "不存檔"), ("no", "取消"))
         if self.mode == "overwrite":
             return "此存檔欄位已有資料，確定要覆蓋嗎？", (("yes", "覆蓋"), ("no", "取消"))
-        if self.mode in ("saved", "error"):
+        if self.mode in ("saved", "error", "deleted", "delete_error"):
             return self.message, (("yes", "確定"),)
         status = self.slots[self.selected_slot]["status"]
         if self.operation == "save":
