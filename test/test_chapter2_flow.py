@@ -14,16 +14,19 @@ import pygame
 
 from controllers.hotbar_controller import HotbarController
 from controllers.interaction_controller import InteractionController
+from controllers.navigation_controller import NavigationController
 from controllers.puzzle_controller import PuzzleController
 from game_states import DIALOGUE, GAME_OVER, PASSWORD, SPACE
 from managers.game_manager import GameManager
 from managers.map_manager import MapManager
+from managers.pathfinding_manager import PathfindingManager
 from managers.interaction_target_manager import InteractionTargetManager
 from managers.puzzle_manager import PuzzleManager
 from managers.story_manager import StoryManager
 from player import Player
 import managers.save_manager as save_manager
 from ui.game_ui import GameUI
+from ui.dialogue_ui import DialogueController
 from ui.interaction_ui import InteractionUI
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -61,7 +64,8 @@ class Chapter2FlowTests(unittest.TestCase):
 
     def build(self, game):
         self.game = game
-        self.dialogue = Mock()
+        self.dialogue = DialogueController()
+        self.dialogue.start = Mock(wraps=self.dialogue.start)
         self.story = StoryManager(game, self.dialogue, Mock(), self.dialogues)
         self.manager = PuzzleManager(game, self.puzzles, self.objects)
         self.puzzle = PuzzleController(self.manager)
@@ -71,6 +75,11 @@ class Chapter2FlowTests(unittest.TestCase):
         self.finish = home_function("finish_dialogue_and_open_ready_puzzle", {
             "game": game, "story_manager": self.story,
             "interaction_controller": self.interaction, "SPACE": SPACE
+        })
+        self.advance = home_function("advance_current_dialogue", {
+            "dialogue_controller": self.dialogue,
+            "interaction_controller": self.interaction,
+            "finish_dialogue_and_open_ready_puzzle": self.finish,
         })
 
     def open(self, object_id):
@@ -209,13 +218,22 @@ class Chapter2FlowTests(unittest.TestCase):
     def test_t7_circuit_completion_lights_room_and_survives_save_load(self):
         self.game.complete_event("t7_unlocked")
         self.story.enter_t7()
-        overlay = home_function("draw_t7_power_outage_overlay", {"game": self.game, "pygame": pygame})
+        overlay = home_function("draw_t7_power_outage_overlay", {
+            "game": self.game, "pygame": pygame, "story_manager": self.story,
+        })
         surface = pygame.Surface((2, 2))
         surface.fill("white")
         overlay(surface)
         self.assertEqual(surface.get_at((0, 0))[:3], (51, 51, 51))
         self.finish()
         self.solve_circuit()
+        self.assertFalse(self.game.has_event("t7_circuit_completed"))
+        self.assertFalse(self.ui.is_open())
+        self.assertIsNone(self.puzzle.current_puzzle_id)
+        surface.fill("white")
+        overlay(surface)
+        self.assertEqual(surface.get_at((0, 0))[:3], (255, 255, 255))
+        self.advance_puzzle_success("t7_circuit")
         self.assertTrue(self.game.has_event("t7_circuit_completed"))
         self.assertTrue(self.game.is_puzzle_solved("t7_circuit"))
         self.assertFalse(self.ui.is_open())
@@ -225,11 +243,11 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(surface.get_at((0, 0))[:3], (255, 255, 255))
         self.finish()
 
-        with patch("save_manager._write_slot") as write:
+        with patch.object(save_manager, "_write_slot") as write:
             save_manager.save_game(self.game, 1)
             saved = json.loads(json.dumps(write.call_args.args[1]))
         restored = GameManager()
-        with patch("save_manager._read_slot", return_value=saved):
+        with patch.object(save_manager, "_read_slot", return_value=saved):
             self.assertTrue(save_manager.load_game(restored, 1))
         self.build(restored)
         self.assertTrue(restored.has_event("t7_circuit_completed"))
@@ -317,8 +335,8 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(self.puzzle.dial_digits, [1, 2, 1])
         self.assertFalse(self.game.is_puzzle_solved(puzzle_id))
         self.click("confirm")
+        self.advance_puzzle_success(puzzle_id)
         self.assertTrue(self.game.is_puzzle_solved(puzzle_id))
-        self.acknowledge_success("抽屜打開了。")
         self.acknowledge_rewards("pencil", "t0_diary_page_4")
         self.open(puzzle_id)
         self.assertEqual(self.ui.mode, "message")
@@ -423,6 +441,25 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(self.ui.result["message"], message)
         self.click("ok")
 
+    def advance_puzzle_success(self, puzzle_id):
+        self.expect_dialogue(puzzle_id)
+        config = self.puzzles[puzzle_id]
+        self.assertEqual(self.dialogue.get_current_line()["text"], config["success_message"])
+        self.assertIsNone(self.puzzle.current_puzzle_id)
+        self.assertFalse(self.ui.is_open())
+        rewards = [reward["value"] for reward in config.get("rewards", [])]
+        for item in rewards:
+            self.assertFalse(self.game.has_item(item))
+        self.advance()
+        self.dialogue.update(10)
+        self.assertEqual(self.game.game_state, DIALOGUE)
+        self.assertEqual(self.story.pending_puzzle_id, puzzle_id)
+        for item in rewards:
+            self.assertFalse(self.game.has_item(item))
+        self.advance()
+        for item in rewards:
+            self.assertTrue(self.game.has_item(item))
+
     def acknowledge_rewards(self, *items):
         for item in items:
             self.assertEqual(self.ui.mode, "item_notification")
@@ -453,6 +490,7 @@ class Chapter2FlowTests(unittest.TestCase):
         self.game.enter_space("C")
         if not self.game.is_puzzle_solved("chapter1_password"):
             self.password("exit_door", "100101")
+            self.advance_puzzle_success("chapter1_password")
             self.click("ok")
             self.click("back")
             self.expect_dialogue("photo_back_story")
@@ -496,22 +534,21 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(self.story.chapter_end_text,
                          "你只解開了一把鎖。但你還沒解開自己。")
 
-    def test_forced_anchor_puzzle_takes_priority_over_pending_reward(self):
+    def test_forced_anchor_puzzle_opens_after_fragment_dialogue(self):
         self.game.enter_space("T0")
         self.game.solve_puzzle("t0_diary_restore")
         for item in ("past_fragment", "future_fragment"):
             self.game.add_item(item)
         self.password("t0_child_safe", "21")
-        self.acknowledge_success("保險箱打開了。")
+        self.advance_puzzle_success("t0_child_safe")
+        self.assertFalse(self.game.has_event("t0_completed"))
+        self.acknowledge_rewards("present_fragment", "rubbing_paper")
         self.expect_dialogue("scene_10_fragment")
         self.game.current_space = "CH2_CORRIDOR"
         self.game.complete_event("anchor_age_puzzle_ready")
         self.finish()
         self.assertEqual(self.ui.mode, "multi_input")
         self.assertEqual(self.puzzle.current_puzzle_id, "anchor_age_verification")
-        self.ui.close()
-        self.interaction.resume_pending_item_notifications()
-        self.acknowledge_rewards("present_fragment", "rubbing_paper")
 
     def test_chapter1_end_to_scene13(self):
         g = self.game
@@ -542,9 +579,9 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(self.ui.mode, "inspectable")
         self.click("back")
         self.password("t0_bedside_drawer", "121")
+        self.advance_puzzle_success("t0_bedside_drawer")
         self.assertTrue(g.has_item("pencil"))
         self.assertTrue(g.has_item("t0_diary_page_4"))
-        self.acknowledge_success("抽屜打開了。")
         self.acknowledge_rewards("pencil", "t0_diary_page_4")
         self.open("t0_bed")
         self.click("t0_pillow")
@@ -577,14 +614,13 @@ class Chapter2FlowTests(unittest.TestCase):
         self.acknowledge_success("日記頁已經按照月份恢復。")
         self.acknowledge_rewards("t0_fixed_diary")
         self.password("t0_child_safe", "21")
+        self.advance_puzzle_success("t0_child_safe")
         self.assertTrue(g.has_item("present_fragment"))
         self.assertTrue(g.has_item("rubbing_paper"))
-        self.acknowledge_success("保險箱打開了。")
-        self.expect_dialogue("scene_10_fragment")
-        self.interaction.resume_pending_item_notifications()
-        self.assertFalse(self.ui.is_open())
-        self.finish()
+        self.assertFalse(g.has_event("t0_completed"))
         self.acknowledge_rewards("present_fragment", "rubbing_paper")
+        self.expect_dialogue("scene_10_fragment")
+        self.finish()
         self.assertEqual(g.current_space, "T0")
         self.assertTrue(g.has_event("t0_completed"))
         self.open("t0_exit_door")
@@ -594,6 +630,7 @@ class Chapter2FlowTests(unittest.TestCase):
         self.expect_dialogue("scene_11_circuit_intro")
         self.finish()
         self.solve_circuit()
+        self.advance_puzzle_success("t7_circuit")
         self.expect_dialogue("scene_11_entry")
         self.finish()
         for missing in ("pencil", "rubbing_paper"):
@@ -642,10 +679,11 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(self.puzzle.current_puzzle_id, "t7_desk_drawer")
         self.set_dial_password("307")
         self.click("confirm")
-        self.acknowledge_success("書桌抽屜打開了。")
+        self.advance_puzzle_success("t7_desk_drawer")
+        self.assertFalse(g.has_event("t7_completed"))
+        self.acknowledge_rewards("future_fragment")
         self.expect_dialogue("scene_11_fragment")
         self.finish()
-        self.acknowledge_rewards("future_fragment")
         self.assertEqual(g.current_space, "T7")
         self.open("t7_exit_door")
         self.click("leave")
@@ -675,12 +713,18 @@ class Chapter2FlowTests(unittest.TestCase):
         self.open("t3_windowsill")
         self.assertTrue(g.has_event("t3_time_capsule_found"))
         self.password("t3_time_capsule", "0347")
+        self.assertEqual(self.manager.get_remaining_attempts("t3_time_capsule"), 3)
+        self.puzzle.turn_password_dial(0, 1)
+        self.assertEqual(self.puzzle.password_dial_states["t3_time_capsule"], [0, 3, 4, 7])
+        self.assertEqual(self.puzzle.submit()["status"], "no_puzzle")
+        self.advance_puzzle_success("t3_time_capsule")
+        self.assertEqual(self.manager.get_remaining_attempts("t3_time_capsule"), 3)
         self.assertTrue(g.has_item("past_fragment"))
         self.assertTrue(g.has_item("t3_note"))
-        self.acknowledge_success("鐵盒打開了。")
+        self.assertFalse(g.has_event("t3_capsule_opened"))
+        self.acknowledge_rewards("past_fragment", "t3_note")
         self.expect_dialogue("scene_12_note")
         self.finish()
-        self.acknowledge_rewards("past_fragment", "t3_note")
         self.open("t3_bed_board")
         self.assertEqual(self.ui.mode, "message")
         self.click("ok")
@@ -887,6 +931,92 @@ class Chapter2FlowTests(unittest.TestCase):
             targets.get_interaction_target(player, "T0", rects, regions, self.screen)["id"], "same_center"
         )
 
+    def test_click_to_interact_with_time_door_and_rift(self):
+        manager = MapManager(self.layout, self.game_ui, self.game)
+        self.game.complete_event("t0_unlocked")
+        for space, object_id, destination in (
+            ("CH2_CORRIDOR", "door_t0", "T0"),
+            ("A", "floor_rift_A", "C"),
+        ):
+            with self.subTest(object_id=object_id):
+                self.game.enter_space(space)
+                player = Player(0, 0)
+                manager.place_player(player, space, self.screen)
+                targets = InteractionTargetManager(self.layout, self.game_ui, self.game)
+                navigation = NavigationController(
+                    PathfindingManager(self.game_ui), player, self.game, targets, self.interaction
+                )
+                data = manager.build_space_runtime_data(space, self.screen)
+                rects, regions = data["object_rects"], data["interaction_rects"]
+                obstacles = list(data["collision_rects"].values())
+                polygon = data["walkable_polygon"]
+                navigation.navigate_to_click(
+                    rects[object_id].center, self.screen, obstacles, polygon, rects, regions
+                )
+                self.assertEqual(navigation.pending_interaction, (space, object_id))
+                self.assertEqual(self.game.current_space, space)
+                for _ in range(400):
+                    navigation.update_player(0.02, (), obstacles, polygon, self.screen, rects, regions)
+                    if navigation.pending_interaction is None:
+                        break
+                if object_id == "door_t0":
+                    self.assertEqual(self.game.game_state, DIALOGUE)
+                    self.finish()
+                    self.finish()
+                else:
+                    self.assertEqual(self.ui.mode, "rift")
+                    self.click("enter")
+                    self.assertEqual(self.interaction.pending_entry_rift, object_id)
+                self.assertEqual(self.game.current_space, destination)
+                self.assertIsNone(navigation.pending_interaction)
+
+    def test_exploration_click_blocks_open_ui_and_uses_resized_object_geometry(self):
+        self.game.enter_space("A")
+        surface = pygame.Surface((1024, 768))
+        manager = MapManager(self.layout, self.game_ui, self.game)
+        data = manager.build_space_runtime_data("A", surface)
+        player = Player(0, 0)
+        manager.place_player(player, "A", surface)
+        targets = InteractionTargetManager(self.layout, self.game_ui, self.game)
+        navigation = NavigationController(
+            PathfindingManager(self.game_ui), player, self.game, targets, self.interaction
+        )
+        namespace = {
+            "game": self.game, "ui_screen": "game", "UI_GAME": "game", "SPACE": SPACE,
+            "ui_overlay": None, "interaction_ui": self.ui,
+            "polygon_editor_controller": types.SimpleNamespace(active=False),
+            "navigation_controller": navigation, "handle_hotbar_click": Mock(return_value=False),
+        }
+        home_function("can_navigate_scene", namespace)
+        click = home_function("handle_exploration_click", namespace)
+        rects, regions = data["object_rects"], data["interaction_rects"]
+        args = (
+            rects["floor_rift_A"].center, surface, list(data["collision_rects"].values()),
+            data["walkable_polygon"], rects, regions, None, False,
+        )
+        with patch.object(self.interaction, "open_object", wraps=self.interaction.open_object) as open_object:
+            for overlay in ("settings", "save"):
+                namespace["ui_overlay"] = overlay
+                click(*args)
+            namespace["ui_overlay"] = None
+            namespace["ui_screen"] = "codex"
+            click(*args)
+            namespace["ui_screen"] = "game"
+            for state in (DIALOGUE, PASSWORD, GAME_OVER):
+                self.game.game_state = state
+                click(*args)
+            self.game.game_state = SPACE
+            self.ui.open_message("Test")
+            click(*args)
+            self.assertIsNone(player.mouse_target)
+            self.assertIsNone(navigation.pending_interaction)
+            open_object.assert_not_called()
+        self.ui.close()
+        original_center = manager.get_object_rects("A", self.screen)["floor_rift_A"].center
+        self.assertFalse(rects["floor_rift_A"].collidepoint(original_center))
+        click(*args)
+        self.assertEqual(navigation.pending_interaction, ("A", "floor_rift_A"))
+
     def test_interaction_rect_extends_twenty_base_pixels_from_collision_or_image(self):
         manager = MapManager(self.layout, self.game_ui, self.game)
         runtime = manager.build_space_runtime_data("T0", self.screen)
@@ -954,22 +1084,34 @@ class Chapter2FlowTests(unittest.TestCase):
                     self.assertFalse(place(target, target, manager, player, self.screen, self.interaction, keys))
                     placement.assert_called_once_with(player, target, self.screen, rift, door)
 
-    def test_first_choice_a_spawns_at_scaled_center_facing_left(self):
-        self.story.start_first_choice()
-        self.story.start_choice_result(self.dialogues["scene_04_choice"]["options"]["A"])
-        self.finish()
-        self.assertEqual(self.interaction.pending_entry_rift, "first_choice_a")
+    def test_first_choice_spawns_at_scaled_center_facing_left(self):
         manager = MapManager(self.layout, self.game_ui, self.game)
         place = home_function("place_player_on_space_change", {})
-        for size in ((800, 600), (1024, 768), (1200, 900)):
-            with self.subTest(size=size):
-                surface = pygame.Surface(size)
-                player = Player(0, 0)
-                self.interaction.pending_entry_rift = "first_choice_a"
-                self.assertTrue(place("A", None, manager, player, surface, self.interaction, set()))
-                self.assertEqual(player.rect.center, (210 * size[0] // 800, 337 * size[1] // 600))
-                self.assertEqual(player.direction, 3)
-                self.assertIsNone(self.interaction.pending_entry_rift)
+        for space in ("A", "B", "C"):
+            for size in ((800, 600), (1024, 768), (1200, 900)):
+                with self.subTest(space=space, size=size):
+                    self.story.start_first_choice()
+                    self.story.start_choice_result(self.dialogues["scene_04_choice"]["options"][space])
+                    self.finish()
+                    self.assertEqual(self.game.current_space, space)
+                    self.assertEqual(self.interaction.pending_entry_rift, f"first_choice_{space.lower()}")
+                    surface = pygame.Surface(size)
+                    player = Player(0, 0)
+                    self.assertTrue(place(space, None, manager, player, surface, self.interaction, set()))
+                    self.assertEqual(player.rect.center, (210 * size[0] // 800, 337 * size[1] // 600))
+                    self.assertEqual(player.direction, 3)
+                    self.assertIsNone(self.interaction.pending_entry_rift)
+
+    def test_chapter1_rift_spawn_coordinates(self):
+        expected = {
+            "A": {"floor_rift_B": (470, 350), "rift_C_A": (190, 405)},
+            "B": {"wardrobe_rift": (220, 350), "rift_C_B": (450, 130)},
+            "C": {"floor_rift_A": (115, 380), "ceiling_rift": (480, 280)},
+        }
+        for space, rifts in expected.items():
+            spawns = self.layout["spaces"][space]["entry_spawns"]
+            for rift, (x, y) in rifts.items():
+                self.assertEqual(spawns[rift], {"x": x, "y": y})
 
     def test_time_room_entry_dialogues_and_ashes_are_once_only(self):
         self.game.complete_event("t0_unlocked")
@@ -1034,7 +1176,9 @@ class Chapter2FlowTests(unittest.TestCase):
             "game": self.game, "game_ui": game_ui, "player": player,
             "dialogue_controller": types.SimpleNamespace(dialogue_id="scene_10_entry"),
             "draw_t7_power_outage_overlay": home_function(
-                "draw_t7_power_outage_overlay", {"game": self.game, "pygame": pygame}
+                "draw_t7_power_outage_overlay", {
+                    "game": self.game, "pygame": pygame, "story_manager": self.story,
+                }
             ),
         })
         draw(self.screen, (0, 0), draw_player=False)

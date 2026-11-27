@@ -214,17 +214,27 @@ class PuzzleTests(unittest.TestCase):
             "type": "open_photo", "item_id": "photo_1", "mode": "story"
         })
 
-    def test_photo_reward_without_completion_stays_message(self):
+    def test_photo_reward_without_completion_returns_to_room(self):
         self.puzzles[self.puzzle_id].pop("on_complete")
-        ui, interaction, _ = self.make_ui()
+        ui, interaction, story = self.make_ui()
         interaction.open_object("exit_door")
         self.controller.append_input(self.answer)
         interaction.submit_puzzle()
+        self.advance_success_dialogue(interaction, story, "chapter1_password")
         self.assertTrue(self.game.has_item("photo_1"))
         self.click(ui, interaction, "ok")
-        self.assertEqual(ui.mode, "message")
+        self.assertFalse(ui.is_open())
         self.assertIsNone(ui.photo_id)
-        self.assertEqual(ui.result["message"], "ACCESS GRANTED")
+
+    def advance_success_dialogue(self, interaction, story, puzzle_id):
+        dialogue = story.dialogue_controller
+        self.assertEqual(dialogue.get_current_line()["text"], self.puzzles[puzzle_id]["success_message"])
+        self.assertEqual(dialogue.advance(), "line_completed")
+        self.assertFalse(self.game.is_puzzle_solved(puzzle_id))
+        self.assertEqual(dialogue.advance(), "dialogue_finished")
+        self.assertEqual(story.pending_puzzle_id, puzzle_id)
+        self.assertEqual(story.finish_dialogue_action(), "complete_puzzle")
+        interaction.finish_puzzle_success_dialogue(puzzle_id)
 
     def click(self, ui, interaction, control):
         buttons = ui.draw(self.screen, (0, 0))
@@ -243,6 +253,12 @@ class PuzzleTests(unittest.TestCase):
         interaction.open_object("exit_door")
         self.controller.append_input(self.answer)
         interaction.submit_puzzle()
+        self.assertEqual(self.game.game_state, DIALOGUE)
+        self.assertEqual(story.dialogue_controller.get_current_line()["text"], "ACCESS GRANTED")
+        self.assertFalse(ui.is_open())
+        self.assertIsNone(ui.photo_id)
+        self.assertFalse(self.game.has_item("photo_1"))
+        self.advance_success_dialogue(interaction, story, "chapter1_password")
         self.assertTrue(self.game.is_puzzle_solved("chapter1_password"))
         self.assertTrue(self.game.has_event("chapter1_password_solved"))
         self.assertTrue(self.game.has_item("photo_1"))
@@ -295,16 +311,15 @@ class PuzzleTests(unittest.TestCase):
                 self.game.enter_space("T0")
                 for item in owned:
                     self.game.add_item(item)
-                ui, interaction, _ = self.make_ui()
+                ui, interaction, story = self.make_ui()
                 interaction.open_object("t0_bedside_drawer")
                 buttons = ui.dial_password_controls(self.screen)
                 for index, turns in enumerate((1, 2, 1)):
                     for _ in range(turns):
                         interaction.handle_click(buttons, buttons["_dial_regions"][index, 1].center)
                 self.click(ui, interaction, "confirm")
-                self.assertEqual(ui.mode, "message")
-                self.assertEqual(ui.result["message"], "抽屜打開了。")
-                self.click(ui, interaction, "ok")
+                self.assertFalse(ui.is_open())
+                self.advance_success_dialogue(interaction, story, "t0_bedside_drawer")
 
                 for item in ("pencil", "t0_diary_page_4"):
                     self.assertTrue(self.game.has_item(item))
@@ -412,7 +427,7 @@ class PuzzleTests(unittest.TestCase):
         self.assertEqual(self.game.game_over_reason, "space_c_locked")
 
     def test_binary_password_submits_on_sixth_digit(self):
-        ui, interaction, _ = self.make_ui()
+        ui, interaction, story = self.make_ui()
         interaction.open_object("exit_door")
         for digit in "10010":
             key = pygame.K_0 + int(digit)
@@ -421,6 +436,9 @@ class PuzzleTests(unittest.TestCase):
         self.assertFalse(self.game.is_puzzle_solved(self.puzzle_id))
         self.assertEqual(self.controller.remaining_attempts, 3)
         self.click(ui, interaction, "1")
+        self.assertEqual(self.game.game_state, DIALOGUE)
+        self.assertFalse(ui.is_open())
+        self.advance_success_dialogue(interaction, story, self.puzzle_id)
         self.assertTrue(self.game.is_puzzle_solved(self.puzzle_id))
         self.assertEqual(ui.notification["item_id"], "photo_1")
 
