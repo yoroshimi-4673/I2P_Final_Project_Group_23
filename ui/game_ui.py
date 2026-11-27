@@ -131,6 +131,26 @@ class GameUI:
 
         return image
 
+    def remove_near_white_background(self, image, threshold=245):
+        """複製圖片並只清除近白色像素的透明度。"""
+        processed = image.copy()
+        width, height = processed.get_size()
+        for y in range(height):
+            for x in range(width):
+                red, green, blue, alpha = processed.get_at((x, y))
+                if alpha and min(red, green, blue) >= threshold:
+                    processed.set_at((x, y), (red, green, blue, 0))
+        return processed
+
+    def load_asset_without_white_background(self, asset_path, threshold=245):
+        key = ("remove_white_background", asset_path, threshold)
+        if key not in self.image_cache:
+            image = self.load_image(asset_path)
+            self.image_cache[key] = (
+                self.remove_near_white_background(image, threshold) if image is not None else None
+            )
+        return self.image_cache[key]
+
 
     def draw_item_asset(self, screen, item_id, rect, padding=4, asset_key="ui_asset"):
         """共用道具圖片繪製並保留原始比例。"""
@@ -199,12 +219,17 @@ class GameUI:
         self,
         screen,
         asset_path,
-        rect
+        rect,
+        *,
+        remove_white_background=False,
+        white_background_threshold=245,
     ):
         """保持比例將素材畫進指定區域。"""
 
-        image = self.load_image(
-            asset_path
+        image = (
+            self.load_asset_without_white_background(asset_path, white_background_threshold)
+            if remove_white_background
+            else self.load_image(asset_path)
         )
 
         if image is None:
@@ -1027,7 +1052,9 @@ class GameUI:
                     object_layout.get(
                         "asset"
                     ),
-                    rect
+                    rect,
+                    remove_white_background=object_layout.get("remove_white_background", False),
+                    white_background_threshold=object_layout.get("white_background_threshold", 245),
                 )
 
                 if not asset_drawn:

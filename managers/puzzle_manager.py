@@ -515,6 +515,7 @@ class PuzzleManager:
             ),
             "puzzle_id": puzzle_id,
             "rewards": rewards,
+            "reward_notification_order": puzzle.get("reward_notification_order", "after_completion"),
             "on_complete": puzzle.get(
                 "on_complete"
             )

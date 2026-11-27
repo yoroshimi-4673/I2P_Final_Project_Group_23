@@ -1,3 +1,5 @@
+from math import ceil
+
 import pygame
 
 
@@ -35,6 +37,8 @@ class Player:
 
         # 記錄目前想要靠近的互動物件
         self.interaction_target = None
+        self.path_points = []  # 儲存滑鼠導航剩餘路線的轉折點
+        self.path_index = 0
 
         self.sprite_path = sprite_path  # 正式素材路徑獨立於角色位置狀態
         self.animations = {}
@@ -140,12 +144,7 @@ class Player:
     ):
         """設定一般地面點擊後的移動目標。"""
 
-        self.mouse_target = pygame.Vector2(
-            target_position
-        )
-
-        # 一般移動會取消原本互動目標
-        self.interaction_target = None
+        self.set_path([target_position])
 
     def get_interaction_stop_point(
         self,
@@ -261,19 +260,24 @@ class Player:
             self.cancel_mouse_movement()
             return
 
-        self.interaction_target = target
+        self.set_path([self.get_interaction_stop_point(target)], target)
 
-        self.mouse_target = (
-            self.get_interaction_stop_point(
-                target
-            )
-        )
+    def set_path(self, points, interaction_target=None):
+        """以新路線替換目前的滑鼠導航。"""
+        self.cancel_mouse_movement()
+        self.path_points = [pygame.Vector2(point) for point in points]
+        if self.path_points:
+            self.position.update(self.rect.topleft)  # 航線起點對齊目前可見角色位置
+            self.mouse_target = self.path_points[0]
+            self.interaction_target = interaction_target
 
     def cancel_mouse_movement(self):
         """取消目前所有滑鼠自動移動。"""
 
         self.mouse_target = None
         self.interaction_target = None
+        self.path_points = []
+        self.path_index = 0
 
     def can_interact(
         self,
@@ -288,61 +292,50 @@ class Player:
         )
 
     def get_mouse_direction(self):
-        """取得朝目前滑鼠目標前進的方向。"""
-
-        if self.mouse_target is None:
-            return pygame.Vector2(
-                0,
-                0
-            )
-
-        player_center = pygame.Vector2(
-            self.rect.center
-        )
-
-        difference = (
-            self.mouse_target
-            - player_center
-        )
-
-        # 接近目標時視為已經抵達
-        if difference.length() < 4:
-            self.cancel_mouse_movement()
-
-            return pygame.Vector2(
-                0,
-                0
-            )
-
-        return difference.normalize()
+        """略過已抵達的轉折點，回傳下一段方向。"""
+        center = self.position + (self.rect.width // 2, self.rect.height // 2)
+        while self.mouse_target is not None:
+            difference = self.mouse_target - center
+            if difference.length_squared() > 1e-8:
+                return difference.normalize()
+            self.path_index += 1
+            if self.path_index == len(self.path_points):
+                self.cancel_mouse_movement()
+            else:
+                self.mouse_target = self.path_points[self.path_index]
+        return pygame.Vector2()
 
     # ========================================================
     # Polygon碰撞
     # ========================================================
 
-    def get_feet_points(self):
-        """取得角色腳底三個Polygon碰撞取樣點。"""
+    def get_collision_rect(self):
+        """即時計算角色底部中央的家具碰撞矩形。"""
+        return self.get_collision_rect_at(self.rect.center)
 
-        inset = max(
-            2,
-            self.rect.width // 6
+    def get_collision_rect_at(self, sprite_center):
+        """計算假想角色中心的腳部碰撞矩形。"""
+        width = max(1, round(self.rect.width * 0.50))  # 只取角色底部中央一半寬度
+        height = max(1, round(self.rect.height * 0.15))  # 使用角色底部百分之十五高度
+        sprite_bottom = round(sprite_center[1]) + self.rect.height - self.rect.height // 2
+        return pygame.Rect(
+            round(sprite_center[0]) - width // 2,
+            sprite_bottom - height,
+            width,
+            height,
         )
 
-        feet_y = self.rect.bottom - 2
+    def get_feet_points(self):
+        """取得角色腳底三個Polygon碰撞取樣點。"""
+        return self.get_feet_points_at(self.rect.center)
 
+    def get_feet_points_at(self, sprite_center):
+        collision_rect = self.get_collision_rect_at(sprite_center)
+        feet_y = collision_rect.bottom - 1  # 三個取樣點沿碰撞盒最下緣
         return [
-            (
-                self.rect.left + inset,
-                feet_y
-            ),
-            (
-                self.rect.centerx,
-                feet_y
-            ),
-            (
-                self.rect.right - inset,
-                feet_y
-            )
+            (collision_rect.left, feet_y),
+            (collision_rect.centerx, feet_y),
+            (collision_rect.right - 1, feet_y),
         ]
 
     def point_on_segment(
@@ -458,6 +451,9 @@ class Player:
     ):
         """確認角色腳底仍完整位於可行走Polygon內。"""
 
+        return self.are_feet_inside_polygon(self.rect.center, walkable_polygon)
+
+    def are_feet_inside_polygon(self, sprite_center, walkable_polygon):
         if (
             walkable_polygon is None
             or len(walkable_polygon) < 3
@@ -470,7 +466,13 @@ class Player:
                 point,
                 walkable_polygon
             )
-            for point in self.get_feet_points()
+            for point in self.get_feet_points_at(sprite_center)
+        )
+
+    def is_footprint_walkable(self, sprite_center, obstacles, polygon):
+        collision_rect = self.get_collision_rect_at(sprite_center)
+        return collision_rect.collidelist(obstacles) == -1 and self.are_feet_inside_polygon(
+            sprite_center, polygon
         )
 
     # ========================================================
@@ -499,25 +501,13 @@ class Player:
         # 檢查家具等Rect碰撞
         for obstacle in obstacles:
 
-            if self.rect.colliderect(
-                obstacle
-            ):
-
+            collision_rect = self.get_collision_rect()  # 用修正後的位置重新計算碰撞盒
+            if collision_rect.colliderect(obstacle):
                 if move_x > 0:
-
-                    self.rect.right = (
-                        obstacle.left
-                    )
-
+                    self.rect.x -= collision_rect.right - obstacle.left  # 依腳部重疊量向左推回角色
                 elif move_x < 0:
-
-                    self.rect.left = (
-                        obstacle.right
-                    )
-
-                self.position.x = (
-                    self.rect.x
-                )
+                    self.rect.x += obstacle.right - collision_rect.left  # 依腳部重疊量向右推回角色
+                self.position.x = self.rect.x
 
         # 若腳底離開Polygon則撤銷水平移動
         if not self.is_inside_walkable_polygon(
@@ -554,25 +544,13 @@ class Player:
         # 檢查家具等Rect碰撞
         for obstacle in obstacles:
 
-            if self.rect.colliderect(
-                obstacle
-            ):
-
+            collision_rect = self.get_collision_rect()  # 用修正後的位置重新計算碰撞盒
+            if collision_rect.colliderect(obstacle):
                 if move_y > 0:
-
-                    self.rect.bottom = (
-                        obstacle.top
-                    )
-
+                    self.rect.y -= collision_rect.bottom - obstacle.top  # 依腳部重疊量向上推回角色
                 elif move_y < 0:
-
-                    self.rect.top = (
-                        obstacle.bottom
-                    )
-
-                self.position.y = (
-                    self.rect.y
-                )
+                    self.rect.y += obstacle.bottom - collision_rect.top  # 依腳部重疊量向下推回角色
+                self.position.y = self.rect.y
 
         # 若腳底離開Polygon則撤銷垂直移動
         if not self.is_inside_walkable_polygon(
@@ -619,6 +597,24 @@ class Player:
         self.rect.y = round(
             self.position.y
         )
+
+    def follow_path(self, direction, distance_budget, obstacles, walkable_polygon):
+        """沿當前路段前進，逐像素驗證以避免跨過薄障礙。"""
+        offset = pygame.Vector2(self.rect.width // 2, self.rect.height // 2)
+        start = self.position + offset
+        distance = min(distance_budget, start.distance_to(self.mouse_target))
+        steps = max(1, ceil(distance))
+        for step in range(1, steps + 1):
+            center = start + direction * (distance * step / steps)
+            if not self.is_footprint_walkable(center, obstacles, walkable_polygon):
+                self.cancel_mouse_movement()
+                return
+            self.position = center - offset
+            self.rect.center = (round(center.x), round(center.y))
+            if self.interaction_target is not None and self.can_interact(self.interaction_target):
+                self.cancel_mouse_movement()
+                return
+        self.get_mouse_direction()  # 到達轉折點後準備下一段路線
 
     def update(
         self,
@@ -674,6 +670,13 @@ class Player:
 
         self.update_direction(direction)
         self.update_animation(dt, direction)  # 動畫共用鍵盤與滑鼠計算出的方向
+
+        if self.mouse_target is not None:
+            self.follow_path(direction, self.speed * dt, obstacles, walkable_polygon)
+            if not pygame.Rect(0, 0, screen_width, screen_height).contains(self.rect):
+                self.keep_inside_bounds(screen_width, screen_height)
+                self.cancel_mouse_movement()
+            return
 
         move_x = (
             direction.x

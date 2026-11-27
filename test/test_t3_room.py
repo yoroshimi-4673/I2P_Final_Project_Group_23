@@ -12,6 +12,7 @@ os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
 import test_chapter2_flow as flow
+from game_states import SPACE
 from managers.game_manager import GameManager
 from managers.map_manager import MapManager
 import save_manager
@@ -35,31 +36,76 @@ class T3RoomTests(unittest.TestCase):
         self.f.game.enter_space("T3")
         self.f.game.current_scene = "scene_12_t3"
 
-    def search(self, object_id):
-        self.f.open(object_id)
+    def finish_reaction(self):
         self.f.expect_dialogue("scene_12_wrong_search")
         self.assertFalse(self.f.ui.is_open())
+        count = self.f.dialogue.start.call_count
         self.f.finish()
+        self.f.interaction.finish_interaction_sequence()
+        self.assertEqual(self.f.dialogue.start.call_count, count)
+        self.assertEqual(self.f.game.game_state, SPACE)
+        self.assertFalse(self.f.ui.is_open())
 
-    def test_desk_collects_child_only_after_dialogue_and_never_duplicates(self):
+    def search(self, object_id):
+        self.f.open(object_id)
+        self.assertEqual(self.f.game.game_state, SPACE)
+        if object_id == "t3_desk":
+            self.assertIn(self.f.ui.mode, ("item_notification", "message"))
+            self.f.click("ok")
+        self.f.click("back" if object_id == "t3_wardrobe" else "close")
+        self.finish_reaction()
+
+    def test_bed_and_wardrobe_open_ui_before_reaction(self):
+        for object_id, mode in (("t3_bed", "container"), ("t3_wardrobe", "inspectable")):
+            with self.subTest(object_id=object_id):
+                before = self.f.dialogue.start.call_count
+                self.f.open(object_id)
+                self.assertEqual(self.f.ui.mode, mode)
+                self.assertEqual(self.f.game.game_state, SPACE)
+                self.assertEqual(self.f.dialogue.start.call_count, before)
+                if object_id == "t3_bed":
+                    self.f.interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+                else:
+                    self.f.click("back")
+                self.assertEqual(self.f.dialogue.start.call_count, before + 1)
+                self.assertEqual(
+                    self.f.dialogue.start.call_args.args[1],
+                    [{"speaker": "旁白", "text": "搜尋了錯誤的位置。"},
+                     {"speaker": "旁白", "text": "黎念感到困惑。"}],
+                )
+                self.finish_reaction()
+
+    def test_desk_notifies_before_reaction_and_never_duplicates_knife(self):
         g = self.f.game
         self.f.open("t3_knife")
         self.assertFalse(g.has_item("t3_knife"))
         self.f.ui.close()
         self.f.open("t3_desk")
-        self.f.expect_dialogue("scene_12_wrong_search")
-        self.assertFalse(g.has_item("t3_knife"))
-        self.f.finish()
         self.assertEqual(self.f.ui.mode, "item_notification")
+        self.assertEqual(self.f.ui.notification["item_id"], "t3_knife")
+        self.assertEqual(g.game_state, SPACE)
+        self.f.dialogue.start.assert_not_called()
         self.assertTrue(g.has_item("t3_knife"))
         self.assertTrue(g.has_discovered_item("t3_knife"))
-        self.assertTrue(g.has_event("t3_desk_searched"))
+        self.assertFalse(g.has_event("t3_desk_searched"))
+        self.f.interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.assertEqual(self.f.ui.mode, "item_notification")
         self.f.click("ok")
         self.assertEqual(self.f.ui.mode, "container")
         self.assertEqual(self.f.ui.current_object_id, "t3_desk")
-        self.search("t3_desk")
+        self.f.dialogue.start.assert_not_called()
+        self.f.click("close")
+        self.assertTrue(g.has_event("t3_desk_searched"))
+        self.finish_reaction()
+
+        self.f.open("t3_desk")
         self.assertEqual(self.f.ui.mode, "message")
         self.assertIn("已經被拿走", self.f.ui.result["description"])
+        self.f.click("ok")
+        self.assertEqual(self.f.ui.mode, "container")
+        self.assertEqual(g.game_state, SPACE)
+        self.f.click("close")
+        self.finish_reaction()
         self.assertEqual(g.inventory.count("t3_knife"), 1)
         g.remove_item("t3_knife")
         self.search("t3_desk")
@@ -72,32 +118,36 @@ class T3RoomTests(unittest.TestCase):
             self.search(object_id)
             self.assertEqual(self.f.game.puzzle_attempts, before)
             self.assertTrue(self.f.game.has_event(object_id + "_searched"))
-            self.f.ui.close()
         self.f.open("t3_windowsill")
         self.assertTrue(self.f.game.has_event("t3_time_capsule_found"))
         self.assertTrue(self.f.game.has_event("t3_windowsill_searched"))
         self.assertEqual(self.f.game.puzzle_attempts, before)
 
     def test_bed_child_carving_needs_knife_capsule_and_knowledge(self):
-        self.search("t3_bed")
+        self.f.open("t3_bed")
         self.assertEqual(self.f.ui.mode, "container")
-        self.f.click("t3_bed_board")
-        self.assertFalse(self.f.game.has_event("t3_0347_carved"))
-        self.f.game.complete_event("t3_capsule_opened")
-        self.search("t3_bed")
-        self.f.click("t3_bed_board")
-        self.assertEqual(self.f.ui.mode, "message")
-        self.search("t3_desk")
-        self.search("t3_bed")
-        self.f.click("t3_bed_board")
-        self.assertFalse(self.f.game.has_event("t3_0347_carved"))
-        self.f.game.learn_knowledge("number_0347")
-        self.search("t3_bed")
+        for missing in ("capsule", "knife", "knowledge"):
+            with self.subTest(missing=missing):
+                self.f.click("t3_bed_board")
+                self.assertEqual(self.f.ui.mode, "message")
+                self.assertFalse(self.f.game.has_event("t3_0347_carved"))
+                self.f.click("ok")
+                self.assertEqual(self.f.ui.mode, "container")
+                self.assertEqual(self.f.game.game_state, SPACE)
+                if missing == "capsule":
+                    self.f.game.complete_event("t3_capsule_opened")
+                elif missing == "knife":
+                    self.f.game.add_item("t3_knife")
+                else:
+                    self.f.game.learn_knowledge("number_0347")
+        self.f.dialogue.start.assert_not_called()
         self.f.click("t3_bed_board")
         self.f.expect_dialogue("scene_12_carving")
         self.assertTrue(self.f.game.has_event("t3_0347_carved"))
         self.assertTrue(self.f.game.has_event("t3_completed"))
         self.assertTrue(self.f.game.has_item("t3_knife"))
+        self.f.finish()
+        self.finish_reaction()
 
     def test_existing_save_state_retains_search_knife_carving_and_puzzle(self):
         self.search("t3_desk")
@@ -106,9 +156,10 @@ class T3RoomTests(unittest.TestCase):
         g.complete_event("t3_capsule_opened")
         g.solve_puzzle("t3_time_capsule")
         g.add_item("past_fragment")
-        self.search("t3_bed")
+        self.f.open("t3_bed")
         self.f.click("t3_bed_board")
         self.f.finish()
+        self.finish_reaction()
         writer = mock_open()
         with patch("builtins.open", writer):
             save_manager.save_game(g)
@@ -117,13 +168,14 @@ class T3RoomTests(unittest.TestCase):
         with patch("builtins.open", mock_open(read_data=payload)):
             self.assertTrue(save_manager.load_game(restored))
         self.f.build(restored)
-        self.search("t3_desk")
+        self.f.open("t3_desk")
         self.assertEqual(self.f.ui.mode, "message")
         self.assertEqual(restored.inventory.count("t3_knife"), 1)
         self.assertTrue(restored.has_event("t3_0347_carved"))
         self.assertTrue(restored.is_puzzle_solved("t3_time_capsule"))
         self.assertTrue(restored.has_knowledge("number_0347"))
         self.assertTrue(restored.has_item("past_fragment"))
+
 
     def test_world_layout_assets_and_first_npc_frame(self):
         gui = self.f.game_ui
@@ -148,6 +200,7 @@ class T3RoomTests(unittest.TestCase):
             self.assertEqual(room["objects"]["t3_windowsill"]["x"], 286)
             gui.draw_space(surface, self.f.game, (0, 0))
         npc = room["decorations"]["young_li_nian"]
+        self.assertEqual((npc["x"], npc["y"], npc["width"], npc["height"]), (120, 215, 55, 75))
         sheet = gui.load_image(npc["asset"])
         self.assertEqual(sheet.get_size(), (64, 51))
         key = ("decoration_frame", npc["asset"], 4, 3, 0, 0)

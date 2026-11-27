@@ -1,5 +1,6 @@
 """負責interaction的鍵盤焦點與輸入處理"""
 import pygame
+from game_states import SPACE
 from managers.interaction_manager import (
     search_object,
     collect_item
@@ -13,10 +14,8 @@ class InteractionController:
         self.story_manager = story_manager
         self.game = game
         self.puzzle_controller = puzzle_controller
-        self.item_notification_queue = []
-        self.item_notification_completion = None
-        self.item_notification_result = None
-        self.item_notification_object_id = None
+        self.reset_puzzle_completion()
+        self.pending_post_interaction_dialogue = None
 
         # 紀錄目前鍵盤焦點控制向ID
         self.focus_id = None
@@ -61,12 +60,15 @@ class InteractionController:
 
         object_type = current_object["type"]
 
-        # 三個錯誤搜尋位置先由劇情處理提示
+        # 三個錯誤搜尋位置在互動結束後播放反應
         if self.game.current_space == "T3" and object_id in (
             "t3_bed", "t3_desk", "t3_wardrobe"
         ):
-            self.interaction_ui.close()
-            self.story_manager.start_t3_search(object_id)
+            self.pending_post_interaction_dialogue = object_id
+            self.reset_interaction_focus()
+            self.interaction_ui.open_object(object_id)
+            if object_id == "t3_desk":
+                self.open_container_child("t3_knife")
             return
 
 
@@ -342,15 +344,21 @@ class InteractionController:
 
 
             completion = result.get("on_complete")
-            notifications = self.get_new_item_notifications(result.get("rewards", []))
+            rewards = result.get("rewards", [])
             self.puzzle_controller.close_puzzle()
 
-            if notifications:
-                self.item_notification_queue = notifications
+            if any(reward.get("type") == "item" for reward in rewards):
+                self.item_notification_queue = self.get_new_item_notifications(rewards)
                 self.item_notification_completion = completion
                 self.item_notification_result = result
                 self.item_notification_object_id = self.interaction_ui.current_object_id
-                self.show_next_item_notification()
+                if result.get("reward_notification_order") == "before_completion":
+                    self.puzzle_completion_stage = "before_completion"
+                    self.show_next_item_notification()
+                else:
+                    self.puzzle_completion_stage = "message"
+                    self.interaction_ui.mode = "message"
+                    self.reset_interaction_focus()
                 return result
 
             if completion is not None:
@@ -379,6 +387,51 @@ class InteractionController:
             and (reward.get("result") or {}).get("status") == "item_found"
         ]
 
+    def reset_puzzle_completion(self):
+        self.item_notification_queue = []
+        self.item_notification_completion = None
+        self.item_notification_result = None
+        self.item_notification_object_id = None
+        self.puzzle_completion_stage = None
+
+    def acknowledge_puzzle_success(self):
+        completion = self.item_notification_completion
+        self.item_notification_completion = None
+        self.puzzle_completion_stage = "waiting"  # 劇情接手時保留整批道具通知
+        self.interaction_ui.close()
+        if completion is not None and not self.handle_puzzle_completion(completion):
+            self.interaction_ui.close()
+        self.resume_pending_item_notifications()
+
+    def resume_pending_item_notifications(self):
+        if (
+            self.puzzle_completion_stage == "waiting"
+            and self.game.game_state == SPACE
+            and not self.interaction_ui.is_open()
+        ):
+            self.puzzle_completion_stage = "notifications"
+            self.show_next_item_notification()
+
+    def finish_interaction_sequence(self):
+        """先完成待顯示的獎勵，再處理互動的事後反應。"""
+        self.resume_pending_item_notifications()
+        if (
+            self.pending_post_interaction_dialogue is None
+            or self.puzzle_completion_stage is not None
+            or self.game.game_state != SPACE
+            or self.interaction_ui.is_open()
+        ):
+            return
+
+        object_id = self.pending_post_interaction_dialogue
+        self.pending_post_interaction_dialogue = None  # 播放前清除避免重複觸發反應
+        if self.game.current_space == "T3":
+            self.story_manager.start_t3_search(object_id)
+
+    def return_from_interaction(self):
+        self.interaction_ui.go_back()
+        self.finish_interaction_sequence()
+
     def show_next_item_notification(self):
         if self.item_notification_queue:
             notification = self.item_notification_queue.pop(0)
@@ -388,19 +441,20 @@ class InteractionController:
             self.reset_interaction_focus()
             return
 
-        completion = self.item_notification_completion
-        self.interaction_ui.result = self.item_notification_result
-        self.interaction_ui.current_object_id = self.item_notification_object_id
-        self.interaction_ui.notification = None
-        self.item_notification_completion = None
-        self.item_notification_result = None
-        self.item_notification_object_id = None
-        self.reset_interaction_focus()
-
-        if completion is not None:
-            self.handle_puzzle_completion(completion)
+        if self.puzzle_completion_stage == "before_completion":
+            completion = self.item_notification_completion
+            self.interaction_ui.result = self.item_notification_result
+            self.interaction_ui.current_object_id = self.item_notification_object_id
+            self.interaction_ui.notification = None
+            self.reset_puzzle_completion()
+            if completion is not None:
+                self.handle_puzzle_completion(completion)
+            else:
+                self.interaction_ui.mode = "message"
         else:
-            self.interaction_ui.mode = "message"
+            self.reset_puzzle_completion()
+            self.interaction_ui.close()
+        self.reset_interaction_focus()
 
     def handle_puzzle_completion(
         self,
@@ -411,11 +465,6 @@ class InteractionController:
         action_type = completion.get(
             "type"
         )
-
-        if action_type == "return_to_space":
-            self.interaction_ui.close()
-            self.reset_interaction_focus()
-            return
 
         if action_type == "open_photo":
 
@@ -429,7 +478,7 @@ class InteractionController:
                     "message"
                 )
 
-                return
+                return False
 
             self.interaction_ui.open_photo(
                 item_id,
@@ -439,7 +488,7 @@ class InteractionController:
                 )
             )
 
-            return
+            return True
 
         if action_type == "story_event":
 
@@ -463,11 +512,12 @@ class InteractionController:
 
                 if handled is True:
                     self.interaction_ui.close()
-                    return
+                    return True
 
         self.interaction_ui.mode = (
             "message"
         )
+        return False
 
     def reset_interaction_focus(self):
         """重新開啟Interaction時清除上一個鍵盤焦點。"""
@@ -754,11 +804,20 @@ class InteractionController:
         # Escape統一處理返回或關閉互動視窗
         if event.key == pygame.K_ESCAPE:
 
+            if self.interaction_ui.mode == "photo" and self.interaction_ui.photo_mode == "story":
+                return  # 劇情照片需查看背面才能離開
+
             if (
                 self.interaction_ui.mode == "item_notification"
-                and self.item_notification_result is not None
+                and (
+                    self.puzzle_completion_stage in ("before_completion", "notifications")
+                    or self.pending_post_interaction_dialogue is not None
+                )
+            ) or (
+                self.puzzle_completion_stage == "message"
+                and self.interaction_ui.result is self.item_notification_result
             ):
-                return
+                return  # 確認成功訊息後才能繼續獎勵流程
 
             if self.interaction_ui.mode == "diary_drag":
                 self.interaction_ui.open_diary_exit_confirmation()
@@ -776,10 +835,11 @@ class InteractionController:
                 self.interaction_ui.close()
 
             elif self.interaction_ui.parent_stack:
-                self.interaction_ui.go_back()
+                self.return_from_interaction()
 
             else:
                 self.interaction_ui.close()
+                self.finish_interaction_sequence()
 
     def close_readable(self):
         """關閉文件並僅於首次閱讀後播放劇情。"""
@@ -820,6 +880,7 @@ class InteractionController:
             ):
 
                 self.interaction_ui.close()
+                self.finish_interaction_sequence()
 
                 return
 
@@ -876,7 +937,7 @@ class InteractionController:
                 mouse_pos
             ):
 
-                self.interaction_ui.go_back()
+                self.return_from_interaction()
 
         # ========================================================
         # Rift
@@ -1320,10 +1381,11 @@ class InteractionController:
                 mouse_pos
             ):
 
-                if self.item_notification_result is not None:
+                if self.puzzle_completion_stage in ("before_completion", "notifications"):
                     self.show_next_item_notification()
+                    self.finish_interaction_sequence()
                 else:
-                    self.interaction_ui.go_back()
+                    self.return_from_interaction()
 
         # ========================================================
         # Message
@@ -1337,17 +1399,13 @@ class InteractionController:
                 mouse_pos
             ):
 
-                self.interaction_ui.go_back()
-
-    def complete_t3_search(self, object_id):
-        """???????????????????"""
-
-        if self.game.current_space != "T3":
-            return
-        self.reset_interaction_focus()
-        self.interaction_ui.open_object(object_id)
-        if object_id == "t3_desk":
-            self.open_container_child("t3_knife")
+                if (
+                    self.puzzle_completion_stage == "message"
+                    and self.interaction_ui.result is self.item_notification_result
+                ):
+                    self.acknowledge_puzzle_success()
+                else:
+                    self.return_from_interaction()
 
 
     def open_container_child(
@@ -1416,6 +1474,8 @@ class InteractionController:
                 return
 
         if child["type"] in ("puzzle", "carving_target"):
+            if child["type"] == "carving_target":
+                self.interaction_ui.push_current()  # 床板提示結束後先回到床的容器
             self.open_object(child_id)
         else:
             self.interaction_ui.open_child(child_id)

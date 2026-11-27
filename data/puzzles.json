@@ -8,6 +8,7 @@
         "max_attempts": 3,
         "solved_flag": "chapter1_password_solved",
         "success_message": "ACCESS GRANTED",
+        "reward_notification_order": "before_completion",
         "wrong_message": "密碼錯誤。",
         "rewards": [
             {
@@ -16,7 +17,9 @@
             }
         ],
         "on_complete": {
-            "type": "return_to_space"
+            "type": "open_photo",
+            "item_id": "photo_1",
+            "mode": "story"
         },
         "failure": {
             "type": "game_over",

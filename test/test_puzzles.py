@@ -211,7 +211,7 @@ class PuzzleTests(unittest.TestCase):
         result = self.manager.submit_answer(self.puzzle_id, self.answer)
         self.assertEqual(result["status"], "correct")
         self.assertEqual(result["on_complete"], {
-            "type": "return_to_space"
+            "type": "open_photo", "item_id": "photo_1", "mode": "story"
         })
 
     def test_photo_reward_without_completion_stays_message(self):
@@ -238,7 +238,7 @@ class PuzzleTests(unittest.TestCase):
         self.assertEqual(set(load_data("levels.json")["C"]["objects"]), expected_objects)
         self.assertNotIn("password_panel_body", space["collision_zones"])
 
-    def test_chapter1_reward_notifies_then_returns_to_space(self):
+    def test_chapter1_reward_notifies_then_plays_photo_story(self):
         ui, interaction, story = self.make_ui()
         interaction.open_object("exit_door")
         self.controller.append_input(self.answer)
@@ -250,14 +250,34 @@ class PuzzleTests(unittest.TestCase):
         interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
         self.assertEqual(ui.mode, "item_notification")
         self.click(ui, interaction, "ok")
-        self.assertFalse(ui.is_open())
-        self.assertEqual((self.game.current_space, self.game.game_state), ("C", SPACE))
+        self.assertEqual(
+            (ui.mode, ui.photo_id, ui.photo_mode, ui.photo_side),
+            ("photo", "photo_1", "story", "front"),
+        )
+        interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.assertEqual(ui.mode, "photo")
+        self.assertFalse(ui.draw(self.screen, (0, 0))["allow_close"])
         self.assertFalse(self.game.has_event("photo_back_seen"))
-        self.assertIsNone(ui.photo_id)
+        self.click(ui, interaction, "back")
+        self.assertFalse(ui.is_open())
+        self.assertTrue(self.game.has_event("photo_back_seen"))
+        self.assertEqual(self.game.game_state, DIALOGUE)
+        self.assertEqual(story.dialogue_controller.dialogue_id, "photo_back_story")
+        script = "\n".join(line["text"] for line in story.dialogue_controller.lines)
+        for line in (
+            "空間D……還有？", "牆上顯示器突然亮起。", "收斂率更新",
+            "空間A：81%", "空間B：55%", "空間C：37%",
+            "收斂率在漲……", "這個房間在消失。", "我得走。",
+        ):
+            self.assertIn(line, script)
+        story.finish_dialogue_action()
+        self.assertEqual((self.game.current_space, self.game.game_state), ("C", SPACE))
 
         hotbar = HotbarController(self.game, ui.game_ui, ui, interaction)
         hotbar.open_item("photo_1")
         self.assertEqual((ui.mode, ui.photo_id, ui.photo_mode), ("photo", "photo_1", "inventory"))
+        self.click(ui, interaction, "back")
+        self.assertEqual((ui.mode, ui.photo_side, self.game.game_state), ("photo", "back", SPACE))
         ui.close()
 
         interaction.open_object("exit_door")
@@ -279,15 +299,26 @@ class PuzzleTests(unittest.TestCase):
                 interaction.open_object("t0_bedside_drawer")
                 self.controller.append_input("121")
                 interaction.submit_puzzle()
+                self.assertEqual(ui.mode, "message")
+                self.assertEqual(ui.result["message"], "抽屜打開了。")
+                self.click(ui, interaction, "ok")
 
                 for item in ("pencil", "t0_diary_page_4"):
                     self.assertTrue(self.game.has_item(item))
                     if item not in owned:
                         self.assertEqual((ui.mode, ui.notification["item_id"]), ("item_notification", item))
                         self.click(ui, interaction, "ok")
-                self.assertEqual(ui.mode, "message")
-                self.assertEqual(ui.result["message"], "抽屜打開了。")
+                self.assertFalse(ui.is_open())
                 self.assertIsNone(interaction.item_notification_result)
+
+    def test_t0_item_assets_load_through_shared_renderer(self):
+        ui, _, _ = self.make_ui()
+        for item, asset in (("pencil", "pencil.png"), ("present_fragment", "piece.png")):
+            with self.subTest(item=item):
+                path = self.objects[item]["ui_asset"]
+                self.assertEqual(Path(path).name, asset)
+                self.assertTrue((ROOT / path).is_file())
+                self.assertTrue(ui.game_ui.draw_item_asset(self.screen, item, pygame.Rect(0, 0, 50, 50)))
 
     def test_completion_fallback_and_optional_story_event(self):
         ui, interaction, _ = self.make_ui()
@@ -363,7 +394,7 @@ class PuzzleTests(unittest.TestCase):
         with patch("builtins.input", return_value=self.answer), patch("sys.stdout", new_callable=io.StringIO):
             with patch("managers.interaction_manager.interact_with_photo") as photo:
                 interact_with_puzzle(self.game, "exit_door", self.objects, self.manager)
-                photo.assert_not_called()
+                photo.assert_called_once_with(self.game, "photo_1", self.objects, mode="story")
         self.assertTrue(self.manager.is_solved(self.puzzle_id))
 
     def test_ab_fragments_hotbar_codex_and_rifts(self):
