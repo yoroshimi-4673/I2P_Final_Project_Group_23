@@ -1563,6 +1563,24 @@
         "default_height": 300
     },
     "puzzle_layouts": {
+        "t7_circuit": {
+            "background_asset": "assets/素材庫/第二章/T+7/修電綫/back.png",
+            "source_size": {"width": 1774, "height": 1027},
+            "grid": {
+                "x": 133,
+                "y": 135,
+                "rows": 5,
+                "cols": 10,
+                "tile_width": 153,
+                "tile_height": 153
+            },
+            "screen_margin": 18,
+            "controls": {
+                "reset": {"x": 500, "y": 548, "width": 120, "height": 38},
+                "leave": {"x": 650, "y": 548, "width": 120, "height": 38}
+            },
+            "hint": {"x": 25, "y": 555, "width": 450}
+        },
         "chapter1_binary_lock": {
             "asset": "assets/素材庫/第一章/空間C/lock.png",
             "lock_rect": {

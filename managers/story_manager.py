@@ -353,6 +353,10 @@ class StoryManager:
 
             self.complete_t7()
 
+        elif event_id == "t7_circuit_completed":
+
+            self.complete_t7_circuit()
+
         elif event_id == "t3_capsule_opened":
 
             self.complete_t3_capsule()
@@ -399,12 +403,15 @@ class StoryManager:
             "T7"
         )
 
-        self.start_dialogue(
-            "scene_11_entry",
-            after_action="return_to_space"
-        )
-
+        if not self.game.has_event("t7_circuit_completed"):
+            self.start_dialogue("scene_11_circuit_intro", after_action="open_t7_circuit")
         return True
+
+    def complete_t7_circuit(self):
+        """恢復未來病房供電並播放正式進場台詞。"""
+        if not self.game.has_event("t7_circuit_completed"):
+            self.game.complete_event("t7_circuit_completed")
+            self.start_dialogue("scene_11_entry", after_action="return_to_space")
 
     def complete_t7_rubbing(self):
         """保存0347情報並播放拓印劇情。"""
@@ -777,6 +784,11 @@ class StoryManager:
         elif action == "enter_t7_from_door":
 
             self.enter_t7()
+
+        elif action == "open_t7_circuit":
+
+            self.game.game_state = SPACE
+            return action
 
         elif action == "request_t3_from_door":
 

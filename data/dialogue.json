@@ -123,6 +123,12 @@
             "text": "T+0 已確認。T+7 解鎖。"
         }
     ],
+    "scene_11_circuit_intro": [
+        {
+            "speaker": "黎琛",
+            "text": "這個房間的電燈線路壞掉了，必須先重新接好。"
+        }
+    ],
     "scene_11_entry": [
         {
             "speaker": "黎琛",
