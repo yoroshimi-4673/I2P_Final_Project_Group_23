@@ -452,10 +452,23 @@ class Chapter2FlowTests(unittest.TestCase):
             (windowsill["name"], windowsill["type"], windowsill["item"]),
             ("窗台", "searchable", "t0_diary_page_5"),
         )
-        self.assertEqual(
-            self.game_ui.scale_rect(self.screen, layout_objects["t0_windowsill"]),
-            pygame.Rect(286, 43, 41, 137),
-        )
+
+    def test_windowsill_interaction_polygon(self):
+        manager = MapManager(self.layout, self.game_ui, self.game)
+        player = Player(0, 0, width=2, height=2)
+        in_region = home_function("is_in_interaction_region", {
+            "ui_layout": self.layout, "game": self.game, "game_ui": self.game_ui,
+            "screen": self.screen, "player": player,
+        })
+        for space, object_id in (("T0", "t0_windowsill"), ("T3", "t3_windowsill")):
+            with self.subTest(space=space):
+                self.game.enter_space(space)
+                rect = manager.get_interaction_rects(space, self.screen)[object_id]
+                self.assertEqual(rect, pygame.Rect(293, 150, 201, 47))
+                player.rect.center = (390, 175)
+                self.assertTrue(in_region(object_id, rect))
+                player.rect.center = (295, 153)
+                self.assertFalse(in_region(object_id, rect))
 
     def test_corridor_return_spawns_are_independent_of_door_positions(self):
         corridor = self.layout["spaces"]["CH2_CORRIDOR"]

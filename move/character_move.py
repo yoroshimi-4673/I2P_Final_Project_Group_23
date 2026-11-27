@@ -80,7 +80,7 @@ class Player:
 
 
 if __name__ == "__main__":
-    player = Player("main_player.png", WIDTH // 2, HEIGHT // 2, scale=3, speed=4)
+    player = Player("main_character.png", WIDTH // 2, HEIGHT // 2, scale=3, speed=4)
 
     while True:
         for event in pygame.event.get():

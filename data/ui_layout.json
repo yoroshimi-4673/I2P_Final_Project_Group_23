@@ -855,15 +855,16 @@
                     "interaction_padding": 0
                 },
                 "t0_windowsill": {
-                    "x": 286,
-                    "y": 43,
-                    "width": 41,
-                    "height": 137,
+                    "x": 293,
+                    "y": 150,
+                    "width": 201,
+                    "height": 47,
                     "asset": null,
                     "label": "窗台",
                     "interaction_label": "窗台",
                     "render_mode": "background",
-                    "interaction_padding": 0
+                    "interaction_padding": 0,
+                    "interaction_polygon": [[307, 153], [293, 167], [293, 197], [494, 197], [494, 160], [490, 153], [487, 150]]
                 }
             },
             "entry_spawns": {},
@@ -1296,15 +1297,16 @@
                     "interaction_padding": 0
                 },
                 "t3_windowsill": {
-                    "x": 286,
-                    "y": 43,
-                    "width": 41,
-                    "height": 137,
+                    "x": 293,
+                    "y": 150,
+                    "width": 201,
+                    "height": 47,
                     "asset": null,
                     "label": "窗台",
                     "interaction_label": "窗台",
                     "render_mode": "background",
-                    "interaction_padding": 0
+                    "interaction_padding": 0,
+                    "interaction_polygon": [[307, 153], [293, 167], [293, 197], [494, 197], [494, 160], [490, 153], [487, 150]]
                 },
                 "t3_height_marks": {
                     "x": 290,

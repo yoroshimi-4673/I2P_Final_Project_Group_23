@@ -13,7 +13,8 @@ class Player:
         width=40,
         height=40,
         speed=300,
-        sprite_path=None
+        sprite_path=None,
+        visual_scale=1.5
     ):
         # 建立玩家矩形，用來記錄位置與碰撞範圍
         self.rect = pygame.Rect(
@@ -50,7 +51,9 @@ class Player:
         if sprite_path is not None:
             self.animations = self._load_sprite_sheet(sprite_path)
 
-    def _load_sprite_sheet(self, filename, cols=4, rows=3):
+        self.visual_scale = visual_scale #角色大小放大倍率
+
+    def _load_sprite_sheet(self, filename, cols=4, rows=4):
         """保留原始透明影格，缺圖時使用矩形備援。"""
         try:
             sheet = pygame.image.load(filename)
@@ -88,14 +91,12 @@ class Player:
             self.frame_index = 0
             self.animation_timer = 0.0
             return
-        if self.frame_index == 0:
+        if self.frame_index not in (1, 3):
             self.frame_index = 1
         self.animation_timer += dt
-        steps = int(self.animation_timer / self.animation_interval)
-        if steps:
-            if steps % 2:
-                self.frame_index = 3 - self.frame_index
-            self.animation_timer -= steps * self.animation_interval  # 保留餘時避免不同幀率造成動畫漂移
+        if self.animation_timer >= self.animation_interval:
+            self.frame_index = 3 if self.frame_index == 1 else 1
+            self.animation_timer = 0.0
 
     def get_keyboard_direction(
         self,
@@ -718,10 +719,13 @@ class Player:
             pygame.draw.rect(screen, (50, 205, 50), self.rect)
             return
         frame = self.animations[self.direction][self.frame_index]
-        scale = min(
+        base_scale = min(
             self.rect.width / frame.get_width(),
             self.rect.height / frame.get_height()
         )
+
+        scale = base_scale * self.visual_scale
+
         size = (max(1, round(frame.get_width() * scale)),
                 max(1, round(frame.get_height() * scale)))
         image = pygame.transform.scale(frame, size)  # 最近鄰縮放保留角色像素邊緣
