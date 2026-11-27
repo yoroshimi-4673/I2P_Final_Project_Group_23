@@ -13,9 +13,7 @@
             "id": "chapter_2",
             "title": "Chapter 2",
             "items": [
-                "t0_diary_page_2",
-                "t0_diary_page_4",
-                "t0_diary_page_5",
+                "t0_fixed_diary",
                 "pencil",
                 "rubbing_paper",
                 "present_fragment",

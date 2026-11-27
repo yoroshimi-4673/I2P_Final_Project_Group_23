@@ -24,6 +24,7 @@ class InteractionController:
         self.last_buttons = {}
 
         self.pending_entry_rift = None
+        self.pending_entry_object = None  # 記錄下個空間的物件型出生來源
         
     def open_object(
         self,
@@ -38,7 +39,32 @@ class InteractionController:
             ]
         )
 
+        if (
+            object_id == "t0_diary"
+            and self.game.is_puzzle_solved(
+                "t0_diary_restore"
+            )
+        ):
+
+            self.open_fixed_diary()
+
+            return
+
+        if current_object.get("reader_type") == "diary":
+            self.puzzle_controller.diary_reader_page = 0
+            self.interaction_ui.open_diary_reader(object_id)
+            return
+
         object_type = current_object["type"]
+
+        # 三個錯誤搜尋位置先由劇情處理提示
+        if self.game.current_space == "T3" and object_id in (
+            "t3_bed", "t3_desk", "t3_wardrobe"
+        ):
+            self.interaction_ui.close()
+            self.story_manager.start_t3_search(object_id)
+            return
+
 
         # 特殊互動交由劇情或既有介面處理
         if object_id == "ch2_terminal":
@@ -79,9 +105,9 @@ class InteractionController:
 
         if object_type == "time_exit":
 
-            self.interaction_ui.close()
-
-            self.story_manager.return_to_chapter2_corridor()
+            self.interaction_ui.open_exit_confirmation(
+                object_id
+            )
 
             return
 
@@ -141,6 +167,7 @@ class InteractionController:
                     "t3_time_capsule_found"
                 ):
 
+                    self.game.complete_event("t3_windowsill_searched")
                     self.game.complete_event(
                         "t3_time_capsule_found"
                     )
@@ -169,37 +196,6 @@ class InteractionController:
             self.interaction_ui.open_message(
                 "現在還沒有發現這個盒子。",
                 object_id
-            )
-
-            return
-
-        if object_id == "t3_knife":
-
-            if self.game.has_discovered_item(
-                "t3_knife"
-            ):
-
-                self.interaction_ui.open_message(
-                    "這把美工刀已經拿走了。",
-                    object_id
-                )
-
-                return
-
-            result = collect_item(
-                self.game,
-                "t3_knife",
-                self.interaction_ui.objects
-            )
-
-            self.interaction_ui.current_object_id = (
-                "t3_knife"
-            )
-
-            self.interaction_ui.result = result
-            self.interaction_ui.notification = result
-            self.interaction_ui.mode = (
-                "item_notification"
             )
 
             return
@@ -317,6 +313,8 @@ class InteractionController:
     def submit_puzzle(self):
         """提交目前Puzzle並處理通用完成流程。"""
 
+        diary_drag = self.puzzle_controller.ui_mode == "diary_drag"
+
         result = (
             self.puzzle_controller
             .submit()
@@ -331,6 +329,10 @@ class InteractionController:
         )
 
         if status == "correct":
+
+            if diary_drag:
+                self.puzzle_controller.reset_diary_drag_state()
+
 
             completion = result.get(
                 "on_complete"
@@ -693,6 +695,15 @@ class InteractionController:
         # Escape統一處理返回或關閉互動視窗
         if event.key == pygame.K_ESCAPE:
 
+            if self.interaction_ui.mode == "diary_drag":
+                self.interaction_ui.open_diary_exit_confirmation()
+                return
+            if self.interaction_ui.mode == "diary_exit_confirmation":
+                self.puzzle_controller.diary_exit_confirmation = False
+                self.interaction_ui.mode = "diary_drag"
+                return
+
+
             if self.interaction_ui.mode == "readable":
                 self.close_readable()
 
@@ -851,6 +862,169 @@ class InteractionController:
         # ========================================================
         # Password
         # ========================================================
+
+        elif mode == "exit_confirmation":
+
+            if buttons["leave"].collidepoint(
+                mouse_pos
+            ):
+
+                self.confirm_time_room_exit()
+                return
+
+            if buttons["cancel"].collidepoint(
+                mouse_pos
+            ):
+
+                self.interaction_ui.close()
+                return
+
+        elif mode == "diary_drag":
+
+            if "_drag_rects" not in buttons:
+                return
+
+            drag_rects = buttons.get(
+                "_drag_rects",
+                {}
+            )
+
+            # 先判斷頁面，避免按鈕區搶事件
+            for page_id, rect in reversed(
+                list(
+                    drag_rects.items()
+                )
+            ):
+
+                if rect.collidepoint(
+                    mouse_pos
+                ):
+
+                    self.start_diary_drag(
+                        page_id,
+                        rect,
+                        mouse_pos
+                    )
+
+                    return
+
+            if buttons["confirm"].collidepoint(
+                mouse_pos
+            ):
+
+                result = (
+                    self.submit_puzzle()
+                )
+
+                self.interaction_ui.result = (
+                    result
+                )
+
+                return
+
+            if buttons["reset"].collidepoint(
+                mouse_pos
+            ):
+
+                self.puzzle_controller.reset_diary_drag_state()
+
+                self.interaction_ui.result = {
+                    "status": "input_required",
+                    "message": ""
+                }
+
+                return
+
+            if buttons["exit"].collidepoint(
+                mouse_pos
+            ):
+
+                self.interaction_ui.open_diary_exit_confirmation()
+
+                return
+
+        elif mode == "diary_exit_confirmation":
+
+            if buttons["cancel"].collidepoint(
+                mouse_pos
+            ):
+
+                self.puzzle_controller.diary_exit_confirmation = False
+                self.interaction_ui.mode = "diary_drag"
+
+                return
+
+            if buttons["confirm"].collidepoint(
+                mouse_pos
+            ):
+
+                # 保險：所有已發現且應存在的散頁保持在inventory
+                for page_id in (
+                    "t0_diary_page_2",
+                    "t0_diary_page_4",
+                    "t0_diary_page_5"
+                ):
+
+                    if (
+                        self.game.has_discovered_item(
+                            page_id
+                        )
+                        and not self.game.has_item(
+                            page_id
+                        )
+                        and not self.game.is_puzzle_solved(
+                            "t0_diary_restore"
+                        )
+                    ):
+
+                        self.game.add_item(
+                            page_id
+                        )
+
+                self.puzzle_controller.reset_diary_drag_state()
+
+                self.interaction_ui.close()
+
+                return
+
+        elif mode == "diary_reader":
+
+            if (
+                buttons.get(
+                    "can_previous"
+                )
+                and buttons[
+                    "previous"
+                ].collidepoint(
+                    mouse_pos
+                )
+            ):
+
+                self.puzzle_controller.diary_reader_page -= 1
+                return
+
+            if (
+                buttons.get(
+                    "can_next"
+                )
+                and buttons[
+                    "next"
+                ].collidepoint(
+                    mouse_pos
+                )
+            ):
+
+                self.puzzle_controller.diary_reader_page += 1
+                return
+
+            if buttons[
+                "close"
+            ].collidepoint(
+                mouse_pos
+            ):
+
+                self.interaction_ui.close()
+                return
 
         elif mode == "sequence":
 
@@ -1109,6 +1283,17 @@ class InteractionController:
 
                 self.interaction_ui.go_back()
 
+    def complete_t3_search(self, object_id):
+        """???????????????????"""
+
+        if self.game.current_space != "T3":
+            return
+        self.reset_interaction_focus()
+        self.interaction_ui.open_object(object_id)
+        if object_id == "t3_desk":
+            self.open_container_child("t3_knife")
+
+
     def open_container_child(
         self,
         child_id
@@ -1123,6 +1308,21 @@ class InteractionController:
         child = self.interaction_ui.objects[
             child_id
         ]
+
+        # 美工刀只能從書桌容器的子道具取得
+        if child_id == "t3_knife" and self.interaction_ui.current_object_id == "t3_desk":
+            self.interaction_ui.push_current()
+            if self.game.has_discovered_item(child_id):
+                self.interaction_ui.open_message(
+                    "美工刀已經被拿走了。", child_id
+                )
+            else:
+                result = collect_item(self.game, child_id, self.interaction_ui.objects)
+                self.interaction_ui.current_object_id = child_id
+                self.interaction_ui.result = result
+                self.interaction_ui.notification = result
+                self.interaction_ui.mode = "item_notification"
+            return
 
         if child[
             "type"
@@ -1159,7 +1359,7 @@ class InteractionController:
 
                 return
 
-        if child["type"] == "puzzle":
+        if child["type"] in ("puzzle", "carving_target"):
             self.open_object(child_id)
         else:
             self.interaction_ui.open_child(child_id)
@@ -1190,4 +1390,167 @@ class InteractionController:
             rect.inflate(6, 6),
             width=3,
             border_radius=9
+        )
+
+
+    def confirm_time_room_exit(self):
+        """確認離開時間房並保存返回白色走廊的出生門。"""
+
+        self.interaction_ui.close()
+
+        entry_object = (
+            self.story_manager
+            .return_to_chapter2_corridor()
+        )
+
+        self.pending_entry_object = (
+            entry_object
+        )
+
+        return entry_object
+
+
+    def start_diary_drag(
+        self,
+        page_id,
+        page_rect,
+        mouse_pos
+    ):
+        """開始拖曳指定日記頁。"""
+
+        if page_id not in self.puzzle_controller.get_available_diary_pages():
+            return
+
+        self.puzzle_controller.remove_diary_page_from_slot(
+            page_id
+        )
+
+        self.puzzle_controller.diary_dragging_page = (
+            page_id
+        )
+
+        self.puzzle_controller.diary_drag_offset = (
+            page_rect.x - mouse_pos[0],
+            page_rect.y - mouse_pos[1]
+        )
+
+        self.puzzle_controller.diary_page_positions[
+            page_id
+        ] = (
+            page_rect.topleft
+        )
+
+
+    def update_diary_drag(
+        self,
+        mouse_pos
+    ):
+        """更新目前拖曳中的日記頁位置。"""
+
+        page_id = (
+            self.puzzle_controller
+            .diary_dragging_page
+        )
+
+        if page_id is None:
+            return
+
+        offset_x, offset_y = (
+            self.puzzle_controller
+            .diary_drag_offset
+        )
+
+        self.puzzle_controller.diary_page_positions[
+            page_id
+        ] = (
+            mouse_pos[0] + offset_x,
+            mouse_pos[1] + offset_y
+        )
+
+
+    def finish_diary_drag(
+        self,
+        buttons,
+        mouse_pos
+    ):
+        """完成拖曳並將頁面吸附至槽位或退回原位。"""
+
+        page_id = (
+            self.puzzle_controller
+            .diary_dragging_page
+        )
+
+        if page_id is None:
+            return
+
+        dropped_slot = None
+
+        for slot_id in (
+            "page_2",
+            "page_4",
+            "page_5"
+        ):
+
+            rect = buttons.get(
+                "diary_slot:"
+                + slot_id
+            )
+
+            if (
+                rect is not None
+                and rect.collidepoint(
+                    mouse_pos
+                )
+            ):
+
+                dropped_slot = (
+                    slot_id
+                )
+
+                break
+
+        if dropped_slot is not None:
+
+            old_page = (
+                self.puzzle_controller
+                .set_diary_slot(
+                    dropped_slot,
+                    page_id
+                )
+            )
+
+            # 被換下來的頁面回自己的home
+            if old_page is not None:
+
+                self.puzzle_controller.diary_page_positions.pop(
+                    old_page,
+                    None
+                )
+
+        # 無論成功吸附與否，都移除自由拖曳座標。
+        # slot狀態或home layout會決定下一幀位置。
+        self.puzzle_controller.diary_page_positions.pop(
+            page_id,
+            None
+        )
+
+        self.puzzle_controller.diary_dragging_page = (
+            None
+        )
+
+        self.puzzle_controller.diary_drag_offset = (
+            0,
+            0
+        )
+
+
+    def open_fixed_diary(self):
+        """開啟完成後的陪伴日記閱讀器。"""
+
+        self.puzzle_controller.diary_reader_page = (
+            0
+        )
+
+        self.interaction_ui.open_diary_reader(
+            "t0_fixed_diary"
         )

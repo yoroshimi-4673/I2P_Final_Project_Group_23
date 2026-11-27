@@ -1,35 +1,25 @@
 {
     "chapter1_password": {
         "chapter": 1,
-
         "ui_mode": "password",
-
         "input_type": "digits",
         "length": 6,
-
         "answer": "100101",
-
         "max_attempts": 3,
-
         "solved_flag": "chapter1_password_solved",
-
         "success_message": "ACCESS GRANTED",
-
         "wrong_message": "密碼錯誤。",
-
         "rewards": [
             {
                 "type": "item",
                 "value": "photo_1"
             }
         ],
-
         "on_complete": {
             "type": "open_photo",
             "item_id": "photo_1",
             "mode": "story"
         },
-
         "failure": {
             "type": "game_over",
             "reason": "space_c_locked",
@@ -57,21 +47,28 @@
     },
     "t0_diary_restore": {
         "chapter": 2,
-        "ui_mode": "sequence",
-        "requirements": {
-            "items": [
-                "t0_diary_page_2",
-                "t0_diary_page_4",
-                "t0_diary_page_5"
-            ]
-        },
+        "ui_mode": "diary_drag",
         "answer": [
             "t0_diary_page_2",
             "t0_diary_page_4",
             "t0_diary_page_5"
         ],
         "success_message": "日記頁已經按照月份恢復。",
-        "wrong_message": "頁面的順序似乎不對。"
+        "wrong_message": "頁面的順序似乎不對。",
+        "rewards": [
+            {
+                "type": "consume_items",
+                "values": [
+                    "t0_diary_page_2",
+                    "t0_diary_page_4",
+                    "t0_diary_page_5"
+                ]
+            },
+            {
+                "type": "item",
+                "value": "t0_fixed_diary"
+            }
+        ]
     },
     "t0_child_safe": {
         "chapter": 2,

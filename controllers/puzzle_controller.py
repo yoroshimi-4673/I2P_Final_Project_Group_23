@@ -27,6 +27,8 @@ class PuzzleController:
         self.multi_input = {}  # 記錄多欄輸入謎題各欄內容
         self.active_field_id = None  # 記錄目前正在輸入的欄位
         self.reset_anchor_slots()
+        self.reset_diary_drag_state()
+        self.diary_reader_page = 0
 
         self.last_result = None
 
@@ -96,17 +98,17 @@ class PuzzleController:
                 "message": "這個謎題已經完成。"
             }
 
-        # elif not self.puzzle_manager.can_attempt(
-        #     puzzle_id
-        # ):
+        elif not self.puzzle_manager.can_attempt(
+            puzzle_id
+        ):
 
-        #     result = {
-        #         "status": "puzzle_unavailable",
-        #         "message": "目前無法操作此謎題。",
-        #         "remaining_attempts": (
-        #             self.remaining_attempts
-        #         )
-        #     }
+            result = {
+                "status": "puzzle_unavailable",
+                "message": "目前無法操作此謎題。",
+                "remaining_attempts": (
+                    self.remaining_attempts
+                )
+            }
 
         else:
 
@@ -124,6 +126,9 @@ class PuzzleController:
                 }
                 if fields:
                     self.active_field_id = fields[0]["id"]
+
+            if self.ui_mode == "diary_drag":
+                self.reset_diary_drag_state()
 
             result = {
                 "status": "input_required",
@@ -150,6 +155,8 @@ class PuzzleController:
         ):
 
             game.game_state = SPACE
+
+        self.reset_diary_drag_state()
 
         self.current_puzzle_id = None
 
@@ -178,10 +185,10 @@ class PuzzleController:
         if self.current_puzzle_id is None:
             return
 
-        # if not self.puzzle_manager.can_attempt(
-        #     self.current_puzzle_id
-        # ):
-        #     return
+        if not self.puzzle_manager.can_attempt(
+            self.current_puzzle_id
+        ):
+            return
 
         value = str(
             value
@@ -247,7 +254,16 @@ class PuzzleController:
                 "message": "目前沒有正在操作的謎題。"
             }
 
-        if self.ui_mode == "sequence":
+        if self.ui_mode == "diary_drag":
+            answer = self.get_diary_submission()
+            if any(page is None for page in answer):
+                self.last_result = {
+                    "status": "incomplete_input",
+                    "message": "請先將所有日記紙放入空槽中。"
+                }
+                return self.last_result
+
+        elif self.ui_mode == "sequence":
 
             answer = list(
                 self.sequence_input
@@ -495,3 +511,119 @@ class PuzzleController:
             "slot": slot_id,
             "item_id": item_id
         }
+
+
+    def reset_diary_drag_state(self):
+        """清除本次尚未完成的日記排列。"""
+
+        self.diary_slots = {
+            "page_2": None,
+            "page_4": None,
+            "page_5": None
+        }
+
+        self.diary_dragging_page = None
+        self.diary_drag_offset = (
+            0,
+            0
+        )
+
+        self.diary_page_positions = {}
+
+        self.diary_exit_confirmation = (
+            False
+        )
+
+
+    def get_available_diary_pages(self):
+        """取得目前背包中可以拖曳的日記散頁。"""
+
+        page_ids = (
+            "t0_diary_page_2",
+            "t0_diary_page_4",
+            "t0_diary_page_5"
+        )
+
+        return [
+            page_id
+            for page_id in page_ids
+            if self.puzzle_manager.game.has_item(
+                page_id
+            )
+        ]
+
+
+    def get_diary_submission(self):
+        """按照Page2/Page4/Page5槽位順序產生Puzzle答案。"""
+
+        return [
+            self.diary_slots[
+                "page_2"
+            ],
+            self.diary_slots[
+                "page_4"
+            ],
+            self.diary_slots[
+                "page_5"
+            ]
+        ]
+
+
+    def set_diary_slot(
+        self,
+        slot_id,
+        page_id
+    ):
+        """將散頁放入指定槽位並排除重複佔用。"""
+
+        if slot_id not in self.diary_slots or page_id not in self.get_available_diary_pages():
+            return False
+
+        # 同一頁若原本位於其他槽先移除
+        for existing_slot in self.diary_slots:
+
+            if (
+                self.diary_slots[
+                    existing_slot
+                ]
+                == page_id
+            ):
+                self.diary_slots[
+                    existing_slot
+                ] = None
+
+        previous_page = (
+            self.diary_slots[
+                slot_id
+            ]
+        )
+
+        self.diary_slots[
+            slot_id
+        ] = page_id
+
+        return previous_page
+
+
+    def remove_diary_page_from_slot(
+        self,
+        page_id
+    ):
+        """開始重新拖曳時解除原槽位。"""
+
+        for slot_id in self.diary_slots:
+
+            if (
+                self.diary_slots[
+                    slot_id
+                ]
+                == page_id
+            ):
+
+                self.diary_slots[
+                    slot_id
+                ] = None
+
+                return slot_id
+
+        return None

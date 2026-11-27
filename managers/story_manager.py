@@ -38,6 +38,8 @@ class StoryManager:
         # 記錄目前Dialogue結束後要執行的流程
         self.dialogue_after_action = None
 
+        self.pending_t3_search = None  # 只暫存對話後要繼續搜尋的物件
+
         # 保存第一章結尾最後顯示的文字內容
         self.chapter_end_text = (
             "你只解開了一把鎖。"
@@ -50,6 +52,7 @@ class StoryManager:
 
         self.pending_target_space = None
         self.dialogue_after_action = None
+        self.pending_t3_search = None
 
         self.chapter_end_text = (
             "你只解開了一把鎖。"
@@ -500,6 +503,16 @@ class StoryManager:
             after_action="return_to_space"
         )
 
+    def start_t3_search(self, object_id):
+        """錯誤位置先播放提示，不修改密碼嘗試次數。"""
+
+        if object_id not in ("t3_bed", "t3_desk", "t3_wardrobe"):
+            return False
+        self.pending_t3_search = object_id
+        self.start_dialogue("scene_12_wrong_search", after_action="finish_t3_search")
+        return True
+
+
     def complete_t3_capsule(self):
         """時間膠囊打開後播放字條劇情。"""
 
@@ -540,14 +553,33 @@ class StoryManager:
 
         return True
 
-    def return_to_chapter2_corridor(
-        self
-    ):
+    def return_to_chapter2_corridor(self):
         """由T0/T7/T3返回第二章白色通道。"""
 
         previous_space = (
             self.game.current_space
         )
+
+        # 記錄返回白色走廊時對應的房門
+        return_door_map = {
+            "T0": "door_t0",
+            "T7": "door_t7",
+            "T3": "door_t3"
+        }
+
+        return_door_id = (
+            return_door_map.get(
+                previous_space
+            )
+        )
+
+        # InteractionController若由外部注入/保存入口狀態，
+        # 不要在StoryManager直接操作pixel座標。
+        # 若目前StoryManager無法存取InteractionController，
+        # 請只回傳return_door_id，並由呼叫端保存。
+        #
+        # 本函式最後可：
+        # return return_door_id
 
         self.game.enter_space(
             "CH2_CORRIDOR"
@@ -559,7 +591,6 @@ class StoryManager:
                 "t3_completed"
             )
         ):
-
             self.game.current_scene = (
                 "scene_13_anchor_terminal"
             )
@@ -569,12 +600,12 @@ class StoryManager:
             )
 
         else:
-
             self.game.current_scene = (
                 "scene_09_corridor"
             )
 
-        return True
+        return return_door_id
+
 
     def complete_anchor_fragments(self):
         """三枚碎片全部放入正確凹槽。"""
@@ -725,6 +756,15 @@ class StoryManager:
         elif action == "return_to_space":
 
             self.game.game_state = SPACE
+
+        elif action == "finish_t3_search":
+
+            object_id = self.pending_t3_search
+            self.pending_t3_search = None
+            self.game.game_state = SPACE
+            if object_id is not None:
+                self.game.complete_event(object_id + "_searched")
+                return {"type": "complete_t3_search", "object_id": object_id}
 
         elif action == "enter_t3":
 
