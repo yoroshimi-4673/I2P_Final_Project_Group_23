@@ -6,6 +6,15 @@ from managers.interaction_manager import (
     collect_item
 )
 
+PASSWORD_SUCCESS_DIALOGUES = {
+    "chapter1_password",
+    "t0_bedside_drawer",
+    "t0_child_safe",
+    "t7_desk_drawer",
+    "t3_time_capsule",
+}
+
+
 class InteractionController:
 
     def __init__(self, interaction_ui, story_manager, game, puzzle_controller):
@@ -359,9 +368,8 @@ class InteractionController:
 
         diary_drag = self.puzzle_controller.ui_mode == "diary_drag"
 
-        result = (
-            self.puzzle_controller
-            .submit()
+        result = self.puzzle_controller.submit(
+            defer_success=self.puzzle_controller.current_puzzle_id in PASSWORD_SUCCESS_DIALOGUES
         )
 
         self.interaction_ui.result = (
@@ -372,7 +380,10 @@ class InteractionController:
             "status"
         )
 
-        if status == "correct":
+        if status == "success_dialogue":
+            self.start_puzzle_success_dialogue(result["puzzle_id"])
+
+        elif status == "correct":
 
             if diary_drag:
                 self.puzzle_controller.reset_diary_drag_state()
@@ -417,6 +428,27 @@ class InteractionController:
             self.reset_interaction_focus()
 
         return result
+
+    def start_puzzle_success_dialogue(self, puzzle_id):
+        puzzle = self.puzzle_controller.puzzle_manager.get_puzzle(puzzle_id)
+        self.interaction_ui.close()
+        self.reset_interaction_focus()
+        self.story_manager.start_dialogue(
+            puzzle_id,
+            after_action="complete_puzzle",
+            lines=[{"text": puzzle["success_message"]}],
+        )
+
+    def finish_puzzle_success_dialogue(self, puzzle_id):
+        result = self.puzzle_controller.puzzle_manager.apply_success(puzzle_id)
+        if result["status"] != "correct":
+            return
+
+        self.item_notification_queue = self.get_new_item_notifications(result["rewards"])
+        self.item_notification_completion = result["on_complete"]
+        self.item_notification_result = result
+        self.puzzle_completion_stage = "before_completion" if result["on_complete"] else "notifications"
+        self.show_next_item_notification()
 
     def get_new_item_notifications(self, rewards):
         return [
@@ -964,8 +996,13 @@ class InteractionController:
             else:
                 for position, rect in buttons.get("_tiles", {}).items():
                     if rect.collidepoint(mouse_pos):
-                        result = self.puzzle_controller.rotate_circuit_tile(*position)
-                        if result["status"] == "correct":
+                        result = self.puzzle_controller.rotate_circuit_tile(
+                            *position,
+                            defer_success=self.puzzle_controller.current_puzzle_id == "t7_circuit",
+                        )
+                        if result["status"] == "success_dialogue":
+                            self.start_puzzle_success_dialogue(result["puzzle_id"])
+                        elif result["status"] == "correct":
                             self.interaction_ui.result = result
                             self.handle_puzzle_completion(result["on_complete"])
                         break

@@ -391,7 +391,11 @@ def place_player_on_space_change(
 
 
 def draw_t7_power_outage_overlay(surface):
-    if game.current_space == "T7" and not game.has_event("t7_circuit_completed"):
+    if (
+        game.current_space == "T7"
+        and not game.has_event("t7_circuit_completed")
+        and story_manager.pending_puzzle_id != "t7_circuit"
+    ):
         overlay = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
         overlay.fill((0, 0, 0, 204))
         surface.blit(overlay, (0, 0))
@@ -760,8 +764,11 @@ def advance_current_dialogue():
 def finish_dialogue_and_open_ready_puzzle():
     """對話結束後開啟已準備好的謎題介面。"""
 
+    pending_puzzle_id = story_manager.pending_puzzle_id
     action = story_manager.finish_dialogue_action()
-    if action == "first_choice_a":
+    if action == "complete_puzzle":
+        interaction_controller.finish_puzzle_success_dialogue(pending_puzzle_id)
+    if action in ("first_choice_a", "first_choice_b", "first_choice_c"):
         interaction_controller.pending_entry_rift = action  # 沿用一次性的入口出生配置
     if (
         action == "open_t7_circuit"

@@ -625,7 +625,9 @@ class PuzzleManager:
     def submit_answer(
         self,
         puzzle_id,
-        answer
+        answer,
+        *,
+        defer_success=False
     ):
         """執行一次完整Puzzle提交流程。"""
 
@@ -686,6 +688,8 @@ class PuzzleManager:
             puzzle_id,
             answer
         ):
+            if defer_success:
+                return {"status": "success_dialogue", "puzzle_id": puzzle_id}
 
             return self.apply_success(
                 puzzle_id
