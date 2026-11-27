@@ -977,48 +977,58 @@ class GameUI:
                 mouse_pos
             )
 
-            asset_drawn = self.draw_asset(
-                screen,
-                object_layout.get(
-                    "asset"
-                ),
-                rect
+            render_mode = object_layout.get(
+                "render_mode",
+                "normal"
             )
 
-            if not asset_drawn:
-                color = (
-                    (120, 125, 145)
-                    if hovered
-                    else
-                    (78, 82, 95)
-                )
-
-                self.draw_placeholder_rect(
+            # 背景物件僅保留互動範圍不重繪
+            if render_mode != "background":
+                asset_drawn = self.draw_asset(
                     screen,
-                    rect,
                     object_layout.get(
-                        "label",
-                        object_id
+                        "asset"
                     ),
-                    color=color
-                )
-
-            overlay_asset = object_layout.get(
-                "overlay_asset"
-            )
-
-            if overlay_asset:
-                self.draw_asset(
-                    screen,
-                    overlay_asset,
                     rect
                 )
+
+                if not asset_drawn:
+                    color = (
+                        (120, 125, 145)
+                        if hovered
+                        else
+                        (78, 82, 95)
+                    )
+
+                    self.draw_placeholder_rect(
+                        screen,
+                        rect,
+                        object_layout.get(
+                            "label",
+                            object_id
+                        ),
+                        color=color
+                    )
+
+                overlay_asset = object_layout.get(
+                    "overlay_asset"
+                )
+
+                if overlay_asset:
+                    self.draw_asset(
+                        screen,
+                        overlay_asset,
+                        rect
+                    )
 
             object_rects[
                 object_id
             ] = rect
 
-            if hovered:
+            if (
+                hovered
+                and render_mode != "background"
+            ):
                 object_name = self.objects.get(
                     object_id,
                     {}
@@ -1044,6 +1054,24 @@ class GameUI:
                         rect.y - 22
                     )
                 )
+
+        # 純視覺角色僅繪圖不建立互動範圍
+        for decoration in space_layout.get(
+            "decorations",
+            {}
+        ).values():
+            rect = self.scale_rect(
+                screen,
+                decoration
+            )
+
+            self.draw_asset(
+                screen,
+                decoration.get(
+                    "asset"
+                ),
+                rect
+            )
 
         return object_rects
 

@@ -20,6 +20,8 @@ class CodexUI:
 
         self.selected_item = None
 
+        self.selected_chapter_id = "chapter_1"  # 記錄目前圖鑑正在查看的章節
+
         self.left_scroll_y = 0
 
         self.right_scroll_y = 0
@@ -37,6 +39,96 @@ class CodexUI:
         return self.codex_data.get(
             "chapters",
             []
+        )
+
+
+    def get_selected_chapter(self):
+        """取得目前圖鑑正在查看的章節資料。"""
+
+        chapters = (
+            self.get_chapters()
+        )
+
+        for chapter in chapters:
+
+            if (
+                chapter.get("id")
+                == self.selected_chapter_id
+            ):
+
+                return chapter
+
+        if chapters:
+
+            self.selected_chapter_id = (
+                chapters[0].get(
+                    "id"
+                )
+            )
+
+            return chapters[0]
+
+        return None
+
+
+    def select_chapter(
+        self,
+        chapter_id
+    ):
+        """切換目前圖鑑章節。"""
+
+        valid_ids = {
+            chapter.get(
+                "id"
+            )
+            for chapter in self.get_chapters()
+        }
+
+        if chapter_id not in valid_ids:
+            return False
+
+        self.selected_chapter_id = (
+            chapter_id
+        )
+
+        self.selected_item = None
+
+        # 切換章節後回到內容頂端
+        self.right_scroll_y = 0
+
+        return True
+
+
+    def get_chapter_progress(
+        self,
+        game
+    ):
+        """取得目前章節的圖鑑解鎖進度。"""
+
+        chapter = (
+            self.get_selected_chapter()
+        )
+
+        if chapter is None:
+            return (0, 0)
+
+        items = chapter.get(
+            "items",
+            []
+        )
+
+        unlocked = sum(
+            1
+            for item_id in items
+            if self.is_unlocked(
+                game,
+                item_id
+            )
+        )
+
+        return (
+            unlocked,
+            len(items)
         )
 
 
@@ -177,6 +269,7 @@ class CodexUI:
         )
 
         chapters = self.get_chapters()
+        selected_chapter = self.get_selected_chapter()
 
         chapter_buttons = {}
 
@@ -232,6 +325,11 @@ class CodexUI:
                 38
             )
 
+            is_selected = (
+                chapter.get("id")
+                == self.selected_chapter_id
+            )
+
             self.game_ui.draw_button(
                 screen,
                 chapter.get(
@@ -242,10 +340,18 @@ class CodexUI:
                     )
                 ),
                 rect,
-                rect.collidepoint(
-                    mouse_pos
+                (
+                    rect.collidepoint(
+                        mouse_pos
+                    )
+                    or is_selected
                 ),
-                bg_color=(45, 55, 75)
+                bg_color=(
+                    (70, 85, 120)
+                    if is_selected
+                    else
+                    (45, 55, 75)
+                )
             )
 
             chapter_buttons[
@@ -312,33 +418,34 @@ class CodexUI:
         # 計算右側內容總高度
         # ----------------------------------------------------
 
-        total_height = 0
-
-        for chapter in chapters:
-
-            item_count = len(
-                chapter.get(
-                    "items",
-                    []
-                )
+        items = (
+            selected_chapter.get(
+                "items",
+                []
             )
+            if selected_chapter
+            else []
+        )
 
-            rows = (
-                item_count
-                + columns
-                - 1
-            ) // columns
+        item_count = len(
+            items
+        )
 
-            total_height += (
-                45
-                + rows
-                * (
-                    card_height
-                    + padding
-                )
-                + 25
+        rows = (
+            item_count
+            + columns
+            - 1
+        ) // columns
+
+        total_height = (
+            45
+            + rows
+            * (
+                card_height
+                + padding
             )
-
+            + 25
+        )
 
         visible_height = (
             height - 60
@@ -370,7 +477,8 @@ class CodexUI:
         # 每一章
         # ----------------------------------------------------
 
-        for chapter in chapters:
+        chapter = selected_chapter
+        if chapter is not None:
 
             chapter_title = (
                 self.game_ui.font_large.render(
@@ -397,6 +505,24 @@ class CodexUI:
                 "items",
                 []
             )
+
+            if not items:
+
+                empty_surface = (
+                    self.game_ui.font_ui.render(
+                        "本章尚未有可收集道具",
+                        True,
+                        (150, 150, 165)
+                    )
+                )
+
+                screen.blit(
+                    empty_surface,
+                    (
+                        content_x,
+                        current_y + 25
+                    )
+                )
 
 
             # ------------------------------------------------
@@ -637,26 +763,6 @@ class CodexUI:
                 ] = rect
 
 
-            # ------------------------------------------------
-            # 下一章Y座標
-            # ------------------------------------------------
-
-            rows = (
-                len(items)
-                + columns
-                - 1
-            ) // columns
-
-            current_y += (
-                rows
-                * (
-                    card_height
-                    + padding
-                )
-                + 25
-            )
-
-
         # ====================================================
         # Scrollbar
         # ====================================================
@@ -768,7 +874,7 @@ class CodexUI:
         # ====================================================
 
         unlocked_count, total_count = (
-            self.get_progress(
+            self.get_chapter_progress(
                 game
             )
         )

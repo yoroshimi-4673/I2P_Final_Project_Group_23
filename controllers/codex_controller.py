@@ -102,6 +102,28 @@ class CodexController:
 
             return None
 
+        chapter_buttons = (
+            codex_buttons.get(
+                "chapters",
+                {}
+            )
+        )
+
+        for (
+            chapter_id,
+            rect
+        ) in chapter_buttons.items():
+
+            if rect.collidepoint(
+                mouse_pos
+            ):
+
+                self.codex_ui.select_chapter(
+                    chapter_id
+                )
+
+                return None
+
         back_button = (
             codex_buttons.get(
                 "back"
