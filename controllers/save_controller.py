@@ -1,4 +1,8 @@
-from save_manager import VALID_SAVE_SLOTS, get_save_slot_info
+import pygame
+
+import managers.save_manager as save_manager
+from game_states import DIALOGUE
+from managers.save_manager import VALID_SAVE_SLOTS, get_save_slot_info
 
 
 class SaveController:
@@ -6,9 +10,68 @@ class SaveController:
 
     START_ACTIONS = (("new", "新遊戲"), ("load", "讀取遊戲"), ("back", "返回"))
 
-    def __init__(self):
+    def __init__(self, *, game=None, player=None, hotbar_controller=None,
+                 dialogue_controller=None, story_manager=None):
+        self.game = game
+        self.player = player
+        self.hotbar_controller = hotbar_controller
+        self.dialogue_controller = dialogue_controller
+        self.story_manager = story_manager
         self.active_save_slot = None
         self.close()
+
+    def execute_action(self, action, *, screen_size=None, restore_loaded_session=None, start_new_game=None):
+        """執行已確認的存讀檔操作，並回傳主畫面切換指令。"""
+        if action is None:
+            return None
+
+        operation, slot = action
+        if operation == "save":
+            try:
+                self._save(slot, screen_size)
+            except (OSError, ValueError, pygame.error):
+                self.complete("save", False)
+            else:
+                self.complete("save", True)
+        elif operation == "load":
+            session = {}
+            success = save_manager.load_game(
+                self.game, slot, self.player, self.hotbar_controller, restored_session=session,
+            )
+            if success:
+                restore_loaded_session(session)  # 由遊戲主程式還原畫面與執行狀態
+            self.complete("load", success)
+        elif operation == "reset":
+            try:
+                save_manager.reset_save(slot)
+            except OSError:
+                self.complete("reset", False)
+            else:
+                self.complete("reset", True)
+        elif operation == "new":
+            self.active_save_slot = slot
+            self.close()
+            start_new_game()
+        else:
+            self.close()
+            return operation
+        return None
+
+    def _save(self, slot, screen_size):
+        session = {"screen_size": list(screen_size)}
+        dialogue = self.dialogue_controller
+        if self.game.game_state == DIALOGUE and not dialogue.finished:
+            session["dialogue"] = {  # 保留原有對話存檔的欄位與結構
+                "id": dialogue.dialogue_id,
+                "lines": dialogue.lines,
+                "index": dialogue.current_index,
+                "visible_characters": dialogue.visible_characters,
+                "after_action": self.story_manager.dialogue_after_action,
+                "target_space": self.story_manager.pending_target_space,
+            }
+        save_manager.save_game(
+            self.game, slot, self.player, self.hotbar_controller, self.screenshot, session=session,
+        )
 
     def close(self):
         self.mode = None

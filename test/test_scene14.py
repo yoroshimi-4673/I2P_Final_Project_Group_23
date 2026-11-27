@@ -8,6 +8,7 @@ import test_chapter2_flow as flow
 from game_states import DIALOGUE, SPACE, SUCCESS
 from managers.interaction_manager import enter_door
 from managers.map_manager import MapManager
+from managers.interaction_target_manager import InteractionTargetManager
 from player import Player
 from ui.dialogue_ui import DialogueController
 
@@ -55,13 +56,10 @@ class Scene14Tests(unittest.TestCase):
                 player.rect.center = (f.game_ui.scale_x(screen, 605), f.game_ui.scale_y(screen, 270))
                 player.direction = 1
                 self.assertTrue(player.is_inside_walkable_polygon(runtime["walkable_polygon"]))
-                namespace = {
-                    "pygame": pygame, "ui_layout": f.layout, "game": f.game,
-                    "game_ui": f.game_ui, "screen": screen, "player": player,
-                }
-                flow.home_function("is_in_interaction_region", namespace)
-                nearest = flow.home_function("get_nearest_interaction_target", namespace)
-                target = nearest(runtime["object_rects"], runtime["interaction_rects"])
+                targets = InteractionTargetManager(f.layout, f.game_ui, f.game)
+                target = targets.get_interaction_target(
+                    player, "CH2_CORRIDOR", runtime["object_rects"], runtime["interaction_rects"], screen
+                )
                 self.assertEqual(target["id"], "door_d")
 
     def test_d_door_prompt_uses_layout_text(self):
