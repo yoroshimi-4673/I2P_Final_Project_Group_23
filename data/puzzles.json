@@ -155,7 +155,7 @@
             {"row": 1, "col": 9, "type": "corner", "rotation": 2},
 
             {"row": 2, "col": 1, "type": "cross", "rotation": 0, "rotatable": false},
-            {"row": 2, "col": 2, "type": "straight", "rotation": 1},
+            {"row": 2, "col": 2, "type": "straight", "rotation": 0},
             {"row": 2, "col": 3, "type": "corner", "rotation": 0},
             {"row": 2, "col": 5, "type": "T", "rotation": 0},
             {"row": 2, "col": 6, "type": "corner", "rotation": 2},

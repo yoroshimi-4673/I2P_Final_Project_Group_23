@@ -723,50 +723,15 @@ class GameUI:
         screen,
         dialogue_controller
     ):
-        """依照序章進度顯示簡易背景。"""
+        """依目前序章節點繪製全畫面背景。"""
 
-        index = dialogue_controller.current_index
+        line = dialogue_controller.get_current_line() or {}  # 讀取節點資料並處理對話結束
+        background = line.get("background")  # 使用資料設定的序章圖片路徑
+        if line.get("background_mode") != "black" and background:
+            if self.draw_background_asset(screen, background):  # 沿用素材快取與全畫面縮放
+                return
 
-        if index <= 2:
-            screen.fill(
-                (28, 32, 45)
-            )
-
-            label = (
-                "研究所 / Background Placeholder"
-            )
-
-        elif index <= 5:
-            screen.fill(
-                (90, 94, 102)
-            )
-
-            label = (
-                "醫院走廊 / Background Placeholder"
-            )
-
-        else:
-            self.draw_room_307(
-                screen
-            )
-
-            return
-
-        label_surface = self.font_large.render(
-            label,
-            True,
-            (220, 220, 225)
-        )
-
-        screen.blit(
-            label_surface,
-            label_surface.get_rect(
-                center=(
-                    screen.get_width() // 2,
-                    90
-                )
-            )
-        )
+        screen.fill((0, 0, 0))  # 純黑節點或素材缺失時清空畫面
 
 
     # ========================================================
