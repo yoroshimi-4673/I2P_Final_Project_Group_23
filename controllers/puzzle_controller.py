@@ -54,6 +54,8 @@ class PuzzleController:
         self.current_puzzle_id = None
 
         self.input_text = ""
+        self.password_dial_states = {}
+        self.dial_reset_generation = puzzle_manager.game.reset_generation
 
         self.sequence_input = []  # 記錄排序類謎題目前選擇順序
         self.multi_input = {}  # 記錄多欄輸入謎題各欄內容
@@ -154,6 +156,13 @@ class PuzzleController:
                 PASSWORD
             )
 
+            if self.ui_mode == "dial_password":
+                generation = self.puzzle_manager.game.reset_generation
+                if self.dial_reset_generation != generation:
+                    self.password_dial_states.clear()
+                    self.dial_reset_generation = generation
+                self.password_dial_states.setdefault(puzzle_id, [0] * puzzle["length"])
+
             if self.ui_mode == "multi_input":
                 fields = puzzle.get("fields", [])
                 self.multi_input = {
@@ -182,7 +191,7 @@ class PuzzleController:
 
 
     def close_puzzle(self):
-        """關閉Puzzle並清除暫時輸入資料。"""
+        """關閉Puzzle並清除單次開啟的輸入資料。"""
 
         game = self.puzzle_manager.game
 
@@ -376,6 +385,14 @@ class PuzzleController:
 
         self.input_text = ""
 
+    @property
+    def dial_digits(self):
+        return self.password_dial_states[self.current_puzzle_id]
+
+    def turn_password_dial(self, index, step):
+        digits = self.dial_digits
+        digits[index] = (digits[index] + step) % 10
+
 
     def submit(self):
         """提交目前Puzzle輸入內容。"""
@@ -398,6 +415,9 @@ class PuzzleController:
                     "message": "請先將所有日記紙放入空槽中。"
                 }
                 return self.last_result
+
+        elif self.ui_mode == "dial_password":
+            answer = "".join(map(str, self.dial_digits))
 
         elif self.ui_mode == "sequence":
 

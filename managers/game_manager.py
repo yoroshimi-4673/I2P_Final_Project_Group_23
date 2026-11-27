@@ -27,6 +27,7 @@ class GameManager:
 
         self.play_time = 0
         self.session_start = time.time()
+        self.reset_generation = 0
 
 
     # ======== 空間管理 ======== #
@@ -151,6 +152,7 @@ class GameManager:
     # ======== New Game ======== #
 
     def reset_game(self):  # 將所有遊戲狀態重新恢復成全新遊戲
+        self.reset_generation += 1
         self.game_state = DIALOGUE
         self.current_scene = "intro"
         self.current_space = None

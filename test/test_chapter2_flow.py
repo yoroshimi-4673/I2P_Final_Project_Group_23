@@ -178,10 +178,182 @@ class Chapter2FlowTests(unittest.TestCase):
 
     def password(self, object_id, answer):
         self.open(object_id)
-        for digit in answer:
-            self.click(digit)
-        if self.ui.mode == "password":
-            self.click("submit")
+        if self.ui.mode == "dial_password":
+            self.set_dial_password(answer)
+            self.click("confirm")
+        else:
+            for digit in answer:
+                self.click(digit)
+
+    def set_dial_password(self, answer):
+        for index, target in enumerate(map(int, answer)):
+            steps = (target - self.puzzle.dial_digits[index]) % 10
+            step = 1 if steps <= 5 else -1
+            for _ in range(min(steps, 10 - steps)):
+                self.click_dial(index, step)
+
+    def click_dial(self, index, step, screen=None):
+        screen = self.screen if screen is None else screen
+        buttons = self.ui.dial_password_controls(screen)
+        self.interaction.handle_click(buttons, buttons["_dial_regions"][index, step].center)
+
+    def test_dial_password_wraps_and_preserves_input_until_game_reset(self):
+        drawer = "t0_bedside_drawer"
+        safe = "t0_child_safe"
+        escape = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE)
+        self.game.enter_space("T0")
+        self.game.solve_puzzle("t0_diary_restore")
+        self.open(drawer)
+        self.assertEqual(self.puzzle.dial_digits, [0, 0, 0])
+        self.click_dial(0, 1)
+        self.assertEqual(self.puzzle.dial_digits, [1, 0, 0])
+        self.click_dial(1, -1)
+        self.assertEqual(self.puzzle.dial_digits, [1, 9, 0])
+        self.click_dial(1, 1)
+        self.assertEqual(self.puzzle.dial_digits, [1, 0, 0])
+        self.set_dial_password("120")
+        self.click("confirm")
+        self.assertEqual(self.ui.result["message"], "抽屜卡住了。")
+        self.assertEqual(self.puzzle.dial_digits, [1, 2, 0])
+        self.interaction.handle_key(escape)
+        self.assertFalse(self.ui.is_open())
+        self.open(safe)
+        self.assertEqual(self.puzzle.dial_digits, [0, 0])
+        self.click_dial(1, -1)
+        self.click("back")
+        self.open(drawer)
+        self.assertEqual(self.puzzle.dial_digits, [1, 2, 0])
+        self.interaction.handle_key(escape)
+        self.open(safe)
+        self.assertEqual(self.puzzle.dial_digits, [0, 9])
+        self.interaction.handle_key(escape)
+        self.game.reset_game()
+        self.game.enter_space("T0")
+        self.game.solve_puzzle("t0_diary_restore")
+        self.open(drawer)
+        self.assertEqual(self.puzzle.dial_digits, [0, 0, 0])
+        self.ui.close()
+        self.open(safe)
+        self.assertEqual(self.puzzle.dial_digits, [0, 0])
+
+    def test_dial_password_ignores_keyboard_and_reopens_solved_message(self):
+        puzzle_id = "t0_bedside_drawer"
+        self.game.enter_space("T0")
+        self.open(puzzle_id)
+        self.set_dial_password("121")
+        controls = self.ui.draw(self.screen, (0, 0))
+        self.assertEqual(set(controls), {"_dial_regions", "confirm", "back"})
+        self.interaction.last_buttons = controls
+        self.interaction.update_interaction_hover_focus(controls, controls["confirm"].center)
+        keys = [
+            *range(pygame.K_0, pygame.K_9 + 1), pygame.K_BACKSPACE, pygame.K_RETURN,
+            pygame.K_KP_ENTER, pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_TAB,
+        ]
+        for key in keys:
+            self.interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=key))
+        self.assertEqual(self.puzzle.dial_digits, [1, 2, 1])
+        self.assertFalse(self.game.is_puzzle_solved(puzzle_id))
+        self.click("confirm")
+        self.assertTrue(self.game.is_puzzle_solved(puzzle_id))
+        self.acknowledge_success("抽屜打開了。")
+        self.acknowledge_rewards("pencil", "t0_diary_page_4")
+        self.open(puzzle_id)
+        self.assertEqual(self.ui.mode, "message")
+        self.assertEqual(self.ui.result["status"], "puzzle_solved")
+
+    def test_dial_back_matches_escape_without_submitting_or_spending_attempts(self):
+        puzzle_id = "t3_time_capsule"
+        self.game.enter_space("T3")
+        self.game.complete_event("t3_time_capsule_found")
+        self.game.learn_knowledge("number_0347")
+        self.open(puzzle_id)
+        self.click("confirm")  # 先用掉一次，驗證返回也不會把剩餘次數重設。
+        self.assertEqual(self.puzzle.remaining_attempts, 2)
+        self.set_dial_password("0347")
+        escape = pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE)
+
+        with patch.object(self.puzzle, "submit", wraps=self.puzzle.submit) as submit:
+            for exit_action in (lambda: self.click("back"), lambda: self.interaction.handle_key(escape)):
+                self.interaction.last_buttons = self.ui.draw(self.screen, (0, 0))
+                exit_action()
+                submit.assert_not_called()
+                self.assertFalse(self.ui.is_open())
+                self.assertIsNone(self.puzzle.current_puzzle_id)
+                self.assertEqual(self.interaction.last_buttons, {})
+                self.assertEqual(self.game.game_state, SPACE)
+                self.assertEqual(self.manager.get_remaining_attempts(puzzle_id), 2)
+                self.assertFalse(self.game.is_puzzle_solved(puzzle_id))
+                self.open(puzzle_id)
+                self.assertEqual(self.puzzle.dial_digits, [0, 3, 4, 7])
+
+    def test_dial_password_is_transient_across_save_and_restart(self):
+        self.game.enter_space("T0")
+        self.open("t0_bedside_drawer")
+        self.set_dial_password("120")
+        self.ui.close()
+        with patch.object(save_manager, "_write_slot") as write:
+            save_manager.save_game(self.game, 1)
+            saved = json.loads(json.dumps(write.call_args.args[1]))
+        self.open("t0_bedside_drawer")
+        self.assertEqual(self.puzzle.dial_digits, [1, 2, 0])
+        restored = GameManager()
+        with patch.object(save_manager, "_read_slot", return_value=saved):
+            self.assertTrue(save_manager.load_game(restored, 1))
+        self.build(restored)
+        self.open("t0_bedside_drawer")
+        self.assertEqual(self.puzzle.dial_digits, [0, 0, 0])
+
+    def test_dial_highlight_and_hit_regions_follow_scaled_art(self):
+        self.game.solve_puzzle("t0_diary_restore")
+        self.game.complete_event("t3_time_capsule_found")
+        self.game.learn_knowledge("number_0347")
+        for room, puzzle_id in (
+            ("T0", "t0_bedside_drawer"), ("T0", "t0_child_safe"),
+            ("T7", "t7_desk_drawer"), ("T3", "t3_time_capsule"),
+        ):
+            self.game.enter_space(room)
+            self.open(puzzle_id)
+            layout = self.layout["chapter2_password_locks"][puzzle_id]
+            for size in ((800, 600), (1000, 750), (640, 480)):
+                with self.subTest(puzzle=puzzle_id, size=size):
+                    screen = pygame.Surface(size)
+                    screen.fill((0, 0, 0))
+                    buttons = self.ui.draw(screen, (0, 0))
+                    regions = buttons["_dial_regions"]
+                    self.assertEqual(len(regions), 2 * len(self.puzzle.dial_digits))
+                    for index, slot in enumerate(layout["digit_slots"]):
+                        up, down = regions[index, 1], regions[index, -1]
+                        self.assertEqual(up.bottom, down.top)
+                        self.assertEqual(up.union(down), self.game_ui.scale_rect(screen, slot))
+                    up, down = regions[0, 1], regions[0, -1]
+                    before = screen.get_at(up.center), screen.get_at(down.center)
+                    screen.fill((0, 0, 0))
+                    self.ui.draw(screen, up.center)
+                    self.assertNotEqual(screen.get_at(up.center), before[0])
+                    self.assertEqual(screen.get_at(down.center), before[1])
+                    screen.fill((0, 0, 0))
+                    self.ui.draw(screen, down.center)
+                    self.assertEqual(screen.get_at(up.center), before[0])
+                    self.assertNotEqual(screen.get_at(down.center), before[1])
+                    digit = self.puzzle.dial_digits[0]
+                    self.click_dial(0, 1, screen)
+                    self.assertEqual(self.puzzle.dial_digits[0], (digit + 1) % 10)
+                    self.click_dial(0, -1, screen)
+                    self.assertEqual(self.puzzle.dial_digits[0], digit)
+
+                    back_rect = self.game_ui.scale_rect(screen, layout["back_button"])
+                    confirm_rect = self.game_ui.scale_rect(screen, layout["confirm_button"])
+                    with patch.object(self.game_ui, "draw_button", wraps=self.game_ui.draw_button) as draw:
+                        controls = self.ui.draw(screen, back_rect.center)
+                    draw.assert_any_call(screen, "返回", back_rect, True)
+                    draw.assert_any_call(screen, "確認", confirm_rect, False)
+                    self.assertEqual(controls["confirm"], confirm_rect)
+                    self.assertEqual(controls["back"], back_rect)
+                    self.assertEqual(controls, self.ui.dial_password_controls(screen))
+                    self.interaction.handle_click(controls, back_rect.center)
+                    self.assertFalse(self.ui.is_open())
+                    self.open(puzzle_id)
+            self.ui.close()
 
     def acknowledge_success(self, message):
         self.assertEqual(self.ui.mode, "message")
@@ -405,9 +577,8 @@ class Chapter2FlowTests(unittest.TestCase):
         self.open("t7_desk")
         self.click("t7_desk_drawer")
         self.assertEqual(self.puzzle.current_puzzle_id, "t7_desk_drawer")
-        for digit in "307":
-            self.click(digit)
-        self.click("submit")
+        self.set_dial_password("307")
+        self.click("confirm")
         self.acknowledge_success("書桌抽屜打開了。")
         self.expect_dialogue("scene_11_fragment")
         self.finish()
@@ -513,11 +684,20 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(self.ui.result["status"], "puzzle_unavailable")
         self.game.learn_knowledge("number_0347")
         self.open("t3_time_capsule")
+        self.assertEqual(self.puzzle.dial_digits, [0, 0, 0, 0])
+        self.click_dial(0, 1)
+        self.interaction.handle_key(pygame.event.Event(pygame.KEYDOWN, key=pygame.K_ESCAPE))
+        self.open("t3_time_capsule")
+        self.assertEqual(self.puzzle.dial_digits, [1, 0, 0, 0])
+        self.assertEqual(self.puzzle.remaining_attempts, 3)
         for answer, remaining in (("1111", 2), ("2222", 1), ("3333", 0)):
-            for digit in answer:
-                self.click(digit)
-            result = self.interaction.submit_puzzle()
-            self.assertEqual(result["remaining_attempts"], remaining)
+            self.set_dial_password(answer)
+            self.assertEqual(self.puzzle.remaining_attempts, remaining + 1)
+            self.click("confirm")
+            self.assertEqual(self.manager.get_remaining_attempts("t3_time_capsule"), remaining)
+            if remaining:
+                self.assertEqual(self.ui.result["message"].splitlines()[0], "密碼錯誤。")
+                self.assertEqual(self.puzzle.dial_digits, list(map(int, answer)))
         self.assertEqual(self.game.game_state, GAME_OVER)
         self.assertEqual(self.game.game_over_reason, "time_loop_broken")
         self.build(GameManager())

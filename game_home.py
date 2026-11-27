@@ -1628,35 +1628,20 @@ while running:
             polygon_editor_cursor = list(screen_to_base(event.pos))
 
         elif (
-            event.type
-            == pygame.MOUSEBUTTONDOWN
+            event.type == pygame.MOUSEBUTTONDOWN
             and event.button == 1
+            and ui_overlay is None
+            and ui_screen == UI_GAME
+            and interaction_ui.mode == "dial_password"
         ):
+            interaction_controller.handle_click(
+                interaction_ui.dial_password_controls(screen),
+                event.pos
+            )
 
-            # Polygon編輯中可用一般滑鼠點擊操作
-            if polygon_editor_active:
-
-                base_point = screen_to_base(event.pos)
-
-                polygon_editor_cursor = [
-                    base_point[0],
-                    base_point[1]
-                ]
-
-                polygon_editor_points.append(
-                    (
-                        base_point[0],
-                        base_point[1]
-                    )
-                )
-
-                print(
-                    "[Polygon Editor] "
-                    f"新增頂點 "
-                    f"{len(polygon_editor_points) - 1}: "
-                    f"{polygon_editor_points[-1]}"
-                )
-
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if polygon_editor_controller.active:
+                polygon_editor_controller.add_point_from_screen(event.pos, screen)
             else:
 
                 mouse_clicked = True
