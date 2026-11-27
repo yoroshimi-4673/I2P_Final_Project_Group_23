@@ -152,11 +152,19 @@ class GameUI:
         return self.image_cache[key]
 
 
-    def draw_item_asset(self, screen, item_id, rect, padding=4, asset_key="ui_asset"):
+    def get_item_display_value(self, item_id, key, game=None, default=None):
+        item_data = self.objects.get(item_id, {})
+        state_event = item_data.get("state_event")
+        value = item_data.get(key, default)
+        if game is not None and state_event and game.has_event(state_event):
+            return item_data.get(f"completed_{key}", value)
+        return value
+
+    def draw_item_asset(self, screen, item_id, rect, padding=4, asset_key="ui_asset", game=None):
         """共用道具圖片繪製並保留原始比例。"""
 
         # 依指定欄位共用正反面圖片快取
-        asset_path = self.objects.get(item_id, {}).get(asset_key)
+        asset_path = self.get_item_display_value(item_id, asset_key, game)
         if not asset_path:
             return False
 
@@ -175,6 +183,14 @@ class GameUI:
         return True
 
 
+    def get_fitted_image_rect(self, image, rect):
+        width, height = image.get_size()
+        scale = min(rect.width / width, rect.height / height)
+        fitted = pygame.Rect(0, 0, max(1, round(width * scale)), max(1, round(height * scale)))
+        fitted.center = rect.center
+        return fitted
+
+
     def scale_image_to_fit(
         self,
         image,
@@ -191,28 +207,7 @@ class GameUI:
         ):
             return image
 
-        scale = min(
-            rect.width / image_width,
-            rect.height / image_height
-        )
-
-        new_width = max(
-            1,
-            round(image_width * scale)
-        )
-
-        new_height = max(
-            1,
-            round(image_height * scale)
-        )
-
-        return pygame.transform.smoothscale(
-            image,
-            (
-                new_width,
-                new_height
-            )
-        )
+        return pygame.transform.smoothscale(image, self.get_fitted_image_rect(image, rect).size)
 
 
     def draw_asset(
@@ -489,7 +484,7 @@ class GameUI:
         """繪製第二章暫時結束資訊並回傳按鈕範圍。"""
         screen.fill((25, 25, 32))
         center_x, center_y = screen.get_rect().center
-        title = self.font_title.render("結束資訊", True, (245, 245, 245))
+        title = self.font_title.render("To be continued", True, (245, 245, 245))
         summary = self.font_ui.render("Chapter 2 已完成。", True, (230, 230, 235))
         screen.blit(title, title.get_rect(center=(center_x, center_y - 100)))
         screen.blit(summary, summary.get_rect(center=(center_x, center_y - 20)))
@@ -1387,7 +1382,7 @@ class GameUI:
                     item_id
                 )
 
-                if not self.draw_item_asset(screen, item_id, rect, padding=8):
+                if not self.draw_item_asset(screen, item_id, rect, padding=8, game=game):
                     text_surface = (
                         self.font_small.render(
                             item_name[:4],

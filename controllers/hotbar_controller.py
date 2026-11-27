@@ -69,6 +69,11 @@ class HotbarController:
 
         self.interaction_controller.reset_interaction_focus()
 
+        item_data = self.interaction_ui.objects.get(item_id, {})
+        if item_data.get("reader_type") == "document":
+            self.interaction_controller.open_inventory_document(item_id, item_data)
+            return
+
         self.interaction_ui.open_object(
             item_id
         )

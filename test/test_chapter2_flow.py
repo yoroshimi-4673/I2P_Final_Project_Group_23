@@ -12,6 +12,7 @@ os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 import pygame
 
+from controllers.hotbar_controller import HotbarController
 from controllers.interaction_controller import InteractionController
 from controllers.puzzle_controller import PuzzleController
 from game_states import DIALOGUE, GAME_OVER, PASSWORD, SPACE
@@ -87,7 +88,8 @@ class Chapter2FlowTests(unittest.TestCase):
         self.open(object_id)
         for digit in answer:
             self.click(digit)
-        self.click("submit")
+        if self.ui.mode == "password":
+            self.click("submit")
 
     def acknowledge_success(self, message):
         self.assertEqual(self.ui.mode, "message")
@@ -100,6 +102,25 @@ class Chapter2FlowTests(unittest.TestCase):
             self.assertEqual(self.ui.notification["item_id"], item)
             self.click("ok")
         self.assertFalse(self.ui.is_open())
+
+    def test_letter_reader_falls_back_to_thumbnail_and_discovered_letter_stays_hidden(self):
+        self.game.enter_space("T7")
+        letter = self.objects["t7_letter"]
+        letter.pop("reader_asset")
+        self.ui.open_readable("t7_letter")
+        self.assertEqual(self.ui.result["asset"], letter["ui_asset"])
+        self.ui.close()
+
+        self.game.add_item("t7_letter")
+        self.game.remove_item("t7_letter")
+        self.open("t7_desk")
+        self.assertEqual(
+            [child["object_id"] for child in self.ui.result["contents"]],
+            ["t7_desk_drawer"]
+        )
+        self.interaction.open_container_child("t7_letter")
+        self.assertEqual(self.ui.mode, "container")
+        self.assertFalse(self.game.has_item("t7_letter"))
 
     def enter_chapter2_from_chapter1_exit(self):
         self.game.enter_space("C")
@@ -212,7 +233,8 @@ class Chapter2FlowTests(unittest.TestCase):
         self.click("yes")
         self.acknowledge_rewards("t0_diary_page_5")
         self.assertTrue(g.has_item("t0_diary_page_5"))
-        self.open("t0_diary")
+        self.open("t0_desk")
+        self.click("t0_diary")
         for index, page in enumerate((2, 4, 5)):
             if index:
                 self.click("diary_next_page")
@@ -253,19 +275,44 @@ class Chapter2FlowTests(unittest.TestCase):
         self.open("t7_broken_bed")
         self.expect_dialogue("scene_11_rubbing")
         self.finish()
-        self.open("t7_letter")
-        self.assertEqual(self.ui.mode, "readable")
+        self.open("t7_desk")
+        self.assertEqual(
+            [child["object_id"] for child in self.ui.result["contents"]],
+            ["t7_letter", "t7_desk_drawer"]
+        )
+        self.click("t7_letter")
+        self.assertEqual(self.ui.notification["item_id"], "t7_letter")
+        self.assertTrue(g.has_discovered_item("t7_letter"))
+        self.assertFalse(g.has_event("t7_letter_read"))
+        self.assertFalse(g.has_knowledge("future_age_14"))
+        self.click("ok")
+        self.assertEqual(
+            [child["object_id"] for child in self.ui.result["contents"]],
+            ["t7_desk_drawer"]
+        )
         self.click("close")
+        hotbar = HotbarController(g, self.game_ui, self.ui, self.interaction)
+        hotbar.open_item("t7_letter")
+        self.assertEqual(self.ui.mode, "readable")
         self.expect_dialogue("scene_11_letter")
+        self.assertTrue(g.has_event("t7_letter_read"))
+        self.assertEqual(self.ui.result["asset"], self.objects["t7_letter"]["reader_asset"])
+        self.click("close")
         self.finish()
         g = self.game
         self.assertTrue(g.has_knowledge("number_0347"))
         self.assertTrue(g.has_knowledge("future_age_14"))
         letter_dialogue_count = self.dialogue.start.call_count
-        self.open("t7_letter")
+        hotbar.open_item("t7_letter")
+        self.assertEqual(self.ui.mode, "readable")
         self.click("close")
         self.assertEqual(self.dialogue.start.call_count, letter_dialogue_count)
-        self.password("t7_desk_drawer", "307")
+        self.open("t7_desk")
+        self.click("t7_desk_drawer")
+        self.assertEqual(self.puzzle.current_puzzle_id, "t7_desk_drawer")
+        for digit in "307":
+            self.click(digit)
+        self.click("submit")
         self.acknowledge_success("書桌抽屜打開了。")
         self.expect_dialogue("scene_11_fragment")
         self.finish()
@@ -309,19 +356,18 @@ class Chapter2FlowTests(unittest.TestCase):
         self.assertEqual(self.ui.mode, "message")
         self.click("ok")
         self.open("t3_desk")
+        self.click("t3_knife")
         self.assertEqual((self.ui.mode, self.ui.notification["item_id"]), ("item_notification", "t3_knife"))
         self.assertTrue(g.has_item("t3_knife"))
         self.click("ok")
         self.click("close")
-        self.expect_dialogue("scene_12_wrong_search")
-        self.finish()
+        self.assertEqual(g.game_state, SPACE)
         g = self.game
         self.open("t3_bed")
         self.click("t3_bed_board")
         self.expect_dialogue("scene_12_carving")
         self.finish()
-        self.expect_dialogue("scene_12_wrong_search")
-        self.finish()
+        self.assertEqual(g.game_state, SPACE)
         self.assertTrue(g.has_event("t3_completed"))
         self.open("t3_exit_door")
         self.click("leave")
@@ -545,9 +591,17 @@ class Chapter2FlowTests(unittest.TestCase):
                 self.assertIn(object_id, self.objects)
                 self.assertGreater(rect["width"], 0)
                 self.assertGreater(rect["height"], 0)
+        nested = {child for obj in self.objects.values() for child in obj.get("contents", [])}
         for object_id, data in self.objects.items():
             if data.get("space"):
-                self.assertIn(object_id, represented)
+                self.assertIn(object_id, represented | nested)
+        for space, parent, children in (
+            ("T0", "t0_desk", {"t0_diary"}),
+            ("T7", "t7_desk", {"t7_letter", "t7_desk_drawer"}),
+        ):
+            world_objects = self.layout["spaces"][space]["objects"]
+            self.assertIn(parent, world_objects)
+            self.assertFalse(children & world_objects.keys())
         manager = MapManager(copy.deepcopy(self.layout), self.game_ui, self.game)
         for space, layout in self.layout["spaces"].items():
             active = manager.get_object_rects(space, self.screen)

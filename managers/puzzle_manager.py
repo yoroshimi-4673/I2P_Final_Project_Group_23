@@ -655,7 +655,7 @@ class PuzzleManager:
 
             return {
                 "status": "puzzle_unavailable",
-                "message": "目前無法操作此謎題。",
+                "message": "目前無法操作此謎題。是不是還缺少了什麼情報呢？",
                 "remaining_attempts": (
                     self.get_remaining_attempts(
                         puzzle_id

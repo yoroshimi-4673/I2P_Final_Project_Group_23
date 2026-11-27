@@ -48,7 +48,7 @@ from ui.interaction_ui import InteractionUI
 pygame.init()
 pygame.key.stop_text_input()
 
-DEBUG_COLLISION = False  # 正式遊玩預設隱藏碰撞校正圖層
+DEBUG_COLLISION = True  # 正式遊玩預設隱藏碰撞校正圖層
 POLYGON_EDITOR_ENABLED = True  # Enable mouse and keyboard polygon editing
 polygon_editor_active = False  # 記錄目前是否正在繪製Polygon
 polygon_editor_points = []  # 暫存本次繪製的Base座標頂點
@@ -1359,6 +1359,17 @@ while running:
 
     for event in pygame.event.get():
 
+        if (
+            event.type == pygame.MOUSEMOTION
+            and ui_screen == UI_GAME
+            and ui_overlay is None
+            and interaction_ui.mode == "password"
+            and puzzle_controller.current_puzzle_id == "chapter1_password"
+        ):
+            interaction_controller.update_interaction_hover_focus(
+                interaction_controller.last_buttons, event.pos
+            )
+
         if event.type == pygame.QUIT:
 
             running = False
@@ -2274,7 +2285,8 @@ while running:
             # 滑鼠hover同步所有Interaction鍵盤焦點
             interaction_controller.update_interaction_hover_focus(
                 interaction_buttons,
-                mouse_pos
+                mouse_pos,
+                mouse_moved=False
             )
 
             # 顯示方向鍵與Enter目前作用的控制項

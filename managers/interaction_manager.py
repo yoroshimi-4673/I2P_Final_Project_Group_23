@@ -27,6 +27,9 @@ def collect_item(game, item_id, objects):
 
     current_object = objects[item_id]  # 取得目前指定物品完整資料
 
+    if current_object.get("codex_only"):
+        return {"status": "not_collectable", "object_id": item_id}
+
     if game.add_item(item_id):  # 將物品加入背包並同步圖鑑紀錄
         return {
             "status": "item_found",
@@ -60,11 +63,17 @@ def inspect_object(game, object_id, objects):
             object_id
         )  # 第一次調查時寫入已檢查紀錄
 
+    object_name = current_object["name"]
+    description = current_object.get(
+        "description",
+        f"這就是一個普通{object_name}。"
+    )
+
     return {
         "status": "inspected",
         "object_id": object_id,
-        "name": current_object["name"],
-        "description": current_object["description"],
+        "name": object_name,
+        "description": description,
         "first_inspection": first_inspection
     }
 
@@ -127,6 +136,9 @@ def get_container_info(game, object_id, objects):
 
     for child_id in contents:
         child_object = objects[child_id]
+        hide_item_id = child_object.get("hide_after_discovered")
+        if hide_item_id is not None and game.has_discovered_item(hide_item_id):
+            continue
 
         content_data.append(
             {

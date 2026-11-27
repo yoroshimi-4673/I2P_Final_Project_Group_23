@@ -63,14 +63,14 @@ class InteractionController:
         object_type = current_object["type"]
 
         # 三個錯誤搜尋位置在互動結束後播放反應
-        if self.game.current_space == "T3" and object_id in (
-            "t3_bed", "t3_desk", "t3_wardrobe"
+        if (
+            self.game.current_space == "T3"
+            and object_id in ("t3_bed", "t3_desk", "t3_wardrobe")
+            and not self.game.has_event("t3_capsule_opened")
         ):
             self.pending_post_interaction_dialogue = object_id
             self.reset_interaction_focus()
             self.interaction_ui.open_object(object_id)
-            if object_id == "t3_desk":
-                self.open_container_child("t3_knife")
             return
 
 
@@ -321,6 +321,14 @@ class InteractionController:
         return result
 
 
+    def input_password_digit(self, digit):
+        binary_lock = self.puzzle_controller.current_puzzle_id == "chapter1_password"
+        if binary_lock and str(digit) not in ("0", "1"):
+            return
+        self.puzzle_controller.append_input(digit)
+        if binary_lock and len(self.puzzle_controller.input_text) == self.puzzle_controller.puzzle["length"]:
+            self.submit_puzzle()
+
     def submit_puzzle(self):
         """提交目前Puzzle並處理通用完成流程。"""
 
@@ -379,6 +387,10 @@ class InteractionController:
 
             self.interaction_ui.close()
 
+        elif status == "wrong" and self.puzzle_controller.current_puzzle_id == "chapter1_password":
+            self.interaction_ui.mode = "message"
+            self.reset_interaction_focus()
+
         return result
 
     def get_new_item_notifications(self, rewards):
@@ -427,7 +439,7 @@ class InteractionController:
 
         object_id = self.pending_post_interaction_dialogue
         self.pending_post_interaction_dialogue = None  # 播放前清除避免重複觸發反應
-        if self.game.current_space == "T3":
+        if self.game.current_space == "T3" and not self.game.has_event("t3_capsule_opened"):
             self.story_manager.start_t3_search(object_id)
 
     def return_from_interaction(self):
@@ -566,12 +578,19 @@ class InteractionController:
             )
 
 
-    def update_interaction_hover_focus(self, buttons, mouse_pos):
+    def update_interaction_hover_focus(self, buttons, mouse_pos, mouse_moved=True):
         """滑鼠移到控制項時同步鍵盤焦點。"""
 
         self.ensure_interaction_focus(
             buttons
         )
+
+        if (
+            self.interaction_ui.mode == "password"
+            and self.puzzle_controller.current_puzzle_id == "chapter1_password"
+            and not mouse_moved
+        ):
+            return
 
         for control_id, rect in (
             self.get_interaction_rect_buttons(
@@ -774,7 +793,7 @@ class InteractionController:
                     - pygame.K_0
                 )
 
-                self.puzzle_controller.append_input(
+                self.input_password_digit(
                     digit
                 )
                 return
@@ -837,7 +856,7 @@ class InteractionController:
 
 
             if self.interaction_ui.mode == "readable":
-                self.close_readable()
+                self.interaction_ui.close()
 
             elif self.interaction_ui.mode == "password":
                 self.interaction_ui.close()
@@ -849,13 +868,13 @@ class InteractionController:
                 self.interaction_ui.close()
                 self.finish_interaction_sequence()
 
-    def close_readable(self):
-        """關閉文件並僅於首次閱讀後播放劇情。"""
-
-        object_id = self.interaction_ui.current_object_id
-        self.interaction_ui.close()
-
-        if object_id == "t7_letter" and not self.game.has_event("t7_letter_read"):
+    def open_inventory_document(self, item_id, item_data):
+        """開啟背包文件，首次讀信時啟動原有劇情。"""
+        self.interaction_ui.open_readable(item_id)
+        if (
+            item_data.get("knowledge_reward") == "future_age_14"
+            and not self.game.has_event("t7_letter_read")
+        ):
             self.story_manager.complete_t7_letter()
 
 
@@ -1213,11 +1232,14 @@ class InteractionController:
                     )
                 ):
 
-                    self.puzzle_controller.append_input(
+                    self.input_password_digit(
                         digit
                     )
 
                     return
+
+            if self.puzzle_controller.current_puzzle_id == "chapter1_password":
+                return
 
             if buttons[
                 "clear"
@@ -1361,7 +1383,7 @@ class InteractionController:
         elif mode == "readable":
 
             if buttons["close"].collidepoint(mouse_pos):
-                self.close_readable()
+                self.interaction_ui.close()
 
         elif mode == "item":
 
@@ -1397,17 +1419,20 @@ class InteractionController:
 
         elif mode == "message":
 
-            if buttons[
-                "ok"
-            ].collidepoint(
-                mouse_pos
-            ):
+            ok_button = buttons.get("ok")
+            if ok_button is not None and ok_button.collidepoint(mouse_pos):
 
                 if (
                     self.puzzle_completion_stage == "message"
                     and self.interaction_ui.result is self.item_notification_result
                 ):
                     self.acknowledge_puzzle_success()
+                elif (
+                    self.puzzle_controller.current_puzzle_id == "chapter1_password"
+                    and self.interaction_ui.result.get("status") == "wrong"
+                ):
+                    self.interaction_ui.mode = "password"
+                    self.reset_interaction_focus()
                 else:
                     self.return_from_interaction()
 
@@ -1427,19 +1452,20 @@ class InteractionController:
             child_id
         ]
 
-        # 美工刀只能從書桌容器的子道具取得
-        if child_id == "t3_knife" and self.interaction_ui.current_object_id == "t3_desk":
-            self.interaction_ui.push_current()
+        hide_item_id = child.get("hide_after_discovered")
+        if hide_item_id is not None and self.game.has_discovered_item(hide_item_id):
+            return
+
+        if child["type"] == "item" and child.get("collectable"):
             if self.game.has_discovered_item(child_id):
-                self.interaction_ui.open_message(
-                    "美工刀已經被拿走了。", child_id
-                )
-            else:
-                result = collect_item(self.game, child_id, self.interaction_ui.objects)
-                self.interaction_ui.current_object_id = child_id
-                self.interaction_ui.result = result
-                self.interaction_ui.notification = result
-                self.interaction_ui.mode = "item_notification"
+                return
+
+            self.interaction_ui.push_current()
+            result = collect_item(self.game, child_id, self.interaction_ui.objects)
+            self.interaction_ui.current_object_id = child_id
+            self.interaction_ui.result = result
+            self.interaction_ui.notification = result
+            self.interaction_ui.mode = "item_notification"
             return
 
         if child[
@@ -1502,6 +1528,14 @@ class InteractionController:
         )
 
         if rect is None:
+            return
+
+        if (
+            self.interaction_ui.mode == "password"
+            and self.puzzle_controller.current_puzzle_id == "chapter1_password"
+            and self.focus_id in ("1", "0")
+        ):
+            pygame.draw.rect(screen, (255, 220, 0), rect.inflate(8, 8), width=3, border_radius=6)
             return
 
         pygame.draw.rect(
