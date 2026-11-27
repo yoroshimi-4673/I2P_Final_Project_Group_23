@@ -56,6 +56,9 @@ class HotbarController:
         if item_id is None:
             return
 
+        if len(self.game.inventory) > 0 and not self.game.has_event("tutorial_hotbar_done"):
+            self.game.complete_event("tutorial_hotbar_done")
+
         if item_id == "photo_1":
 
             self.interaction_controller.reset_interaction_focus()
