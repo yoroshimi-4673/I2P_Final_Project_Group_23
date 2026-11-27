@@ -618,6 +618,18 @@
                     "visible_after_event": "scene_13_started",
                     "remove_white_background": true,
                     "white_background_threshold": 235
+                },
+                "door_d": {
+                    "x": 627,
+                    "y": 231,
+                    "width": 30,
+                    "height": 93,
+                    "label": "D",
+                    "render_mode": "background",
+                    "interaction_padding": 0,
+                    "interaction_polygon": [[627, 234], [627, 324], [657, 324], [657, 231]],
+                    "interaction_label": "前往D空間",
+                    "visible_after_event": "space_d_unlocked"
                 }
             },
             "entry_spawns": {
@@ -642,13 +654,6 @@
                     "height": 128,
                     "kind": "furniture",
                     "visible_after_event": "scene_13_started"
-                }
-            },
-            "pending_objects": {
-                "door_d": {
-                    "label": "D",
-                    "render_mode": "background",
-                    "reason": "等待人工確認背景座標"
                 }
             }
         },

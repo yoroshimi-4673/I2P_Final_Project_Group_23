@@ -154,6 +154,8 @@
         "name": "D",
         "type": "door",
         "space": "CH2_CORRIDOR",
+        "description": "D 門已解鎖。",
+        "locked_description": "D 門尚未解鎖。",
         "required_event": "space_d_unlocked",
         "target_scene": "scene_14"
     },

@@ -485,6 +485,24 @@ class GameUI:
     # Main Menu
     # ========================================================
 
+    def draw_success_end(self, screen, mouse_pos):
+        """繪製第二章暫時結束資訊並回傳按鈕範圍。"""
+        screen.fill((25, 25, 32))
+        center_x, center_y = screen.get_rect().center
+        title = self.font_title.render("結束資訊", True, (245, 245, 245))
+        summary = self.font_ui.render("Chapter 2 已完成。", True, (230, 230, 235))
+        screen.blit(title, title.get_rect(center=(center_x, center_y - 100)))
+        screen.blit(summary, summary.get_rect(center=(center_x, center_y - 20)))
+
+        buttons = {
+            "settings": pygame.Rect(center_x - 175, center_y + 100, 150, 42),
+            "menu": pygame.Rect(center_x + 25, center_y + 100, 150, 42),
+        }
+        for action, label in (("settings", "設定"), ("menu", "回到主畫面")):
+            rect = buttons[action]
+            self.draw_button(screen, label, rect, rect.collidepoint(mouse_pos))
+        return buttons
+
     def draw_main_menu(
         self,
         screen,
