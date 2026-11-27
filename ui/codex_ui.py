@@ -1152,7 +1152,7 @@ class CodexUI:
 
             photo_hint = (
                 self.game_ui.font_small.render(
-                    "照片可於Hotbar中查看正反面。",
+                    "照片可於道具欄中查看正反面。",
                     True,
                     (
                         180,

@@ -104,9 +104,7 @@
         "type": "puzzle",
         "space": "C",
         "description": "純白房間中央懸浮著一個六位數密碼鎖。",
-        "correct_password": "100101",
-        "max_attempts": 3,
-        "reward_item": "photo_1"
+        "puzzle_id": "chapter1_password"
     },
 
     "photo_1": {
@@ -115,6 +113,7 @@
         "description": "黎琛和女兒在公園鞦韆上。兩人都笑著。背景陽光明媚。",
         "back_text": "這不是你的記憶。這是空間D的。",
         "ui_asset": "assets/素材庫/第一章/空間C/photo.png",
+        "ui_back_asset": "assets/素材庫/第一章/空間C/photo_back.png",
         "collectable": true
     },
 

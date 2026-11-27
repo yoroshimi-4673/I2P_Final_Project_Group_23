@@ -11,7 +11,8 @@ class InteractionUI:
         game_ui,
         game,
         objects,
-        levels
+        levels,
+        puzzle_controller
     ):
         self.game_ui = game_ui
 
@@ -29,7 +30,7 @@ class InteractionUI:
 
         self.result = None
 
-        self.password_input = ""
+        self.puzzle_controller = puzzle_controller
 
         self.photo_id = None
 
@@ -63,7 +64,7 @@ class InteractionUI:
 
         self.result = None
 
-        self.password_input = ""
+        self.puzzle_controller.close_puzzle()
 
         self.photo_id = None
 
@@ -128,7 +129,6 @@ class InteractionUI:
             get_container_info,
             inspect_object,
             get_rift_info,
-            get_puzzle_info,
             get_door_info
         )
 
@@ -184,27 +184,6 @@ class InteractionUI:
                     self.levels
                 )
             )
-
-        elif object_type == "puzzle":
-
-            self.password_input = ""
-
-            self.result = (
-                get_puzzle_info(
-                    self.game,
-                    object_id,
-                    self.objects
-                )
-            )
-
-            if (
-                self.result["status"]
-                == "puzzle_solved"
-            ):
-                self.mode = "message"
-
-            else:
-                self.mode = "password"
 
         elif object_type == "door":
 
@@ -380,96 +359,6 @@ class InteractionUI:
         ):
 
             self.close()
-
-
-    # ========================================================
-    # Password
-    # ========================================================
-
-    def add_password_digit(
-        self,
-        digit
-    ):
-        """加入密碼數字。"""
-
-        if len(
-            self.password_input
-        ) >= 6:
-
-            return
-
-        self.password_input += str(
-            digit
-        )
-
-
-    def remove_password_digit(self):
-        """刪除最後一個密碼數字。"""
-
-        self.password_input = (
-            self.password_input[:-1]
-        )
-
-
-    def clear_password(self):
-        """清空密碼。"""
-
-        self.password_input = ""
-
-
-    def submit_password(self):
-        """送出目前密碼。"""
-
-        from managers.interaction_manager import (
-            submit_password
-        )
-
-        result = submit_password(
-            self.game,
-            self.current_object_id,
-            self.password_input,
-            self.objects
-        )
-
-        self.result = result
-
-        status = result[
-            "status"
-        ]
-
-        if status in (
-            "password_wrong",
-            "incomplete_password",
-            "invalid_password_format"
-        ):
-
-            self.password_input = ""
-
-        elif status == "password_correct":
-
-            self.password_input = ""
-
-            reward_item = result.get(
-                "reward_item"
-            )
-
-            if reward_item is not None:
-
-                self.photo_id = (
-                    reward_item
-                )
-
-                self.photo_mode = (
-                    "story"
-                )
-
-                self.photo_side = (
-                    "front"
-                )
-
-                self.mode = (
-                    "photo"
-                )
 
 
     # ========================================================
@@ -1053,7 +942,7 @@ class InteractionUI:
         screen,
         mouse_pos
     ):
-        """繪製六位數密碼UI。"""
+        """沿用密碼版面並讀取謎題控制器狀態。"""
 
         modal = self.draw_modal_base(
             screen,
@@ -1062,7 +951,7 @@ class InteractionUI:
         )
 
         title = self.game_ui.font_large.render(
-            "六位數密碼鎖",
+            self.objects[self.current_object_id]["name"],
             True,
             (255, 220, 140)
         )
@@ -1077,34 +966,32 @@ class InteractionUI:
             )
         )
 
-        attempts = self.result.get(
-            "remaining_attempts",
-            3
-        )
+        attempts = self.puzzle_controller.remaining_attempts
 
-        attempts_surface = self.game_ui.font_small.render(
-            f"剩餘嘗試次數：{attempts}",
-            True,
-            (235, 190, 160)
-        )
+        if attempts is not None:  # 不限次數的謎題不顯示次數文字
+            attempts_surface = self.game_ui.font_small.render(
+                f"剩餘嘗試次數：{attempts}",
+                True,
+                (235, 190, 160)
+            )
 
-        screen.blit(
-            attempts_surface,
-            attempts_surface.get_rect(
-                center=(
-                    modal.centerx,
-                    modal.y + 70
+            screen.blit(
+                attempts_surface,
+                attempts_surface.get_rect(
+                    center=(
+                        modal.centerx,
+                        modal.y + 70
+                    )
                 )
             )
-        )
 
         box_size = 48
         gap = 10
 
-        total_width = (
-            6 * box_size
-            + 5 * gap
-        )
+        puzzle = self.puzzle_controller.puzzle
+        input_length = puzzle.get("length", 0)
+        input_text = self.puzzle_controller.input_text
+        total_width = input_length * box_size + max(0, input_length - 1) * gap
 
         start_x = (
             modal.centerx
@@ -1113,7 +1000,7 @@ class InteractionUI:
 
         box_y = modal.y + 105
 
-        for index in range(6):
+        for index in range(input_length):
 
             rect = pygame.Rect(
                 start_x
@@ -1145,11 +1032,11 @@ class InteractionUI:
             if (
                 index
                 < len(
-                    self.password_input
+                    input_text
                 )
             ):
 
-                digit = self.password_input[
+                digit = input_text[
                     index
                 ]
 
@@ -1304,13 +1191,13 @@ class InteractionUI:
         buttons["back"] = back_rect
 
         if (
-            self.result is not None
-            and self.result.get(
+            self.puzzle_controller.last_result is not None
+            and self.puzzle_controller.last_result.get(
                 "message"
             )
         ):
 
-            message = self.result[
+            message = self.puzzle_controller.last_result[
                 "message"
             ]
 
@@ -1380,17 +1267,16 @@ class InteractionUI:
             140
         )
 
-        # 照片正面沿用共用道具圖片繪製
-        front_drawn = (
-            self.photo_side == "front"
-            and self.game_ui.draw_item_asset(
-                screen,
-                self.photo_id,
-                picture_rect
-            )
+        # 照片正反面沿用同一圖片繪製入口
+        asset_key = "ui_asset" if self.photo_side == "front" else "ui_back_asset"
+        picture_drawn = self.game_ui.draw_item_asset(
+            screen,
+            self.photo_id,
+            picture_rect,
+            asset_key=asset_key
         )
 
-        if not front_drawn:
+        if not picture_drawn:
             self.game_ui.draw_placeholder_rect(
                 screen,
                 picture_rect,

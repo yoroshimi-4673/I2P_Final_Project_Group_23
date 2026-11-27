@@ -132,10 +132,11 @@ class GameUI:
         return image
 
 
-    def draw_item_asset(self, screen, item_id, rect, padding=4):
+    def draw_item_asset(self, screen, item_id, rect, padding=4, asset_key="ui_asset"):
         """共用道具圖片繪製並保留原始比例。"""
 
-        asset_path = self.objects.get(item_id, {}).get("ui_asset")
+        # 依指定欄位共用正反面圖片快取
+        asset_path = self.objects.get(item_id, {}).get(asset_key)
         if not asset_path:
             return False
 
@@ -891,8 +892,7 @@ class GameUI:
         self,
         screen,
         game,
-        mouse_pos,
-        player_color
+        mouse_pos
     ):
         """繪製目前探索空間與正式圖片素材。"""
 
@@ -957,26 +957,6 @@ class GameUI:
                         40
                     )
                 )
-            )
-
-        player_data = space_layout.get(
-            "player"
-        )
-
-        if player_data is not None:
-            player_rect = self.scale_rect(
-                screen,
-                player_data
-            )
-
-            self.draw_placeholder_rect(
-                screen,
-                player_rect,
-                player_data.get(
-                    "label",
-                    "Player Placeholder"
-                ),
-                color=player_color
             )
 
         object_rects = {}
@@ -1326,9 +1306,7 @@ class GameUI:
         self,
         screen,
         mouse_pos,
-        volume,
-        current_look_index,
-        looks
+        volume
     ):
         """繪製共用設定Overlay。"""
 
@@ -1544,48 +1522,6 @@ class GameUI:
             "1024",
             buttons["1024"],
             buttons["1024"].collidepoint(
-                mouse_pos
-            )
-        )
-
-        look_surface = self.font_ui.render(
-            "更換外型 / 顏色：",
-            True,
-            (245, 245, 245)
-        )
-
-        screen.blit(
-            look_surface,
-            (
-                modal_rect.x + 35,
-                modal_rect.y + 245
-            )
-        )
-
-        pygame.draw.rect(
-            screen,
-            looks[current_look_index],
-            (
-                modal_rect.x + 205,
-                modal_rect.y + 240,
-                35,
-                35
-            ),
-            border_radius=5
-        )
-
-        buttons["look"] = pygame.Rect(
-            modal_rect.x + 260,
-            modal_rect.y + 240,
-            120,
-            35
-        )
-
-        self.draw_button(
-            screen,
-            "切換外型",
-            buttons["look"],
-            buttons["look"].collidepoint(
                 mouse_pos
             )
         )

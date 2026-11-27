@@ -1,17 +1,17 @@
 """負責interaction的鍵盤焦點與輸入處理"""
 import pygame
 from managers.interaction_manager import (
-    leave_puzzle,
     search_object
 )
 
 class InteractionController:
 
-    def __init__(self, interaction_ui, story_manager, game):
+    def __init__(self, interaction_ui, story_manager, game, puzzle_controller):
 
         self.interaction_ui = interaction_ui
         self.story_manager = story_manager
         self.game = game
+        self.puzzle_controller = puzzle_controller
 
         # 紀錄目前鍵盤焦點控制向ID
         self.focus_id = None
@@ -24,6 +24,165 @@ class InteractionController:
 
         self.pending_entry_rift = None
         
+    def open_object(
+        self,
+        object_id
+    ):
+        """開啟世界中的指定互動物件。"""
+
+        current_object = (
+            self.interaction_ui
+            .objects[
+                object_id
+            ]
+        )
+
+        if current_object[
+            "type"
+        ] != "puzzle":
+
+            self.interaction_ui.open_object(
+                object_id
+            )
+
+            return
+
+        self.interaction_ui.current_object_id = (
+            object_id
+        )
+
+        puzzle_id = current_object.get(
+            "puzzle_id"
+        )
+
+        result = (
+            self.puzzle_controller
+            .open_puzzle(
+                puzzle_id
+            )
+        )
+
+        self.interaction_ui.result = (
+            result
+        )
+
+        if result[
+            "status"
+        ] == "input_required":
+
+            self.interaction_ui.mode = (
+                self.puzzle_controller
+                .ui_mode
+            )
+
+        else:
+
+            self.interaction_ui.mode = (
+                "message"
+            )
+
+    def submit_puzzle(self):
+        """提交目前Puzzle並處理通用完成流程。"""
+
+        result = (
+            self.puzzle_controller
+            .submit()
+        )
+
+        self.interaction_ui.result = (
+            result
+        )
+
+        status = result.get(
+            "status"
+        )
+
+        if status == "correct":
+
+            completion = result.get(
+                "on_complete"
+            )
+
+            self.puzzle_controller.close_puzzle()
+
+            if completion is not None:
+
+                self.handle_puzzle_completion(
+                    completion
+                )
+
+            else:
+
+                self.interaction_ui.mode = (
+                    "message"
+                )
+
+        elif status == "game_over":
+
+            self.interaction_ui.close()
+
+        return result
+
+    def handle_puzzle_completion(
+        self,
+        completion
+    ):
+        """依Puzzle資料執行完成後的通用流程。"""
+
+        action_type = completion.get(
+            "type"
+        )
+
+        if action_type == "open_photo":
+
+            item_id = completion.get(
+                "item_id"
+            )
+
+            if item_id is None:
+
+                self.interaction_ui.mode = (
+                    "message"
+                )
+
+                return
+
+            self.interaction_ui.open_photo(
+                item_id,
+                mode=completion.get(
+                    "mode",
+                    "inventory"
+                )
+            )
+
+            return
+
+        if action_type == "story_event":
+
+            # 未來第二章若需要劇情事件可由StoryManager處理
+            event_id = completion.get(
+                "event"
+            )
+
+            if (
+                event_id is not None
+                and hasattr(
+                    self.story_manager,
+                    "start_puzzle_event"
+                )
+            ):
+
+                self.story_manager.start_puzzle_event(
+                    event_id,
+                    completion
+                )
+
+                return
+
+        self.interaction_ui.mode = (
+            "message"
+        )
+
     def reset_interaction_focus(self):
         """重新開啟Interaction時清除上一個鍵盤焦點。"""
 
@@ -267,13 +426,13 @@ class InteractionController:
                     - pygame.K_0
                 )
 
-                self.interaction_ui.add_password_digit(
+                self.puzzle_controller.append_input(
                     digit
                 )
                 return
 
             if event.key == pygame.K_BACKSPACE:
-                self.interaction_ui.remove_password_digit()
+                self.puzzle_controller.remove_input()
                 return
 
         # 四方向鍵統一移動目前Interaction焦點
@@ -300,9 +459,6 @@ class InteractionController:
         if event.key == pygame.K_ESCAPE:
 
             if self.interaction_ui.mode == "password":
-                leave_puzzle(
-                    self.game
-                )
                 self.interaction_ui.close()
 
             elif self.interaction_ui.parent_stack:
@@ -464,7 +620,7 @@ class InteractionController:
                     )
                 ):
 
-                    self.interaction_ui.add_password_digit(
+                    self.puzzle_controller.append_input(
                         digit
                     )
 
@@ -476,7 +632,7 @@ class InteractionController:
                 mouse_pos
             ):
 
-                self.interaction_ui.clear_password()
+                self.puzzle_controller.clear_input()
 
             elif buttons[
                 "submit"
@@ -484,28 +640,13 @@ class InteractionController:
                 mouse_pos
             ):
 
-                self.interaction_ui.submit_password()
-
-                if (
-                    self.interaction_ui.result
-                    is not None
-                    and self.interaction_ui.result.get(
-                        "status"
-                    )
-                    == "game_over"
-                ):
-
-                    self.interaction_ui.close()
+                self.submit_puzzle()
 
             elif buttons[
                 "back"
             ].collidepoint(
                 mouse_pos
             ):
-
-                leave_puzzle(
-                    self.game
-                )
 
                 self.interaction_ui.close()
 
@@ -707,9 +848,10 @@ class InteractionController:
 
                 return
 
-        self.interaction_ui.open_child(
-            child_id
-        )
+        if child["type"] == "puzzle":
+            self.open_object(child_id)
+        else:
+            self.interaction_ui.open_child(child_id)
 
     def draw_focus(
         self,
@@ -738,4 +880,3 @@ class InteractionController:
             width=3,
             border_radius=9
         )
-
