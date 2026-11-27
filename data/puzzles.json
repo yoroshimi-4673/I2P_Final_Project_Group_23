@@ -49,6 +49,23 @@
     "t0_diary_restore": {
         "chapter": 2,
         "ui_mode": "diary_drag",
+        "spreads": [
+            {
+                "background_asset": "assets/素材庫/第二章/T+0/日記内容/1.png",
+                "slot_id": "page_2",
+                "side": "right"
+            },
+            {
+                "background_asset": "assets/素材庫/第二章/T+0/日記内容/3.png",
+                "slot_id": "page_4",
+                "side": "right"
+            },
+            {
+                "background_asset": "assets/素材庫/第二章/T+0/日記内容/empty_diary.png",
+                "slot_id": "page_5",
+                "side": "left"
+            }
+        ],
         "answer": [
             "t0_diary_page_2",
             "t0_diary_page_4",

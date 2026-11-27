@@ -213,7 +213,9 @@ class Chapter2FlowTests(unittest.TestCase):
         self.acknowledge_rewards("t0_diary_page_5")
         self.assertTrue(g.has_item("t0_diary_page_5"))
         self.open("t0_diary")
-        for page in (2, 4, 5):
+        for index, page in enumerate((2, 4, 5)):
+            if index:
+                self.click("diary_next_page")
             buttons = self.ui.draw(self.screen, (0, 0))
             item = f"t0_diary_page_{page}"
             rect = buttons["_drag_rects"][item]

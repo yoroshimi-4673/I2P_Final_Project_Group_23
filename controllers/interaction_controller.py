@@ -294,8 +294,6 @@ class InteractionController:
                 self.puzzle_controller
                 .ui_mode
             )
-            if self.interaction_ui.mode == "diary_drag":
-                self.interaction_ui.diary_spread_index = 0
 
         else:
 
@@ -785,10 +783,10 @@ class InteractionController:
         # 陪伴日記拖放介面支援左右方向鍵直接翻頁
         if self.interaction_ui.mode == "diary_drag":
             if event.key == pygame.K_LEFT:
-                self.interaction_ui.diary_spread_index = max(0, self.interaction_ui.diary_spread_index - 1)
+                self.puzzle_controller.previous_diary_spread()
                 return
             if event.key == pygame.K_RIGHT:
-                self.interaction_ui.diary_spread_index = min(2, self.interaction_ui.diary_spread_index + 1)
+                self.puzzle_controller.next_diary_spread()
                 return
         # 四方向鍵統一移動目前Interaction焦點
         if event.key in (
@@ -832,7 +830,6 @@ class InteractionController:
                 self.interaction_ui.open_diary_exit_confirmation()
                 return
             if self.interaction_ui.mode == "diary_exit_confirmation":
-                self.puzzle_controller.diary_exit_confirmation = False
                 self.interaction_ui.mode = "diary_drag"
                 return
 
@@ -1024,18 +1021,14 @@ class InteractionController:
                 "diary_prev_page" in buttons
                 and buttons["diary_prev_page"].collidepoint(mouse_pos)
             ):
-                self.interaction_ui.diary_spread_index = max(
-                    0, self.interaction_ui.diary_spread_index - 1
-                )
+                self.puzzle_controller.previous_diary_spread()
                 return
 
             if (
                 "diary_next_page" in buttons
                 and buttons["diary_next_page"].collidepoint(mouse_pos)
             ):
-                self.interaction_ui.diary_spread_index = min(
-                    2, self.interaction_ui.diary_spread_index + 1
-                )
+                self.puzzle_controller.next_diary_spread()
                 return
 
             drag_rects = buttons.get(
@@ -1081,7 +1074,6 @@ class InteractionController:
             ):
 
                 self.puzzle_controller.reset_diary_drag_state()
-                self.interaction_ui.diary_spread_index = 0
 
                 self.interaction_ui.result = {
                     "status": "input_required",
@@ -1104,7 +1096,6 @@ class InteractionController:
                 mouse_pos
             ):
 
-                self.puzzle_controller.diary_exit_confirmation = False
                 self.interaction_ui.mode = "diary_drag"
 
                 return
@@ -1113,30 +1104,7 @@ class InteractionController:
                 mouse_pos
             ):
 
-                # 保險：所有已發現且應存在的散頁保持在inventory
-                for page_id in (
-                    "t0_diary_page_2",
-                    "t0_diary_page_4",
-                    "t0_diary_page_5"
-                ):
-
-                    if (
-                        self.game.has_discovered_item(
-                            page_id
-                        )
-                        and not self.game.has_item(
-                            page_id
-                        )
-                        and not self.game.is_puzzle_solved(
-                            "t0_diary_restore"
-                        )
-                    ):
-
-                        self.game.add_item(
-                            page_id
-                        )
-
-                self.puzzle_controller.reset_diary_drag_state()
+                self.puzzle_controller.discard_diary_drag()
 
                 self.interaction_ui.close()
 
@@ -1611,138 +1579,19 @@ class InteractionController:
             self.interaction_ui.close()
             self.game.game_state = GAME_OVER
 
-    def start_diary_drag(
-        self,
-        page_id,
-        page_rect,
-        mouse_pos
-    ):
-        """開始拖曳指定日記頁。"""
+    def start_diary_drag(self, page_id, page_rect, mouse_pos):
+        self.puzzle_controller.start_diary_drag(page_id, page_rect.topleft, mouse_pos)
 
-        if page_id not in self.puzzle_controller.get_available_diary_pages():
-            return
+    def update_diary_drag(self, mouse_pos):
+        self.puzzle_controller.update_diary_drag(mouse_pos)
 
-        self.puzzle_controller.remove_diary_page_from_slot(
-            page_id
-        )
+    def finish_diary_drag(self, buttons, mouse_pos):
+        for name, rect in buttons.items():
+            if name.startswith("diary_slot:") and rect.collidepoint(mouse_pos):
+                self.puzzle_controller.finish_diary_drag(name.split(":", 1)[1])
+                return
 
-        self.puzzle_controller.diary_dragging_page = (
-            page_id
-        )
-
-        self.puzzle_controller.diary_drag_offset = (
-            page_rect.x - mouse_pos[0],
-            page_rect.y - mouse_pos[1]
-        )
-
-        self.puzzle_controller.diary_page_positions[
-            page_id
-        ] = (
-            page_rect.topleft
-        )
-
-
-    def update_diary_drag(
-        self,
-        mouse_pos
-    ):
-        """更新目前拖曳中的日記頁位置。"""
-
-        page_id = (
-            self.puzzle_controller
-            .diary_dragging_page
-        )
-
-        if page_id is None:
-            return
-
-        offset_x, offset_y = (
-            self.puzzle_controller
-            .diary_drag_offset
-        )
-
-        self.puzzle_controller.diary_page_positions[
-            page_id
-        ] = (
-            mouse_pos[0] + offset_x,
-            mouse_pos[1] + offset_y
-        )
-
-
-    def finish_diary_drag(
-        self,
-        buttons,
-        mouse_pos
-    ):
-        """完成拖曳並將頁面吸附至槽位或退回原位。"""
-
-        page_id = (
-            self.puzzle_controller
-            .diary_dragging_page
-        )
-
-        if page_id is None:
-            return
-
-        dropped_slot = None
-
-        for slot_id in (
-            "page_2",
-            "page_4",
-            "page_5"
-        ):
-
-            rect = buttons.get(
-                "diary_slot:"
-                + slot_id
-            )
-
-            if (
-                rect is not None
-                and rect.collidepoint(
-                    mouse_pos
-                )
-            ):
-
-                dropped_slot = (
-                    slot_id
-                )
-
-                break
-
-        if dropped_slot is not None:
-
-            old_page = (
-                self.puzzle_controller
-                .set_diary_slot(
-                    dropped_slot,
-                    page_id
-                )
-            )
-
-            # 被換下來的頁面回自己的home
-            if old_page is not None:
-
-                self.puzzle_controller.diary_page_positions.pop(
-                    old_page,
-                    None
-                )
-
-        # 無論成功吸附與否，都移除自由拖曳座標。
-        # slot狀態或home layout會決定下一幀位置。
-        self.puzzle_controller.diary_page_positions.pop(
-            page_id,
-            None
-        )
-
-        self.puzzle_controller.diary_dragging_page = (
-            None
-        )
-
-        self.puzzle_controller.diary_drag_offset = (
-            0,
-            0
-        )
+        self.puzzle_controller.finish_diary_drag(None)
 
 
     def open_fixed_diary(self):

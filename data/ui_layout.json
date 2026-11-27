@@ -1417,6 +1417,74 @@
         "default_height": 300
     },
     "puzzle_layouts": {
+        "diary_drag": {
+            "title_y": 42,
+            "book_area": {
+                "x": 140,
+                "y": 78,
+                "width": 520,
+                "height": 300
+            },
+            "navigation": {
+                "previous": {
+                    "x": 82,
+                    "y": 203,
+                    "width": 42,
+                    "height": 50
+                },
+                "next": {
+                    "x": 676,
+                    "y": 203,
+                    "width": 42,
+                    "height": 50
+                }
+            },
+            "page_home_positions": {
+                "t0_diary_page_2": {
+                    "x": 180,
+                    "y": 405,
+                    "width": 85,
+                    "height": 95
+                },
+                "t0_diary_page_4": {
+                    "x": 357,
+                    "y": 405,
+                    "width": 85,
+                    "height": 95
+                },
+                "t0_diary_page_5": {
+                    "x": 535,
+                    "y": 405,
+                    "width": 85,
+                    "height": 95
+                }
+            },
+            "buttons": {
+                "confirm": {
+                    "x": 430,
+                    "y": 515,
+                    "width": 100,
+                    "height": 42
+                },
+                "reset": {
+                    "x": 545,
+                    "y": 515,
+                    "width": 100,
+                    "height": 42
+                },
+                "exit": {
+                    "x": 660,
+                    "y": 515,
+                    "width": 100,
+                    "height": 42
+                }
+            },
+            "message": {
+                "x": 80,
+                "y": 565,
+                "width": 620
+            }
+        },
         "anchor_fragment_slots": {
             "title": "錨點終端",
             "slots": {

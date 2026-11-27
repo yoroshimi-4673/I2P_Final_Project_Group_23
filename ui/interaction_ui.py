@@ -1,5 +1,3 @@
-from pathlib import Path
-
 import pygame
 
 from ui.dialogue_ui import wrap_text
@@ -41,12 +39,6 @@ class InteractionUI:
         self.photo_side = "front"
 
         self.notification = None
-
-        self.diary_spread_index = 0
-
-        self._diary_raw_images = {}
-
-        self._diary_images_loaded = False
 
     # ========================================================
     # State
@@ -2129,36 +2121,8 @@ class InteractionUI:
         }
 
 
-    def _ensure_diary_images(self):
-        """延遲載入陪伴日記所需素材（路徑：assets/素材庫/第二章/T+0/日記内容）。"""
-        if self._diary_images_loaded:
-            return
-        self._diary_images_loaded = True
-
-        base_dir = Path(__file__).resolve().parent.parent
-        diary_dir = base_dir / "assets" / "素材庫" / "第二章" / "T+0" / "日記内容"
-
-        filenames = [
-            "1.png",
-            "2.png",
-            "3.png",
-            "4.png",
-            "5.png",
-            "empty_diary.png",
-        ]
-        for fname in filenames:
-            path = diary_dir / fname
-            if path.exists():
-                try:
-                    self._diary_raw_images[fname] = pygame.image.load(str(path)).convert_alpha()
-                except Exception:
-                    self._diary_raw_images[fname] = None
-            else:
-                self._diary_raw_images[fname] = None
-
-    def _get_scaled_diary_surface(self, fname, max_size):
-        """依目標區域等比例縮放日記圖片，避免長寬壓縮變形。"""
-        raw = self._diary_raw_images.get(fname)
+    def _get_scaled_diary_surface(self, asset_path, max_size):
+        raw = self.game_ui.load_image(asset_path)
         if raw is None:
             return None
         orig_w, orig_h = raw.get_size()
@@ -2175,7 +2139,10 @@ class InteractionUI:
         mouse_pos
     ):
         """繪製雙頁翻頁版陪伴日記拖放謎題（沿用主程式槽位與判定）。"""
-        self._ensure_diary_images()
+        layout = self.game_ui.ui_layout["puzzle_layouts"]["diary_drag"]
+        spreads = self.puzzle_controller.diary_spreads
+        spread_index = self.puzzle_controller.diary_spread_index
+        spread = spreads[spread_index]
 
         overlay = pygame.Surface(
             screen.get_size(),
@@ -2184,7 +2151,7 @@ class InteractionUI:
         overlay.fill((20, 20, 25, 235))
         screen.blit(overlay, (0, 0))
 
-        width, height = screen.get_size()
+        width = screen.get_width()
 
         # 標題（不顯示頁數）
         title = self.game_ui.font_large.render(
@@ -2195,28 +2162,15 @@ class InteractionUI:
         screen.blit(
             title,
             title.get_rect(
-                center=(width // 2, self.game_ui.scale_y(screen, 42))
+                center=(width // 2, self.game_ui.scale_y(screen, layout["title_y"]))
             )
         )
 
-        # 畫面 0 -> 1.png (右半放 2.png / page_2)
-        # 畫面 1 -> 3.png (右半放 4.png / page_4)
-        # 畫面 2 -> empty_diary.png (左半放 5.png / page_5)
-        spread_configs = [
-            {"bg": "1.png",           "slot_id": "page_2", "side": "right"},
-            {"bg": "3.png",           "slot_id": "page_4", "side": "right"},
-            {"bg": "empty_diary.png", "slot_id": "page_5", "side": "left"},
-        ]
-        self.diary_spread_index = max(0, min(self.diary_spread_index, len(spread_configs) - 1))
-        current_cfg = spread_configs[self.diary_spread_index]
-        active_slot_id = current_cfg["slot_id"]
-
-        # 雙頁底圖區域
-        max_book_rect = self.game_ui.scale_rect(
-            screen,
-            {"x": 140, "y": 78, "width": 520, "height": 300}
+        active_slot_id = spread["slot_id"]
+        max_book_rect = self.game_ui.scale_rect(screen, layout["book_area"])
+        bg_surf = self._get_scaled_diary_surface(
+            spread["background_asset"], max_book_rect.size
         )
-        bg_surf = self._get_scaled_diary_surface(current_cfg["bg"], max_book_rect.size)
         if bg_surf is not None:
             book_rect = bg_surf.get_rect(center=max_book_rect.center)
             screen.blit(bg_surf, book_rect.topleft)
@@ -2226,7 +2180,7 @@ class InteractionUI:
 
         # 計算目前畫面的左半或右半感應區（無放置框線與提示文字）
         half_w = book_rect.width // 2
-        if current_cfg["side"] == "left":
+        if spread["side"] == "left":
             target_slot_rect = pygame.Rect(book_rect.left, book_rect.top, half_w, book_rect.height)
         else:
             target_slot_rect = pygame.Rect(book_rect.left + half_w, book_rect.top, book_rect.width - half_w, book_rect.height)
@@ -2236,33 +2190,23 @@ class InteractionUI:
         }
 
         # 左右翻頁按鈕 (< / >)
-        prev_rect = self.game_ui.scale_rect(screen, {"x": 82, "y": 203, "width": 42, "height": 50})
-        next_rect = self.game_ui.scale_rect(screen, {"x": 676, "y": 203, "width": 42, "height": 50})
+        prev_rect = self.game_ui.scale_rect(screen, layout["navigation"]["previous"])
+        next_rect = self.game_ui.scale_rect(screen, layout["navigation"]["next"])
         self.game_ui.draw_button(
             screen, "<", prev_rect,
             prev_rect.collidepoint(mouse_pos),
-            enabled=(self.diary_spread_index > 0)
+            enabled=(spread_index > 0)
         )
         self.game_ui.draw_button(
             screen, ">", next_rect,
             next_rect.collidepoint(mouse_pos),
-            enabled=(self.diary_spread_index < len(spread_configs) - 1)
+            enabled=(spread_index < len(spreads) - 1)
         )
         buttons["diary_prev_page"] = prev_rect
         buttons["diary_next_page"] = next_rect
 
         # 下方待選碎片列座標
-        page_to_file = {
-            "t0_diary_page_2": "2.png",
-            "t0_diary_page_4": "4.png",
-            "t0_diary_page_5": "5.png",
-        }
-        home_layout = {
-            "t0_diary_page_2": {"x": 180, "y": 405, "width": 85, "height": 95},
-            "t0_diary_page_4": {"x": 357, "y": 405, "width": 85, "height": 95},
-            "t0_diary_page_5": {"x": 535, "y": 405, "width": 85, "height": 95},
-        }
-
+        home_layout = layout["page_home_positions"]
         available_pages = self.puzzle_controller.get_available_diary_pages()
         drag_rects = {}
         placed_page_in_current_spread = self.puzzle_controller.diary_slots.get(active_slot_id)
@@ -2294,15 +2238,15 @@ class InteractionUI:
             if page_id == dragging_page:
                 continue
 
-            fname = page_to_file.get(page_id)
+            asset_path = self.objects.get(page_id, {}).get("ui_asset")
             if page_id == placed_page_in_current_spread:
-                piece_surf = self._get_scaled_diary_surface(fname, rect.size)
+                piece_surf = self._get_scaled_diary_surface(asset_path, rect.size)
                 if piece_surf is not None:
                     screen.blit(piece_surf, piece_surf.get_rect(center=rect.center))
             else:
                 pygame.draw.rect(screen, (45, 48, 56), rect, border_radius=6)
                 pygame.draw.rect(screen, (180, 185, 198), rect, width=2, border_radius=6)
-                thumb_surf = self._get_scaled_diary_surface(fname, (rect.width - 10, rect.height - 10))
+                thumb_surf = self._get_scaled_diary_surface(asset_path, (rect.width - 10, rect.height - 10))
                 if thumb_surf is not None:
                     screen.blit(thumb_surf, thumb_surf.get_rect(center=rect.center))
                 else:
@@ -2315,8 +2259,8 @@ class InteractionUI:
         # 拖曳中的碎片最後畫
         if dragging_page is not None and dragging_page in drag_rects:
             rect = drag_rects[dragging_page]
-            fname = page_to_file.get(dragging_page)
-            drag_surf = self._get_scaled_diary_surface(fname, target_slot_rect.size)
+            asset_path = self.objects.get(dragging_page, {}).get("ui_asset")
+            drag_surf = self._get_scaled_diary_surface(asset_path, target_slot_rect.size)
             if drag_surf is not None:
                 ghost = drag_surf.copy()
                 ghost.set_alpha(220)
@@ -2324,9 +2268,9 @@ class InteractionUI:
             buttons["diary_page:" + dragging_page] = rect
 
         # 右下角：確認、重設、退出按鈕
-        confirm_rect = self.game_ui.scale_rect(screen, {"x": 430, "y": 515, "width": 100, "height": 42})
-        reset_rect = self.game_ui.scale_rect(screen, {"x": 545, "y": 515, "width": 100, "height": 42})
-        exit_rect = self.game_ui.scale_rect(screen, {"x": 660, "y": 515, "width": 100, "height": 42})
+        confirm_rect = self.game_ui.scale_rect(screen, layout["buttons"]["confirm"])
+        reset_rect = self.game_ui.scale_rect(screen, layout["buttons"]["reset"])
+        exit_rect = self.game_ui.scale_rect(screen, layout["buttons"]["exit"])
 
         self.game_ui.draw_button(screen, "確認", confirm_rect, confirm_rect.collidepoint(mouse_pos))
         self.game_ui.draw_button(screen, "重設", reset_rect, reset_rect.collidepoint(mouse_pos))
@@ -2339,12 +2283,13 @@ class InteractionUI:
 
         message = (self.result or {}).get("message", "")
         if message:
+            message_layout = layout["message"]
             self.draw_multiline_text(
                 screen,
                 message,
-                self.game_ui.scale_x(screen, 80),
-                self.game_ui.scale_y(screen, 565),
-                self.game_ui.scale_x(screen, 620),
+                self.game_ui.scale_x(screen, message_layout["x"]),
+                self.game_ui.scale_y(screen, message_layout["y"]),
+                self.game_ui.scale_x(screen, message_layout["width"]),
                 font=self.game_ui.font_small
             )
 
@@ -2355,8 +2300,6 @@ class InteractionUI:
         self
     ):
         """詢問是否清空目前日記排列並離開。"""
-
-        self.puzzle_controller.diary_exit_confirmation = True
 
         self.mode = (
             "diary_exit_confirmation"

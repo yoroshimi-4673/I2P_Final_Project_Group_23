@@ -213,18 +213,21 @@
         "puzzle_id": "t0_child_safe"
     },
     "t0_diary_page_2": {
+        "ui_asset": "assets/素材庫/第二章/T+0/日記内容/2.png",
         "name": "日記第2頁",
         "type": "item",
         "description": "二月的日記頁。本月缺席：3次。",
         "collectable": true
     },
     "t0_diary_page_4": {
+        "ui_asset": "assets/素材庫/第二章/T+0/日記内容/4.png",
         "name": "日記第4頁",
         "type": "item",
         "description": "四月的日記頁。本月缺席：8次。",
         "collectable": true
     },
     "t0_diary_page_5": {
+        "ui_asset": "assets/素材庫/第二章/T+0/日記内容/5.png",
         "name": "日記第5頁",
         "type": "item",
         "description": "五月的日記頁。本月缺席：13次。",
