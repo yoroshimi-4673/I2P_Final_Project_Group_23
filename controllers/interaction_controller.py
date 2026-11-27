@@ -13,6 +13,10 @@ class InteractionController:
         self.story_manager = story_manager
         self.game = game
         self.puzzle_controller = puzzle_controller
+        self.item_notification_queue = []
+        self.item_notification_completion = None
+        self.item_notification_result = None
+        self.item_notification_object_id = None
 
         # 紀錄目前鍵盤焦點控制向ID
         self.focus_id = None
@@ -251,7 +255,13 @@ class InteractionController:
 
             return
 
-        if object_type != "puzzle":
+        puzzle_id = current_object.get("puzzle_id")
+        door_needs_puzzle = (
+            object_type == "door"
+            and puzzle_id is not None
+            and not self.game.is_puzzle_solved(puzzle_id)
+        )
+        if object_type != "puzzle" and not door_needs_puzzle:
 
             self.interaction_ui.open_object(
                 object_id
@@ -261,10 +271,6 @@ class InteractionController:
 
         self.interaction_ui.current_object_id = (
             object_id
-        )
-
-        puzzle_id = current_object.get(
-            "puzzle_id"
         )
 
         result = (
@@ -292,6 +298,8 @@ class InteractionController:
             self.interaction_ui.mode = (
                 "message"
             )
+
+        self.reset_interaction_focus()
 
     def open_anchor_age_verification(self):
         """共用自動開啟與重新查看年齡謎題入口。"""
@@ -333,11 +341,17 @@ class InteractionController:
                 self.puzzle_controller.reset_diary_drag_state()
 
 
-            completion = result.get(
-                "on_complete"
-            )
-
+            completion = result.get("on_complete")
+            notifications = self.get_new_item_notifications(result.get("rewards", []))
             self.puzzle_controller.close_puzzle()
+
+            if notifications:
+                self.item_notification_queue = notifications
+                self.item_notification_completion = completion
+                self.item_notification_result = result
+                self.item_notification_object_id = self.interaction_ui.current_object_id
+                self.show_next_item_notification()
+                return result
 
             if completion is not None:
 
@@ -357,6 +371,37 @@ class InteractionController:
 
         return result
 
+    def get_new_item_notifications(self, rewards):
+        return [
+            reward["result"]
+            for reward in rewards
+            if reward.get("type") == "item"
+            and (reward.get("result") or {}).get("status") == "item_found"
+        ]
+
+    def show_next_item_notification(self):
+        if self.item_notification_queue:
+            notification = self.item_notification_queue.pop(0)
+            self.interaction_ui.notification = notification
+            self.interaction_ui.current_object_id = notification["item_id"]
+            self.interaction_ui.mode = "item_notification"
+            self.reset_interaction_focus()
+            return
+
+        completion = self.item_notification_completion
+        self.interaction_ui.result = self.item_notification_result
+        self.interaction_ui.current_object_id = self.item_notification_object_id
+        self.interaction_ui.notification = None
+        self.item_notification_completion = None
+        self.item_notification_result = None
+        self.item_notification_object_id = None
+        self.reset_interaction_focus()
+
+        if completion is not None:
+            self.handle_puzzle_completion(completion)
+        else:
+            self.interaction_ui.mode = "message"
+
     def handle_puzzle_completion(
         self,
         completion
@@ -366,6 +411,11 @@ class InteractionController:
         action_type = completion.get(
             "type"
         )
+
+        if action_type == "return_to_space":
+            self.interaction_ui.close()
+            self.reset_interaction_focus()
+            return
 
         if action_type == "open_photo":
 
@@ -703,6 +753,12 @@ class InteractionController:
 
         # Escape統一處理返回或關閉互動視窗
         if event.key == pygame.K_ESCAPE:
+
+            if (
+                self.interaction_ui.mode == "item_notification"
+                and self.item_notification_result is not None
+            ):
+                return
 
             if self.interaction_ui.mode == "diary_drag":
                 self.interaction_ui.open_diary_exit_confirmation()
@@ -1264,7 +1320,10 @@ class InteractionController:
                 mouse_pos
             ):
 
-                self.interaction_ui.go_back()
+                if self.item_notification_result is not None:
+                    self.show_next_item_notification()
+                else:
+                    self.interaction_ui.go_back()
 
         # ========================================================
         # Message

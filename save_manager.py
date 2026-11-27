@@ -229,6 +229,10 @@ def load_game(
         []
     )  # 恢復已經發生的重要劇情事件紀錄
 
+    # 舊存檔可能只有解謎紀錄，出口門現在也需要完成事件。
+    if game.is_puzzle_solved("chapter1_password"):
+        game.complete_event("chapter1_password_solved")
+
     game.chapter = save_data.get(
         "chapter",
         0
