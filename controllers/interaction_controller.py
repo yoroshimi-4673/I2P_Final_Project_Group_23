@@ -1,6 +1,6 @@
 """負責interaction的鍵盤焦點與輸入處理"""
 import pygame
-from game_states import SPACE
+from game_states import DIALOGUE, SPACE
 from managers.interaction_manager import (
     search_object,
     collect_item
@@ -303,6 +303,17 @@ class InteractionController:
                 "message"
             )
 
+        self.reset_interaction_focus()
+
+    def show_dialogue_item_notification(self, display_id):
+        """沿用道具通知顯示劇情中的物品變化。"""
+        item = self.interaction_ui.objects[display_id]
+        self.interaction_ui.notification = {
+            "item_id": display_id,
+            "name": item["name"],
+            "display_description": item["description"],  # 只顯示資料，不再發放道具
+        }
+        self.interaction_ui.mode = "item_notification"
         self.reset_interaction_focus()
 
     def open_t7_circuit(self):
@@ -876,7 +887,8 @@ class InteractionController:
             if (
                 self.interaction_ui.mode == "item_notification"
                 and (
-                    self.puzzle_completion_stage in ("before_completion", "notifications")
+                    self.game.game_state == DIALOGUE
+                    or self.puzzle_completion_stage in ("before_completion", "notifications")
                     or self.pending_post_interaction_dialogue is not None
                 )
             ) or (

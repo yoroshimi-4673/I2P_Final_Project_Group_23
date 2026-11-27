@@ -2033,10 +2033,11 @@ class InteractionUI:
     ):
         """繪製新物品取得通知。"""
 
+        description = self.notification.get("display_description")
         modal = self.draw_modal_base(
             screen,
-            width=380,
-            height=340
+            width=460 if description else 380,
+            height=420 if description else 340
         )
 
         title = self.game_ui.font_large.render(
@@ -2081,6 +2082,12 @@ class InteractionUI:
                 )
             )
         )
+
+        if description:
+            self.draw_multiline_text(
+                screen, description, modal.x + 30, modal.y + 255,
+                modal.width - 60, font=self.game_ui.font_small,
+            )
 
         ok_rect = pygame.Rect(
             modal.centerx - 55,

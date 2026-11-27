@@ -1137,6 +1137,10 @@ class GameUI:
     # Hotbar
     # ========================================================
 
+    def get_hotbar_max_offset(self, game):
+        visible_slots = self.ui_layout["hotbar"].get("visible_slots", 5)
+        return max(0, len(game.inventory) - visible_slots)
+
     def get_visible_inventory(
         self,
         game,
@@ -1155,6 +1159,7 @@ class GameUI:
             5
         )
 
+        hotbar_offset = max(0, min(hotbar_offset, self.get_hotbar_max_offset(game)))
         return inventory_display[
             hotbar_offset:
             hotbar_offset + visible_slots
@@ -1230,6 +1235,8 @@ class GameUI:
 
         arrow_left = None
         arrow_right = None
+        last_offset = self.get_hotbar_max_offset(game)
+        hotbar_offset = max(0, min(hotbar_offset, last_offset))
 
         if show_arrows:
 
@@ -1247,6 +1254,7 @@ class GameUI:
                 arrow_left.collidepoint(
                     mouse_pos
                 ),
+                enabled=hotbar_offset > 0,
                 bg_color=(55, 55, 65)
             )
 
@@ -1372,6 +1380,7 @@ class GameUI:
                 arrow_right.collidepoint(
                     mouse_pos
                 ),
+                enabled=hotbar_offset < last_offset,
                 bg_color=(55, 55, 65)
             )
 
