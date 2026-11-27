@@ -191,7 +191,7 @@ class T3RoomTests(unittest.TestCase):
         furniture_bodies = {
             "desk_body": (138, 237, 109, 69),
             "safe_body": (300, 209, 69, 50),
-            "bed_body": (405, 224, 82, 80),
+            "bed_body": (407, 205, 79, 113),
             "bedside_table_body": (510, 221, 55, 76),
             "wardrobe_body": (604, 157, 95, 132),
         }
@@ -217,13 +217,13 @@ class T3RoomTests(unittest.TestCase):
             )
             gui.draw_space(surface, self.f.game, (0, 0))
         npc = room["decorations"]["young_li_nian"]
-        self.assertEqual((npc["x"], npc["y"], npc["width"], npc["height"]), (120, 215, 55, 75))
+        self.assertEqual((npc["x"], npc["y"], npc["width"], npc["height"]), (445, 253, 83, 113))
         sheet = gui.load_image(npc["asset"])
-        self.assertEqual(sheet.get_size(), (64, 51))
-        key = ("decoration_frame", npc["asset"], 4, 3, 0, 0)
+        self.assertEqual(sheet.get_size(), (1252, 1120))
+        key = ("decoration_frame", npc["asset"], 4, 4, 0, 0)
         frame = gui.image_cache[key]
-        self.assertEqual(frame.get_size(), (16, 17))
-        expected = sheet.subsurface(pygame.Rect(0, 0, 16, 17))
+        self.assertEqual(frame.get_size(), (313, 280))
+        expected = sheet.subsurface(pygame.Rect(0, 0, 313, 280))
         self.assertEqual(pygame.image.tobytes(frame, "RGBA"), pygame.image.tobytes(expected, "RGBA"))
         self.assertIs(frame, gui.image_cache[key])
         for obj in room["objects"].values():
