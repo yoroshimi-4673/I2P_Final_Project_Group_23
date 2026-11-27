@@ -852,6 +852,56 @@ class GameUI:
     # Space HUD
     # ========================================================
 
+    def get_current_tutorial_text(self, game):
+        """依序回傳目前階段的新手教學文字（共 4 步）；全部完成則回傳 None。"""
+        if game.current_space not in ("A", "B", "C"):
+            return None
+
+        if not game.has_event("tutorial_move_done"):
+            return "【操作提示 1/4】\n使用 WASD 鍵或點擊地板移動"
+
+        if not game.has_event("tutorial_interact_done"):
+            return "【操作提示 2/4】\n靠近物件時，按 [E] 鍵進行調查"
+
+        if len(game.inventory) > 0 and not game.has_event("tutorial_hotbar_done"):
+            return "【操作提示 3/4】\n點擊下方道具欄或按 Enter 鍵\n檢視物品"
+
+        if game.has_event("tutorial_hotbar_done") and not game.has_event("tutorial_codex_done"):
+            return "【操作提示 4/4】\n點擊左上角「設定」開啟「圖鑑」\n查看已收集的物品"
+
+        return None
+
+    def draw_tutorial_hint(self, screen, game):
+        """在右上角繪製半透明連貫新手教學框。"""
+        hint_text = self.get_current_tutorial_text(game)
+        if not hint_text:
+            return
+
+        lines = hint_text.split("\n")
+        layout = dict(self.ui_layout.get("hud", {}).get(
+            "tutorial_box",
+            {"x": 530, "y": 20, "width": 250, "height": 76}
+        ))
+        layout["height"] = max(layout.get("height", 76), 24 + len(lines) * 24)
+        box_rect = self.scale_rect(screen, layout)
+
+        panel = pygame.Surface(box_rect.size, pygame.SRCALPHA)
+        panel.fill((18, 22, 30, 205))
+        screen.blit(panel, box_rect.topleft)
+        pygame.draw.rect(screen, (140, 175, 220), box_rect, width=2, border_radius=8)
+
+        padding_x = self.scale_x(screen, 12)
+        padding_y = self.scale_y(screen, 10)
+        line_gap = self.scale_y(screen, 24)
+
+        for idx, line in enumerate(lines):
+            color = (255, 225, 130) if idx == 0 else (240, 244, 250)
+            text_surf = self.font_small.render(line, True, color)
+            screen.blit(
+                text_surf,
+                (box_rect.left + padding_x, box_rect.top + padding_y + idx * line_gap)
+            )
+
     def draw_space_hud(
         self,
         screen,
@@ -958,7 +1008,7 @@ class GameUI:
                     y
                 )
             )
-
+        self.draw_tutorial_hint(screen, game)    
 
     # ========================================================
     # Exploration
@@ -1630,7 +1680,21 @@ class GameUI:
                 mouse_pos
             )
         )
+        buttons["tutorial"] = pygame.Rect(
+            modal_rect.x + 35,
+            modal_rect.y + 240,
+            130,
+            36
+        )
 
+        self.draw_button(
+            screen,
+            "新手教學",
+            buttons["tutorial"],
+            buttons["tutorial"].collidepoint(
+                mouse_pos
+            )
+        )
         buttons["save"] = pygame.Rect(
             modal_rect.x + 35,
             modal_rect.y + 295,
@@ -1697,7 +1761,92 @@ class GameUI:
 
         return buttons
 
+    # ========================================================
+    # Tutorial Guide Modal（從系統設定點開的操作總覽）
+    # ========================================================
 
+    def draw_tutorial_guide_overlay(
+        self,
+        screen,
+        mouse_pos
+    ):
+        """繪製完整操作步驟的新手教學總覽視窗。"""
+
+        screen_width, screen_height = screen.get_size()
+
+        overlay = pygame.Surface(
+            (screen_width, screen_height),
+            pygame.SRCALPHA
+        )
+        overlay.fill((0, 0, 0, 185))
+        screen.blit(overlay, (0, 0))
+
+        modal_width = min(520, screen_width - 50)
+        modal_height = min(410, screen_height - 50)
+        modal_rect = pygame.Rect(
+            (screen_width - modal_width) // 2,
+            (screen_height - modal_height) // 2,
+            modal_width,
+            modal_height
+        )
+
+        pygame.draw.rect(
+            screen,
+            (38, 42, 56),
+            modal_rect,
+            border_radius=12
+        )
+        pygame.draw.rect(
+            screen,
+            (225, 225, 235),
+            modal_rect,
+            width=2,
+            border_radius=12
+        )
+
+        title_surface = self.font_large.render(
+            "新手教學・操作說明",
+            True,
+            (255, 220, 130)
+        )
+        screen.blit(
+            title_surface,
+            title_surface.get_rect(
+                center=(modal_rect.centerx, modal_rect.y + 36)
+            )
+        )
+
+        steps = [
+            ("1. 角色移動", "使用 WASD 鍵，或直接點擊地板移動"),
+            ("2. 調查物件", "靠近可互動物件時，按 [E] 鍵進行調查"),
+            ("3. 檢視道具", "點擊下方道具欄（或按數字鍵 / Enter）查看物品"),
+            ("4. 圖鑑紀錄", "於設定開啟圖鑑，點擊物品卡查看詳情、ESC 返回"),
+        ]
+
+        y = modal_rect.y + 78
+        for step_title, step_desc in steps:
+            t_surf = self.font_ui.render(step_title, True, (150, 205, 255))
+            d_surf = self.font_small.render(step_desc, True, (235, 238, 245))
+            screen.blit(t_surf, (modal_rect.x + 36, y))
+            screen.blit(d_surf, (modal_rect.x + 54, y + 26))
+            y += 62
+
+        close_rect = pygame.Rect(
+            modal_rect.centerx - 70,
+            modal_rect.bottom - 54,
+            140,
+            38
+        )
+        self.draw_button(
+            screen,
+            "我知道了",
+            close_rect,
+            close_rect.collidepoint(mouse_pos),
+            bg_color=(70, 110, 155)
+        )
+
+        return {"close": close_rect}
+    
     # ========================================================
     # Codex 暫時畫面
     # ========================================================
